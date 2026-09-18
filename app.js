@@ -1,4 +1,4 @@
-const SUPABASE_URL = "https://defense-enclave-society1.developerroute2016.workers.dev/";
+const SUPABASE_URL = "https://gujtekpteezejmtaxtcj.supabase.co/rest/v1/";
 const SUPABASE_KEY = "sb_publishable_KvdsKcUr_vuvPrg7xU11Ww_q1H7vhg1";
 
 const supabaseClient = window.supabase.createClient(
