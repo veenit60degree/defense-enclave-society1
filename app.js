@@ -1,3 +1,4 @@
+/* Defense Enclave Admin Login Fix: 2026-09-19 */
 //const CONFIG={SUPABASE_URL:'https://gujtekpteezejmtaxtcj.supabase.co',SUPABASE_ANON_KEY:'sb_publishable_KvdsKcUr_vuvPrg7xU11Ww_q1H7vhg1'};
 
 const SUPABASE_URL = "https://gujtekpteezejmtaxtcj.supabase.co/rest/v1/";   //https://gujtekpteezejmtaxtcj.supabase.co
@@ -47,12 +48,59 @@ async function login(){
     if(!sb)return toast('Supabase is not configured yet');
     const {data,error}=await sb.auth.signInWithPassword({email,password});
     if(error)return toast(error.message);
-    const result=await sb.from('profiles').select('*').eq('id',data.user.id).maybeSingle();
-    if(result.error)console.error('Profile loading error:',result.error);
-    const profile=result.data;
+    const result = await sb
+        .from('profiles')
+        .select('*')
+        .eq('id', data.user.id)
+        .maybeSingle();
+
+    if (result.error) {
+        console.error('Profile loading error:', result.error);
+        await sb.auth.signOut();
+        return toast('Unable to load your profile. Please contact the society administrator.');
+    }
+
+    const profile = result.data;
+
+    if (!profile) {
+        console.error('Profile not found for user:', data.user.id);
+        await sb.auth.signOut();
+        return toast('Profile not found. Please contact the society administrator.');
+    }
+
+    if (!profile.role) {
+        console.error('User role is missing:', profile);
+        await sb.auth.signOut();
+        return toast('User role is not configured.');
+    }
+
+    const user = {
+        ...data.user,
+        name: profile.full_name ||
+              data.user.user_metadata?.full_name ||
+              data.user.email?.split('@')[0] ||
+              'Member',
+        email: data.user.email || '',
+        phone: profile.phone || '',
+        house_no: profile.house_number || profile.house_no || '',
+        address: profile.address || '',
+        role: String(profile.role).toLowerCase().trim()
+    };
+
+    console.log('LOGIN PROFILE:', profile);
+    console.log('LOGIN ROLE:', user.role);
+
     authModal.classList.add('hidden');
-    const user={...data.user,name:profile?.full_name||data.user.user_metadata?.full_name||data.user.email?.split('@')[0]||'Member',email:data.user.email||'',phone:profile?.phone||'',house_no:profile?.house_number||profile?.house_no||'',address:profile?.address||'',role:profile?.role||'member'};
-    if(user.role==='admin') openAdminDashboard(user); else openMemberDashboard(user);
+
+    if (user.role === 'admin') {
+        console.log('Opening ADMIN dashboard');
+        window.__adminUser = user;
+        openAdminDashboard(user);
+    } else {
+        console.log('Opening MEMBER dashboard');
+        openMemberDashboard(user);
+    }
+
     toast('Login successful');
 }
 async function register(){
