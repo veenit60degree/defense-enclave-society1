@@ -97,6 +97,84 @@ function openAdminDashboard(user){
  document.getElementById('adminLogout').onclick=async()=>{if(sb) await sb.auth.signOut();app.classList.add('hidden');document.getElementById('public').classList.remove('hidden');toast('Logged out')};
  adminPage('dashboard',user);
 }
+
+/* ============================================================
+   PERSISTENT LOGIN SESSION RESTORATION
+   Added without removing existing Admin/Member methods.
+   ============================================================ */
+async function restoreLoginSession(){
+    if(!sb || !sb.auth) return;
+
+    try{
+        const {data,error}=await sb.auth.getSession();
+
+        if(error){
+            console.error("Session restore error:",error);
+            return;
+        }
+
+        const authUser=data?.session?.user;
+        if(!authUser) return;
+
+        const {data:profile,error:profileError}=await sb
+            .from("profiles")
+            .select("*")
+            .eq("id",authUser.id)
+            .maybeSingle();
+
+        if(profileError){
+            console.error("Profile restore error:",profileError);
+            return;
+        }
+
+        if(!profile){
+            console.error("Profile not found for:",authUser.id);
+            return;
+        }
+
+        const user={
+            ...authUser,
+            name:profile.full_name ||
+                 authUser.user_metadata?.full_name ||
+                 authUser.email?.split("@")[0] || "Member",
+            email:authUser.email || "",
+            phone:profile.phone || "",
+            house_no:profile.house_number || profile.house_no || "",
+            address:profile.address || "",
+            role:(profile.role || "member").toLowerCase()
+        };
+
+        window.__adminUser=user;
+
+        document.getElementById("authModal")?.classList.add("hidden");
+        document.getElementById("authOverlay")?.classList.add("hidden");
+
+        if(user.role==="admin"){
+            await openAdminDashboard(user);
+        }else{
+            await openMemberDashboard(user);
+        }
+
+        console.log("Session restored:",user.email,user.role);
+    }catch(error){
+        console.error("Session restoration failed:",error);
+    }
+}
+
+setTimeout(()=>restoreLoginSession(),100);
+
+if(sb && sb.auth){
+    sb.auth.onAuthStateChange((event,session)=>{
+        console.log("Supabase auth event:",event);
+
+        if(event==="SIGNED_OUT"){
+            window.__adminUser=null;
+            document.getElementById("memberApp")?.classList.add("hidden");
+            document.getElementById("public")?.classList.remove("hidden");
+        }
+    });
+}
+
 function initials(n){return (n||'Admin').split(' ').map(x=>x[0]).slice(0,2).join('').toUpperCase()}
 
 async function saveFinance(){
@@ -125,7 +203,7 @@ async function saveFinance(){
     }
 
     toast('Finance saved successfully.');
-    await adminPage('finance', window.__adminUser);
+    adminPage('finance', window.__adminUser);
 }
 
 function adminAddMaintenance(){
@@ -286,17 +364,12 @@ function adminUploadMap(){
     toast('Map selected: '+file.name);
 }
 
-async function adminPage(p,user){
+function adminPage(p,user){
  const c=document.getElementById('adminContent'),t=document.getElementById('adminTitle');
  document.querySelectorAll('#memberApp .nav-item').forEach(b=>b.classList.toggle('active',b.dataset.a===p));
  const titles={dashboard:'Admin Dashboard',finance:'Society Finance',maintenance:'Active Maintenance',work:'Society Work',events:'Events',gallery:'Photo Gallery',members:'Members',complaints:'Complaints',map:'Society Map'}; t.textContent=titles[p]||'Admin Dashboard';
  if(p==='dashboard') c.innerHTML=`<div class="hero"><div><div class="eyebrow">ADMINISTRATION</div><h2>Welcome, ${user.name}</h2><div class="muted">Manage Defense Enclave Society information from one place.</div></div></div><div class="stats"><div class="stat"><div class="stat-head">Society Fund<span>●</span></div><div class="value">₹18,42,500</div><div class="trend">Manage in Finance</div></div><div class="stat"><div class="stat-head">Total Expenses<span>●</span></div><div class="value">₹6,84,250</div><div class="trend">Manage expenses</div></div><div class="stat"><div class="stat-head">Active Maintenance<span>●</span></div><div class="value">₹2,48,000</div><div class="trend">Manage maintenance</div></div><div class="stat"><div class="stat-head">Pending Tasks<span>●</span></div><div class="value">17</div><div class="trend">Review society work</div></div></div><div class="grid-2-equal"><div class="panel"><h3>Management</h3><div class="activity"><div class="activity-item"><div class="activity-icon">₹</div><div><strong>Society Finance</strong><p>Update fund, expenses and maintenance.</p></div></div><div class="activity-item"><div class="activity-icon">♙</div><div><strong>Members</strong><p>Add, edit and manage society members.</p></div></div><div class="activity-item"><div class="activity-icon">▧</div><div><strong>Gallery</strong><p>Manage photo categories and uploads.</p></div></div></div></div><div class="panel"><h3>Quick actions</h3><div class="form-grid"><button class="primary-btn" onclick="adminPage('finance',window.__adminUser)">Manage Finance</button><button class="primary-btn" onclick="adminPage('members',window.__adminUser)">Manage Members</button><button class="primary-btn" onclick="adminPage('events',window.__adminUser)">Manage Events</button><button class="primary-btn" onclick="adminPage('gallery',window.__adminUser)">Manage Gallery</button></div></div></div>`;
- else if(p==='finance'){
-   const {data:f,error:financeError}=await sb.from('society_finance').select('*').eq('id',1).maybeSingle();
-   if(financeError){console.error(financeError);return toast('Finance load failed: '+financeError.message)}
-   const v=f||{society_fund:1842500,total_expenses:684250,active_maintenance:248000,pending_tasks:17};
-   c.innerHTML=`<div class="hero"><div><h2>Society Finance</h2><div class="muted">Values are loaded from Supabase.</div></div></div><div class="panel"><div class="form-grid"><label>Society Fund<input id="adminFund" type="number" min="0" value="${Number(v.society_fund)||0}"></label><label>Total Expenses<input id="adminExpenses" type="number" min="0" value="${Number(v.total_expenses)||0}"></label><label>Active Maintenance<input id="adminMaintenance" type="number" min="0" value="${Number(v.active_maintenance)||0}"></label><label>Pending Tasks<input id="adminPending" type="number" min="0" value="${Number(v.pending_tasks)||0}"></label></div><div style="margin-top:16px"><button class="primary-btn" onclick="saveFinance()">Save Finance</button></div></div>`;
-}
+ else if(p==='finance') c.innerHTML=`<div class="hero"><div><h2>Society Finance</h2><div class="muted">Update the values displayed to members.</div></div></div><div class="panel"><div class="form-grid"><label>Society Fund<input id="adminFund" type="number" min="0" value="1842500"></label><label>Total Expenses<input id="adminExpenses" type="number" min="0" value="684250"></label><label>Active Maintenance<input id="adminMaintenance" type="number" min="0" value="248000"></label><label>Pending Tasks<input id="adminPending" type="number" min="0" value="17"></label></div><div style="margin-top:16px"><button class="primary-btn" onclick="saveFinance()">Save Finance</button></div></div>`;
  else if(p==='maintenance'){
  window.__maintenance=window.__maintenance||[{item:'Street Light Repair',amount:45000,status:'Active'},{item:'Park Maintenance',amount:80000,status:'Active'}];
  c.innerHTML=`<div class="hero"><div><h2>Active Maintenance</h2><div class="muted">Manage active maintenance expenses.</div></div><button class="primary-btn" onclick="adminAddMaintenance()">+ Add Maintenance</button></div><div class="panel"><table class="table"><thead><tr><th>Item</th><th>Amount</th><th>Status</th><th>Action</th></tr></thead><tbody>${window.__maintenance.map((m,i)=>`<tr><td>${m.item}</td><td>₹${Number(m.amount).toLocaleString('en-IN')}</td><td><span class="status ongoing">${m.status}</span></td><td><button class="outline-btn" onclick="adminEditMaintenance(${i})">Edit</button> <button class="outline-btn" onclick="adminDeleteMaintenance(${i})">Delete</button></td></tr>`).join('')}</tbody></table></div>`;
