@@ -36,10 +36,46 @@ if (
     );
 }
 
-const demo={members:[['RS','Raj Sharma','A-101'],['PK','Priya Kapoor','A-102'],['MG','Manoj Gupta','A-103'],['AJ','Alex Johnson','A-104'],['SK','Sonia Kaur','B-201'],['VS','Vikas Singh','B-202'],['AM','Anita Mehta','B-203'],['NK','Nitin Kumar','C-301'],['PS','Pooja Sethi','C-302']],works:[['Main Gate Repair','Repair and repaint main entrance gate','Ongoing',72,'12 Sep 2026'],['Street Light Upgrade','Replace 18 old lights with LED fixtures','Ongoing',45,'18 Sep 2026'],['Park Renovation','Benches, pathway and plantation work','Pending',0,'25 Sep 2026'],['Water Tank Cleaning','Annual cleaning and inspection','Completed',100,'05 Sep 2026']],events:[['20 Sep 2026','Monthly General Meeting','Community Hall · 6:00 PM','◷'],['02 Oct 2026','Cleanliness Drive','Main Park · 7:00 AM','♧'],['18 Oct 2026','Family Sports Day','Society Ground · 4:00 PM','★']],gallery:['Society Meeting','Independence Day','Park Activity','Festival Evening','Cleanliness Drive','Community Gathering']};
+const demo={members:[['RS','Raj Sharma','A-101'],['PK','Priya Kapoor','A-102'],['MG','Manoj Gupta','A-103'],['AJ','Alex Johnson','A-104'],['SK','Sonia Kaur','B-201'],['VS','Vikas Singh','B-202'],['AM','Anita Mehta','B-203'],['NK','Nitin Kumar','C-301'],['PS','Pooja Sethi','C-302']],works:[['Main Gate Repair','Repair and repaint main entrance gate','Ongoing',72,'12 Sep 2026'],['Street Light Upgrade','Replace 18 old lights with LED fixtures','Ongoing',45,'18 Sep 2026'],['Park Renovation','Benches, pathway and plantation work','Pending',0,'25 Sep 2026'],['Water Tank Cleaning','Annual cleaning and inspection','Completed',100,'05 Sep 2026']],events:[['20 Sep 2026','Monthly General Meeting','Community Hall · 6:00 PM','◷'],['02 Oct 2026','Cleanliness Drive','Main Park · 7:00 AM','♧'],['18 Oct 2026','Family Sports Day','Society Ground · 4:00 PM','★']],gallery:['Society Meeting','Park Activity','Festival Evening','Cleanliness Drive','Community Gathering']};
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)}
-function renderPublic(){document.getElementById('publicStats').innerHTML=[['Society Fund','₹18,42,500','Current balance'],['Total Expenses','₹6,84,250','This year'],['Active Maintenance','₹2,48,000','12 active items'],['Pending Tasks','17','Needs attention']].map(x=>`<div class="stat"><div class="stat-head">${x[0]}<span>●</span></div><div class="value">${x[1]}</div><div class="trend">${x[2]}</div></div>`).join('');document.getElementById('memberGrid').innerHTML=demo.members.map(p=>`<div class="member-card"><div class="member-photo">${p[0]}</div><div><strong>${p[1]}</strong><div class="muted">House ${p[2]}</div><span class="status ongoing" style="margin-top:6px">Active Member</span></div></div>`).join('');document.getElementById('workTable').innerHTML=`<thead><tr><th>Project</th><th>Description</th><th>Status</th><th>Progress</th><th>Target</th></tr></thead><tbody>${demo.works.map(w=>`<tr><td><strong>${w[0]}</strong></td><td>${w[1]}</td><td><span class="status ${w[2].toLowerCase()}">${w[2]}</span></td><td><div class="progress"><i style="width:${w[3]}%"></i></div>${w[3]}%</td><td>${w[4]}</td></tr>`).join('')}</tbody>`;document.getElementById('eventGrid').innerHTML=demo.events.map(e=>`<div class="card"><div class="photo">${e[3]}</div><div class="card-body"><div class="event-date">${e[0]}</div><h3>${e[1]}</h3><div class="muted">${e[2]}</div></div></div>`).join('');document.getElementById('galleryGrid').innerHTML=demo.gallery.map((g,i)=>`<div class="card"><div class="photo">${['◉','★','♧','✦','✓','◎'][i]}</div><div class="card-body"><strong>${g}</strong><div class="muted" style="margin-top:5px">${10+i*3} photos</div></div></div>`).join('')}
-renderPublic();
+async function renderPublic(){
+    let finance={
+        society_fund:1842500,
+        total_expenses:684250,
+        active_maintenance:248000,
+        pending_tasks:17
+    };
+
+    if(sb){
+        try{
+            const {data,error}=await sb.from('society_finance')
+                .select('society_fund,total_expenses,active_maintenance,pending_tasks')
+                .eq('id',1)
+                .maybeSingle();
+
+            if(error) console.error('Public finance load error:',error);
+            if(data) finance=data;
+        }catch(e){
+            console.error('Public finance load exception:',e);
+        }
+    }
+
+    document.getElementById('publicStats').innerHTML=[
+        ['Society Fund',`₹${Number(finance.society_fund||0).toLocaleString('en-IN')}`,'Current balance'],
+        ['Total Expenses',`₹${Number(finance.total_expenses||0).toLocaleString('en-IN')}`,'This year'],
+        ['Active Maintenance',`₹${Number(finance.active_maintenance||0).toLocaleString('en-IN')}`,'Active maintenance'],
+        ['Pending Tasks',String(Number(finance.pending_tasks||0)),'Needs attention']
+    ].map(x=>`<div class="stat"><div class="stat-head">${x[0]}<span>●</span></div><div class="value">${x[1]}</div><div class="trend">${x[2]}</div></div>`).join('');
+
+    document.getElementById('memberGrid').innerHTML=demo.members.map(p=>`<div class="member-card"><div class="member-photo">${p[0]}</div><div><strong>${p[1]}</strong><div class="muted">House ${p[2]}</div><span class="status ongoing" style="margin-top:6px">Active Member</span></div></div>`).join('');
+
+    document.getElementById('workTable').innerHTML=`<thead><tr><th>Project</th><th>Description</th><th>Status</th><th>Progress</th><th>Target</th></tr></thead><tbody>${demo.works.map(w=>`<tr><td><strong>${w[0]}</strong></td><td>${w[1]}</td><td><span class="status ${w[2].toLowerCase()}">${w[2]}</span></td><td><div class="progress"><i style="width:${w[3]}%"></i></div>${w[3]}%</td><td>${w[4]}</td></tr>`).join('')}</tbody>`;
+
+    document.getElementById('eventGrid').innerHTML=demo.events.map(e=>`<div class="card"><div class="photo">${e[3]}</div><div class="card-body"><div class="event-date">${e[0]}</div><h3>${e[1]}</h3><div class="muted">${e[2]}</div></div></div>`).join('');
+
+    document.getElementById('galleryGrid').innerHTML=demo.gallery.map((g,i)=>`<div class="card"><div class="photo">${['◉','★','♧','✦','✓','◎'][i%6]}</div><div class="card-body"><strong>${g}</strong><div class="muted" style="margin-top:5px">Gallery folder</div></div></div>`).join('');
+}
+renderPublic().catch(e=>console.error('Initial public render:',e));
 const authModal=document.getElementById('authModal');const showLogin=()=>{document.getElementById('authHeading').textContent='Member Login';document.getElementById('authLogin').classList.remove('hidden');document.getElementById('authRegister').classList.add('hidden');authModal.classList.remove('hidden')};const showReg=()=>{document.getElementById('authHeading').textContent='Create Member Account';document.getElementById('authLogin').classList.add('hidden');document.getElementById('authRegister').classList.remove('hidden');authModal.classList.remove('hidden')};document.getElementById('openLogin').onclick=showLogin;document.getElementById('openRegister').onclick=showReg;document.getElementById('authClose').onclick=()=>authModal.classList.add('hidden');document.getElementById('switchRegister').onclick=showReg;document.getElementById('switchLogin').onclick=showLogin;
 async function login(){
     const email=document.getElementById('loginEmail').value.trim();
@@ -95,45 +131,38 @@ function openAdminDashboard(user){
  <main class="main"><header class="topbar"><div><div class="eyebrow">DEFENSE ENCLAVE SOCIETY</div><h1 id="adminTitle">Admin Dashboard</h1></div><div class="top-actions"><span class="status ongoing">ADMIN</span><div class="avatar">${initials(user.name)}</div></div></header><section id="adminContent" class="content"></section></main>`;
  const nav=app.querySelector('nav'); nav.onclick=e=>{const b=e.target.closest('.nav-item');if(!b)return;adminPage(b.dataset.a,user)};
  document.getElementById('adminLogout').onclick=async()=>{if(sb) await sb.auth.signOut();app.classList.add('hidden');document.getElementById('public').classList.remove('hidden');toast('Logged out')};
- adminPage('dashboard',user).catch(e=>console.error('Admin page load:',e));
+ adminPage('dashboard',user);
 }
 function initials(n){return (n||'Admin').split(' ').map(x=>x[0]).slice(0,2).join('').toUpperCase()}
 
 async function saveFinance(){
     if(!sb) return toast('Supabase is not configured.');
 
-    const fund=Number(document.getElementById('adminFund')?.value);
-    const expenses=Number(document.getElementById('adminExpenses')?.value);
-    const maintenance=Number(document.getElementById('adminMaintenance')?.value);
-    const pending=Number(document.getElementById('adminPending')?.value);
+    const fund = Number(document.getElementById('adminFund')?.value || 0);
+    const expenses = Number(document.getElementById('adminExpenses')?.value || 0);
+    const maintenance = Number(document.getElementById('adminMaintenance')?.value || 0);
+    const pending = Number(document.getElementById('adminPending')?.value || 0);
 
-    if([fund,expenses,maintenance,pending].some(v=>!Number.isFinite(v)||v<0))
+    if([fund,expenses,maintenance,pending].some(v => !Number.isFinite(v) || v < 0))
         return toast('Please enter valid finance values.');
 
-    const payload={
-        id:1,
-        society_fund:fund,
-        total_expenses:expenses,
-        active_maintenance:maintenance,
-        pending_tasks:Math.floor(pending),
-        updated_at:new Date().toISOString()
-    };
-
-    const {data,error}=await sb.from('society_finance')
-        .upsert(payload,{onConflict:'id'})
-        .select()
-        .single();
+    const {error} = await sb.from('society_finance').upsert({
+        id: 1,
+        society_fund: fund,
+        total_expenses: expenses,
+        active_maintenance: maintenance,
+        pending_tasks: Math.floor(pending),
+        updated_at: new Date().toISOString()
+    }, {onConflict:'id'});
 
     if(error){
-        console.error('Finance save error:',error);
-        return toast('Finance save failed: '+error.message);
+        console.error('Finance save error:', error);
+        return toast('Finance save failed: ' + error.message);
     }
 
-    window.__societyFinance=data||payload;
     toast('Finance saved successfully.');
-
-    // Re-read from Supabase and render the actual saved values.
-    await adminPage('finance',window.__adminUser);
+    await adminPage('finance', window.__adminUser);
+    await renderPublic();
 }
 
 function adminAddMaintenance(){
@@ -240,15 +269,64 @@ function adminAddGalleryFolder(){
     adminPage('gallery',window.__adminUser);
 }
 
-function adminUploadGallery(i){
+async function adminUploadGallery(i){
+    const folderName=demo.gallery[i];
+    if(!folderName) return toast('Gallery folder not found.');
+    if(!sb) return toast('Supabase is not configured.');
+
     const input=document.createElement('input');
     input.type='file';
     input.accept='image/*';
     input.multiple=true;
-    input.onchange=()=>{
-        if(input.files?.length)
-            toast(`${input.files.length} photo(s) selected for "${demo.gallery[i]}"`);
+
+    input.onchange=async()=>{
+        const files=Array.from(input.files||[]);
+        if(!files.length) return;
+
+        let saved=0, failed=0;
+
+        for(const file of files){
+            let storagePath=null;
+            try{
+                const folder=folderName.trim().replace(/[^a-zA-Z0-9_-]+/g,'_');
+                const ext=(file.name.split('.').pop()||'jpg').toLowerCase();
+                const name=`${Date.now()}_${Math.random().toString(36).slice(2,10)}.${ext}`;
+                storagePath=`${folder}/${name}`;
+
+                const upload=await sb.storage.from('gallery').upload(
+                    storagePath,file,
+                    {cacheControl:'3600',upsert:false,contentType:file.type||'image/jpeg'}
+                );
+                if(upload.error) throw upload.error;
+
+                const {data:urlData}=sb.storage.from('gallery').getPublicUrl(storagePath);
+                const publicUrl=urlData?.publicUrl||'';
+
+                const db=await sb.from('gallery_photos').insert({
+                    folder_name:folderName,
+                    file_name:file.name,
+                    storage_path:storagePath,
+                    public_url:publicUrl
+                });
+                if(db.error) throw db.error;
+
+                saved++;
+            }catch(error){
+                console.error('Gallery upload error:',error);
+                if(storagePath){
+                    try{ await sb.storage.from('gallery').remove([storagePath]); }catch(e){}
+                }
+                failed++;
+            }
+        }
+
+        if(saved && !failed) toast(`${saved} photo(s) saved successfully in "${folderName}"`);
+        else if(saved) toast(`${saved} photo(s) saved, ${failed} failed`);
+        else toast('No photo saved. Check the gallery Storage bucket and gallery_photos table.');
+
+        await adminPage('gallery',window.__adminUser);
     };
+
     input.click();
 }
 
@@ -298,45 +376,12 @@ async function adminPage(p,user){
  const c=document.getElementById('adminContent'),t=document.getElementById('adminTitle');
  document.querySelectorAll('#memberApp .nav-item').forEach(b=>b.classList.toggle('active',b.dataset.a===p));
  const titles={dashboard:'Admin Dashboard',finance:'Society Finance',maintenance:'Active Maintenance',work:'Society Work',events:'Events',gallery:'Photo Gallery',members:'Members',complaints:'Complaints',map:'Society Map'}; t.textContent=titles[p]||'Admin Dashboard';
- if(p==='dashboard'){
-    if(sb){
-        const {data,error}=await sb.from('society_finance')
-            .select('society_fund,total_expenses,active_maintenance,pending_tasks')
-            .eq('id',1).maybeSingle();
-        if(!error && data) window.__societyFinance=data;
-    }
-    c.innerHTML=`<div class="hero"><div><div class="eyebrow">ADMINISTRATION</div><h2>Welcome, ${user.name}</h2><div class="muted">Manage Defense Enclave Society information from one place.</div></div></div><div class="stats"><div class="stat"><div class="stat-head">Society Fund<span>●</span></div><div class="value">${Number(window.__societyFinance?.society_fund ?? 1842500).toLocaleString('en-IN')}</div><div class="trend">Manage in Finance</div></div><div class="stat"><div class="stat-head">Total Expenses<span>●</span></div><div class="value">${Number(window.__societyFinance?.total_expenses ?? 684250).toLocaleString('en-IN')}</div><div class="trend">Manage expenses</div></div><div class="stat"><div class="stat-head">Active Maintenance<span>●</span></div><div class="value">${Number(window.__societyFinance?.active_maintenance ?? 248000).toLocaleString('en-IN')}</div><div class="trend">Manage maintenance</div></div><div class="stat"><div class="stat-head">Pending Tasks<span>●</span></div><div class="value">${Number(window.__societyFinance?.pending_tasks ?? 17)}</div><div class="trend">Review society work</div></div></div><div class="grid-2-equal"><div class="panel"><h3>Management</h3><div class="activity"><div class="activity-item"><div class="activity-icon">₹</div><div><strong>Society Finance</strong><p>Update fund, expenses and maintenance.</p></div></div><div class="activity-item"><div class="activity-icon">♙</div><div><strong>Members</strong><p>Add, edit and manage society members.</p></div></div><div class="activity-item"><div class="activity-icon">▧</div><div><strong>Gallery</strong><p>Manage photo categories and uploads.</p></div></div></div></div><div class="panel"><h3>Quick actions</h3><div class="form-grid"><button class="primary-btn" onclick="adminPage('finance',window.__adminUser)">Manage Finance</button><button class="primary-btn" onclick="adminPage('members',window.__adminUser)">Manage Members</button><button class="primary-btn" onclick="adminPage('events',window.__adminUser)">Manage Events</button><button class="primary-btn" onclick="adminPage('gallery',window.__adminUser)">Manage Gallery</button></div></div></div>`;
- }
+ if(p==='dashboard') c.innerHTML=`<div class="hero"><div><div class="eyebrow">ADMINISTRATION</div><h2>Welcome, ${user.name}</h2><div class="muted">Manage Defense Enclave Society information from one place.</div></div></div><div class="stats"><div class="stat"><div class="stat-head">Society Fund<span>●</span></div><div class="value">₹18,42,500</div><div class="trend">Manage in Finance</div></div><div class="stat"><div class="stat-head">Total Expenses<span>●</span></div><div class="value">₹6,84,250</div><div class="trend">Manage expenses</div></div><div class="stat"><div class="stat-head">Active Maintenance<span>●</span></div><div class="value">₹2,48,000</div><div class="trend">Manage maintenance</div></div><div class="stat"><div class="stat-head">Pending Tasks<span>●</span></div><div class="value">17</div><div class="trend">Review society work</div></div></div><div class="grid-2-equal"><div class="panel"><h3>Management</h3><div class="activity"><div class="activity-item"><div class="activity-icon">₹</div><div><strong>Society Finance</strong><p>Update fund, expenses and maintenance.</p></div></div><div class="activity-item"><div class="activity-icon">♙</div><div><strong>Members</strong><p>Add, edit and manage society members.</p></div></div><div class="activity-item"><div class="activity-icon">▧</div><div><strong>Gallery</strong><p>Manage photo categories and uploads.</p></div></div></div></div><div class="panel"><h3>Quick actions</h3><div class="form-grid"><button class="primary-btn" onclick="adminPage('finance',window.__adminUser)">Manage Finance</button><button class="primary-btn" onclick="adminPage('members',window.__adminUser)">Manage Members</button><button class="primary-btn" onclick="adminPage('events',window.__adminUser)">Manage Events</button><button class="primary-btn" onclick="adminPage('gallery',window.__adminUser)">Manage Gallery</button></div></div></div>`;
  else if(p==='finance'){
-    let finance={society_fund:1842500,total_expenses:684250,active_maintenance:248000,pending_tasks:17};
-
-    if(sb){
-        const {data,error}=await sb.from('society_finance')
-            .select('society_fund,total_expenses,active_maintenance,pending_tasks')
-            .eq('id',1).maybeSingle();
-
-        if(error){
-            console.error('Finance load error:',error);
-            toast('Finance load failed: '+error.message);
-        }else if(data){
-            finance={
-                society_fund:Number(data.society_fund)||0,
-                total_expenses:Number(data.total_expenses)||0,
-                active_maintenance:Number(data.active_maintenance)||0,
-                pending_tasks:Number(data.pending_tasks)||0
-            };
-        }
-    }
-
-    window.__societyFinance=finance;
-
-    c.innerHTML=`<div class="hero"><div><h2>Society Finance</h2><div class="muted">Values below are loaded from Supabase.</div></div></div>
-    <div class="panel"><div class="form-grid">
-    <label>Society Fund<input id="adminFund" type="number" min="0" value="${finance.society_fund}"></label>
-    <label>Total Expenses<input id="adminExpenses" type="number" min="0" value="${finance.total_expenses}"></label>
-    <label>Active Maintenance<input id="adminMaintenance" type="number" min="0" value="${finance.active_maintenance}"></label>
-    <label>Pending Tasks<input id="adminPending" type="number" min="0" value="${finance.pending_tasks}"></label>
-    </div><div style="margin-top:16px"><button class="primary-btn" onclick="saveFinance()">Save Finance</button></div></div>`;
+   const {data:f,error:financeError}=await sb.from('society_finance').select('*').eq('id',1).maybeSingle();
+   if(financeError){console.error(financeError);return toast('Finance load failed: '+financeError.message)}
+   const v=f||{society_fund:1842500,total_expenses:684250,active_maintenance:248000,pending_tasks:17};
+   c.innerHTML=`<div class="hero"><div><h2>Society Finance</h2><div class="muted">Values are loaded from Supabase.</div></div></div><div class="panel"><div class="form-grid"><label>Society Fund<input id="adminFund" type="number" min="0" value="${Number(v.society_fund)||0}"></label><label>Total Expenses<input id="adminExpenses" type="number" min="0" value="${Number(v.total_expenses)||0}"></label><label>Active Maintenance<input id="adminMaintenance" type="number" min="0" value="${Number(v.active_maintenance)||0}"></label><label>Pending Tasks<input id="adminPending" type="number" min="0" value="${Number(v.pending_tasks)||0}"></label></div><div style="margin-top:16px"><button class="primary-btn" onclick="saveFinance()">Save Finance</button></div></div>`;
 }
  else if(p==='maintenance'){
  window.__maintenance=window.__maintenance||[{item:'Street Light Repair',amount:45000,status:'Active'},{item:'Park Maintenance',amount:80000,status:'Active'}];
@@ -352,3 +397,81 @@ async function adminPage(p,user){
 }
 function openMemberDashboard(user){document.getElementById('public').classList.add('hidden');const app=document.getElementById('memberApp');app.className='app-shell';app.innerHTML=`<aside class="sidebar"><div class="brand"><div class="brand-mark">DE</div><div><strong>Defense Enclave</strong><span>Member Portal</span></div></div><nav><button class="nav-item active" data-p="dash">⌂ <span>Dashboard</span></button><button class="nav-item" data-p="profile">♙ <span>My Profile</span></button><button class="nav-item" data-p="complaints">⚑ <span>Complaints</span></button><button class="nav-item" data-p="work">▣ <span>Society Work</span></button><button class="nav-item" data-p="events">◷ <span>Events</span></button><button class="nav-item" data-p="gallery">▧ <span>Gallery</span></button><button class="nav-item" data-p="public">↩ <span>Public Site</span></button></nav><div class="sidebar-bottom"><div class="user-mini"><div class="avatar">${(user.name||'A J').split(' ').map(x=>x[0]).slice(0,2).join('')}</div><div><strong>${user.name||'Member'}</strong><span>${user.house_no||'Member'}</span></div></div><button class="outline-btn" id="memberLogout">Log out</button></div></aside><main class="main"><header class="topbar"><div><div class="eyebrow">DEFENSE ENCLAVE SOCIETY</div><h1 id="memberTitle">Member Dashboard</h1></div><div class="top-actions"><button class="icon-btn" id="memberTour">?</button><div class="avatar">${(user.name||'A J').split(' ').map(x=>x[0]).slice(0,2).join('')}</div></div></header><section id="memberContent" class="content"></section></main>`;const nav=app.querySelector('nav');nav.onclick=e=>{const b=e.target.closest('.nav-item');if(!b)return;if(b.dataset.p==='public'){app.classList.add('hidden');document.getElementById('public').classList.remove('hidden');return}memberPage(b.dataset.p,user)};document.getElementById('memberLogout').onclick=async()=>{if(sb){const {error}=await sb.auth.signOut();if(error)return toast(error.message)}app.classList.add('hidden');document.getElementById('public').classList.remove('hidden');toast('Logged out')};document.getElementById('memberTour').onclick=()=>toast('Tour: dashboard → profile → complaints → work → events → gallery');memberPage('dash',user)}
 function memberPage(p,user){const c=document.getElementById('memberContent'),t=document.getElementById('memberTitle');document.querySelectorAll('#memberApp .nav-item').forEach(b=>b.classList.toggle('active',b.dataset.p===p));t.textContent={dash:'Member Dashboard',profile:'My Profile',complaints:'Complaints',work:'Society Work',events:'Events',gallery:'Photo Gallery'}[p];if(p==='dash')c.innerHTML=`<div class="hero"><div><div class="eyebrow">WELCOME BACK</div><h2>Good afternoon, ${user.name||'Member'}!</h2><div class="muted">Your society financial and activity overview.</div></div><button class="primary-btn" id="newComplaint">+ New Complaint</button></div><div class="stats">${[['Society Fund','₹18,42,500','Current balance'],['Total Expenses','₹6,84,250','This year'],['Active Maintenance','₹2,48,000','12 active items'],['Pending Tasks','17','Needs attention']].map(x=>`<div class="stat"><div class="stat-head">${x[0]}<span>●</span></div><div class="value">${x[1]}</div><div class="trend">${x[2]}</div></div>`).join('')}</div><div class="grid-2"><div class="panel"><div class="panel-head"><h3>Society Expenses — Last 6 Months</h3><span class="muted">₹ thousands</span></div><div class="chart">${[86,112,74,138,121,154].map(v=>`<div class="bar" style="height:${v*1.12}px"><span>${v}</span></div>`).join('')}</div><div class="months"><span>Apr</span><span>May</span><span>Jun</span><span>Jul</span><span>Aug</span><span>Sep</span></div></div><div class="panel"><h3>Expense Breakdown</h3><div class="donut-wrap"><div class="donut"></div><div class="legend"><div>● Maintenance 40%</div><div>● Security 25%</div><div>● Utilities 20%</div><div>● Other 15%</div></div></div></div></div><div class="grid-2-equal" style="margin-top:16px"><div class="panel"><h3>Recent Activity</h3><div class="activity"><div class="activity-item"><div class="activity-icon">₹</div><div><strong>Maintenance payment recorded</strong><p>Block B · ₹12,500 · 2 hours ago</p></div></div><div class="activity-item"><div class="activity-icon">✓</div><div><strong>Street light complaint updated</strong><p>Complaint #DE-1042 · In Progress</p></div></div><div class="activity-item"><div class="activity-icon">⚑</div><div><strong>New society announcement</strong><p>Monthly meeting notice · Today</p></div></div></div></div><div class="panel"><h3>Monthly Overview</h3><p class="muted">Revenue ₹3.42L · Expenses ₹1.54L</p><div class="progress"><i style="width:45%"></i></div><p class="muted">45% of monthly collection used</p></div></div>`;else if(p==='profile')c.innerHTML=`<div class="hero"><div><h2>My Profile</h2><div class="muted">Your registered society information.</div></div></div><div class="panel"><div class="form-grid"><label>Name<input value="${user.name||''}" id="profileName"></label><label>Email<input value="${user.email||''}" readonly></label><label>House / Flat<input value="${user.house_no||''}" id="profileHouse"></label><label>Phone<input placeholder="Phone number"></label></div><label>Address<textarea>${user.address||''}</textarea></label><button class="primary-btn" onclick="toast('Profile saved in demo mode')">Save Profile</button></div>`;else if(p==='complaints')c.innerHTML=`<div class="hero"><div><h2>My Complaints</h2><div class="muted">Submit and track society issues.</div></div><button class="primary-btn" id="newComplaint">+ New Complaint</button></div><div class="panel"><table class="table"><thead><tr><th>ID</th><th>Category</th><th>Complaint</th><th>Status</th><th>Date</th></tr></thead><tbody>${demo.works.slice(0,3).map((w,i)=>`<tr><td>#DE-10${42-i}</td><td>${['Street Light','Cleanliness','Water'][i]}</td><td>${w[1]}</td><td><span class="status ${i===1?'completed':i===0?'ongoing':'pending'}">${i===1?'Resolved':i===0?'In Progress':'Submitted'}</span></td><td>15 Sep 2026</td></tr>`).join('')}</tbody></table></div>`;else if(p==='work')c.innerHTML=`<div class="hero"><div><h2>Society Work</h2><div class="muted">Transparent project progress.</div></div></div><div class="panel"><table class="table"><thead><tr><th>Project</th><th>Status</th><th>Progress</th><th>Target</th></tr></thead><tbody>${demo.works.map(w=>`<tr><td><strong>${w[0]}</strong><br><span class="muted">${w[1]}</span></td><td><span class="status ${w[2].toLowerCase()}">${w[2]}</span></td><td><div class="progress"><i style="width:${w[3]}%"></i></div>${w[3]}%</td><td>${w[4]}</td></tr>`).join('')}</tbody></table></div>`;else if(p==='events')c.innerHTML=`<div class="hero"><div><h2>Events</h2><div class="muted">Upcoming society events.</div></div></div><div class="event-grid">${demo.events.map(e=>`<div class="card"><div class="photo">${e[3]}</div><div class="card-body"><div class="event-date">${e[0]}</div><h3>${e[1]}</h3><div class="muted">${e[2]}</div></div></div>`).join('')}</div>`;else if(p==='gallery')c.innerHTML=`<div class="hero"><div><h2>Photo Gallery</h2><div class="muted">Community moments.</div></div></div><div class="gallery-grid">${demo.gallery.map((g,i)=>`<div class="card"><div class="photo">${['◉','★','♧','✦','✓','◎'][i]}</div><div class="card-body"><strong>${g}</strong></div></div>`).join('')}</div>`;document.getElementById('newComplaint')?.addEventListener('click',()=>toast('Complaint form is ready; database connection will persist it in production.'))}
+
+
+/* ============================================================
+   PERSISTENT LOGIN SESSION RESTORATION
+   ============================================================ */
+async function restoreLoginSession(){
+    if(!sb || !sb.auth) return;
+
+    try{
+        const {data,error}=await sb.auth.getSession();
+
+        if(error){
+            console.error('Session restore error:',error);
+            return;
+        }
+
+        const authUser=data?.session?.user;
+        if(!authUser) return;
+
+        const {data:profile,error:profileError}=await sb
+            .from('profiles')
+            .select('*')
+            .eq('id',authUser.id)
+            .maybeSingle();
+
+        if(profileError){
+            console.error('Profile restore error:',profileError);
+            return;
+        }
+
+        if(!profile){
+            console.error('Profile not found:',authUser.id);
+            return;
+        }
+
+        const user={
+            ...authUser,
+            name:profile.full_name ||
+                 authUser.user_metadata?.full_name ||
+                 authUser.email?.split('@')[0] || 'Member',
+            email:authUser.email||'',
+            phone:profile.phone||'',
+            house_no:profile.house_number||profile.house_no||'',
+            address:profile.address||'',
+            role:(profile.role||'member').toLowerCase()
+        };
+
+        window.__adminUser=user;
+
+        document.getElementById('authModal')?.classList.add('hidden');
+        document.getElementById('authOverlay')?.classList.add('hidden');
+
+        if(user.role==='admin'){
+            await openAdminDashboard(user);
+        }else{
+            await openMemberDashboard(user);
+        }
+
+        console.log('Login session restored:',user.email,user.role);
+    }catch(e){
+        console.error('Session restoration failed:',e);
+    }
+}
+
+setTimeout(()=>restoreLoginSession(),300);
+
+if(sb && sb.auth){
+    sb.auth.onAuthStateChange((event)=>{
+        console.log('Supabase auth event:',event);
+
+        if(event==='SIGNED_OUT'){
+            window.__adminUser=null;
+            document.getElementById('memberApp')?.classList.add('hidden');
+            document.getElementById('public')?.classList.remove('hidden');
+            renderPublic().catch(e=>console.error('Public refresh:',e));
+        }
+    });
+}
