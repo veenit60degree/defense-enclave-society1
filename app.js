@@ -1,4 +1,4 @@
-/* Defense Enclave Admin Login Fix: 2026-09-19 */
+/* Defense Enclave Admin Buttons: 2026-09-19 */
 //const CONFIG={SUPABASE_URL:'https://gujtekpteezejmtaxtcj.supabase.co',SUPABASE_ANON_KEY:'sb_publishable_KvdsKcUr_vuvPrg7xU11Ww_q1H7vhg1'};
 
 const SUPABASE_URL = "https://gujtekpteezejmtaxtcj.supabase.co/rest/v1/";   //https://gujtekpteezejmtaxtcj.supabase.co
@@ -48,59 +48,12 @@ async function login(){
     if(!sb)return toast('Supabase is not configured yet');
     const {data,error}=await sb.auth.signInWithPassword({email,password});
     if(error)return toast(error.message);
-    const result = await sb
-        .from('profiles')
-        .select('*')
-        .eq('id', data.user.id)
-        .maybeSingle();
-
-    if (result.error) {
-        console.error('Profile loading error:', result.error);
-        await sb.auth.signOut();
-        return toast('Unable to load your profile. Please contact the society administrator.');
-    }
-
-    const profile = result.data;
-
-    if (!profile) {
-        console.error('Profile not found for user:', data.user.id);
-        await sb.auth.signOut();
-        return toast('Profile not found. Please contact the society administrator.');
-    }
-
-    if (!profile.role) {
-        console.error('User role is missing:', profile);
-        await sb.auth.signOut();
-        return toast('User role is not configured.');
-    }
-
-    const user = {
-        ...data.user,
-        name: profile.full_name ||
-              data.user.user_metadata?.full_name ||
-              data.user.email?.split('@')[0] ||
-              'Member',
-        email: data.user.email || '',
-        phone: profile.phone || '',
-        house_no: profile.house_number || profile.house_no || '',
-        address: profile.address || '',
-        role: String(profile.role).toLowerCase().trim()
-    };
-
-    console.log('LOGIN PROFILE:', profile);
-    console.log('LOGIN ROLE:', user.role);
-
+    const result=await sb.from('profiles').select('*').eq('id',data.user.id).maybeSingle();
+    if(result.error)console.error('Profile loading error:',result.error);
+    const profile=result.data;
     authModal.classList.add('hidden');
-
-    if (user.role === 'admin') {
-        console.log('Opening ADMIN dashboard');
-        window.__adminUser = user;
-        openAdminDashboard(user);
-    } else {
-        console.log('Opening MEMBER dashboard');
-        openMemberDashboard(user);
-    }
-
+    const user={...data.user,name:profile?.full_name||data.user.user_metadata?.full_name||data.user.email?.split('@')[0]||'Member',email:data.user.email||'',phone:profile?.phone||'',house_no:profile?.house_number||profile?.house_no||'',address:profile?.address||'',role:profile?.role||'member'};
+    if(user.role==='admin') openAdminDashboard(user); else openMemberDashboard(user);
     toast('Login successful');
 }
 async function register(){
@@ -145,19 +98,210 @@ function openAdminDashboard(user){
  adminPage('dashboard',user);
 }
 function initials(n){return (n||'Admin').split(' ').map(x=>x[0]).slice(0,2).join('').toUpperCase()}
+
+async function saveFinance(){
+    if(!sb) return toast('Supabase is not configured.');
+
+    const fund = Number(document.getElementById('adminFund')?.value || 0);
+    const expenses = Number(document.getElementById('adminExpenses')?.value || 0);
+    const maintenance = Number(document.getElementById('adminMaintenance')?.value || 0);
+    const pending = Number(document.getElementById('adminPending')?.value || 0);
+
+    if([fund,expenses,maintenance,pending].some(v => !Number.isFinite(v) || v < 0))
+        return toast('Please enter valid finance values.');
+
+    const {error} = await sb.from('society_finance').upsert({
+        id: 1,
+        society_fund: fund,
+        total_expenses: expenses,
+        active_maintenance: maintenance,
+        pending_tasks: Math.floor(pending),
+        updated_at: new Date().toISOString()
+    }, {onConflict:'id'});
+
+    if(error){
+        console.error('Finance save error:', error);
+        return toast('Finance save failed: ' + error.message);
+    }
+
+    toast('Finance saved successfully.');
+    adminPage('finance', window.__adminUser);
+}
+
+function adminAddMaintenance(){
+    const item = prompt('Maintenance item name:');
+    if(!item) return;
+    const amount = prompt('Amount:','0');
+    if(amount===null) return;
+    const status = prompt('Status (Active/Pending/Completed):','Active') || 'Active';
+    window.__maintenance = window.__maintenance || [
+        {item:'Street Light Repair',amount:45000,status:'Active'},
+        {item:'Park Maintenance',amount:80000,status:'Active'}
+    ];
+    window.__maintenance.push({item,amount:Number(amount)||0,status});
+    toast('Maintenance added');
+    adminPage('maintenance',window.__adminUser);
+}
+
+function adminEditMaintenance(i){
+    const x = window.__maintenance[i];
+    if(!x) return;
+    const item = prompt('Maintenance item:',x.item);
+    if(item===null) return;
+    const amount = prompt('Amount:',x.amount);
+    if(amount===null) return;
+    const status = prompt('Status:',x.status);
+    if(status===null) return;
+    x.item=item; x.amount=Number(amount)||0; x.status=status;
+    toast('Maintenance updated');
+    adminPage('maintenance',window.__adminUser);
+}
+
+function adminDeleteMaintenance(i){
+    if(!confirm('Delete this maintenance item?')) return;
+    window.__maintenance.splice(i,1);
+    toast('Maintenance deleted');
+    adminPage('maintenance',window.__adminUser);
+}
+
+function adminAddWork(){
+    const name=prompt('Work / project name:');
+    if(!name) return;
+    const desc=prompt('Description:','');
+    const status=prompt('Status (Ongoing/Pending/Completed):','Pending') || 'Pending';
+    const progress=prompt('Progress %:','0');
+    const target=prompt('Target date:','');
+    demo.works.push([name,desc||'',status,Math.max(0,Math.min(100,Number(progress)||0)),target||'']);
+    toast('Work added');
+    adminPage('work',window.__adminUser);
+}
+
+function adminEditWork(i){
+    const w=demo.works[i];
+    if(!w) return;
+    const name=prompt('Work / project name:',w[0]);
+    if(name===null) return;
+    const desc=prompt('Description:',w[1]);
+    if(desc===null) return;
+    const status=prompt('Status:',w[2]);
+    if(status===null) return;
+    const progress=prompt('Progress %:',w[3]);
+    if(progress===null) return;
+    const target=prompt('Target date:',w[4]);
+    if(target===null) return;
+    w[0]=name; w[1]=desc; w[2]=status; w[3]=Math.max(0,Math.min(100,Number(progress)||0)); w[4]=target;
+    toast('Work updated');
+    adminPage('work',window.__adminUser);
+}
+
+function adminAddEvent(){
+    const date=prompt('Event date:', '20 Sep 2026');
+    if(!date) return;
+    const title=prompt('Event title:');
+    if(!title) return;
+    const place=prompt('Location / time:','');
+    const icon=prompt('Icon:','◷') || '◷';
+    demo.events.push([date,title,place||'',icon]);
+    toast('Event added');
+    adminPage('events',window.__adminUser);
+}
+
+function adminEditEvent(i){
+    const e=demo.events[i];
+    if(!e) return;
+    const date=prompt('Event date:',e[0]); if(date===null)return;
+    const title=prompt('Event title:',e[1]); if(title===null)return;
+    const place=prompt('Location / time:',e[2]); if(place===null)return;
+    e[0]=date;e[1]=title;e[2]=place;
+    toast('Event updated');
+    adminPage('events',window.__adminUser);
+}
+
+function adminDeleteEvent(i){
+    if(!confirm('Delete this event?')) return;
+    demo.events.splice(i,1);
+    toast('Event deleted');
+    adminPage('events',window.__adminUser);
+}
+
+function adminAddGalleryFolder(){
+    const name=prompt('New gallery folder name:');
+    if(!name) return;
+    demo.gallery.push(name);
+    toast('Gallery folder added');
+    adminPage('gallery',window.__adminUser);
+}
+
+function adminUploadGallery(i){
+    const input=document.createElement('input');
+    input.type='file';
+    input.accept='image/*';
+    input.multiple=true;
+    input.onchange=()=>{
+        if(input.files?.length)
+            toast(`${input.files.length} photo(s) selected for "${demo.gallery[i]}"`);
+    };
+    input.click();
+}
+
+function adminAddMember(){
+    const name=prompt('Member name:');
+    if(!name) return;
+    const house=prompt('House / Flat number:','');
+    demo.members.push([initials(name),name,house||'']);
+    toast('Member added');
+    adminPage('members',window.__adminUser);
+}
+
+function adminEditMember(i){
+    const m=demo.members[i];
+    if(!m) return;
+    const name=prompt('Member name:',m[1]); if(name===null)return;
+    const house=prompt('House / Flat:',m[2]); if(house===null)return;
+    m[0]=initials(name);m[1]=name;m[2]=house;
+    toast('Member updated');
+    adminPage('members',window.__adminUser);
+}
+
+function adminDeleteMember(i){
+    if(!confirm('Remove this member from the society list?')) return;
+    demo.members.splice(i,1);
+    toast('Member removed');
+    adminPage('members',window.__adminUser);
+}
+
+function adminUpdateComplaint(){
+    const status=prompt('Complaint status (Submitted/In Progress/Resolved):','In Progress');
+    if(status===null)return;
+    toast('Complaint status updated to '+status);
+}
+
+function adminUploadMap(){
+    const input=document.getElementById('mapPdf');
+    const file=input?.files?.[0];
+    if(!file) return toast('Please select a PDF first.');
+    if(file.type!=='application/pdf') return toast('Only PDF files are allowed.');
+    if(file.size>10*1024*1024) return toast('PDF must be 10 MB or smaller.');
+    window.__societyMapName=file.name;
+    toast('Map selected: '+file.name);
+}
+
 function adminPage(p,user){
  const c=document.getElementById('adminContent'),t=document.getElementById('adminTitle');
  document.querySelectorAll('#memberApp .nav-item').forEach(b=>b.classList.toggle('active',b.dataset.a===p));
  const titles={dashboard:'Admin Dashboard',finance:'Society Finance',maintenance:'Active Maintenance',work:'Society Work',events:'Events',gallery:'Photo Gallery',members:'Members',complaints:'Complaints',map:'Society Map'}; t.textContent=titles[p]||'Admin Dashboard';
  if(p==='dashboard') c.innerHTML=`<div class="hero"><div><div class="eyebrow">ADMINISTRATION</div><h2>Welcome, ${user.name}</h2><div class="muted">Manage Defense Enclave Society information from one place.</div></div></div><div class="stats"><div class="stat"><div class="stat-head">Society Fund<span>●</span></div><div class="value">₹18,42,500</div><div class="trend">Manage in Finance</div></div><div class="stat"><div class="stat-head">Total Expenses<span>●</span></div><div class="value">₹6,84,250</div><div class="trend">Manage expenses</div></div><div class="stat"><div class="stat-head">Active Maintenance<span>●</span></div><div class="value">₹2,48,000</div><div class="trend">Manage maintenance</div></div><div class="stat"><div class="stat-head">Pending Tasks<span>●</span></div><div class="value">17</div><div class="trend">Review society work</div></div></div><div class="grid-2-equal"><div class="panel"><h3>Management</h3><div class="activity"><div class="activity-item"><div class="activity-icon">₹</div><div><strong>Society Finance</strong><p>Update fund, expenses and maintenance.</p></div></div><div class="activity-item"><div class="activity-icon">♙</div><div><strong>Members</strong><p>Add, edit and manage society members.</p></div></div><div class="activity-item"><div class="activity-icon">▧</div><div><strong>Gallery</strong><p>Manage photo categories and uploads.</p></div></div></div></div><div class="panel"><h3>Quick actions</h3><div class="form-grid"><button class="primary-btn" onclick="adminPage('finance',window.__adminUser)">Manage Finance</button><button class="primary-btn" onclick="adminPage('members',window.__adminUser)">Manage Members</button><button class="primary-btn" onclick="adminPage('events',window.__adminUser)">Manage Events</button><button class="primary-btn" onclick="adminPage('gallery',window.__adminUser)">Manage Gallery</button></div></div></div>`;
- else if(p==='finance') c.innerHTML=`<div class="hero"><div><h2>Society Finance</h2><div class="muted">Update the values displayed to members.</div></div></div><div class="panel"><div class="form-grid"><label>Society Fund<input id="adminFund" type="number" value="1842500"></label><label>Total Expenses<input id="adminExpenses" type="number" value="684250"></label><label>Active Maintenance<input id="adminMaintenance" type="number" value="248000"></label><label>Pending Tasks<input id="adminPending" type="number" value="17"></label></div><button class="primary-btn" onclick="toast('Finance UI ready. Database save will be connected next.')">Save Finance</button></div>`;
- else if(p==='maintenance') c.innerHTML=`<div class="hero"><div><h2>Active Maintenance</h2><div class="muted">Manage active maintenance expenses.</div></div><button class="primary-btn" onclick="toast('Add maintenance form will be connected to Supabase next.')">+ Add Maintenance</button></div><div class="panel"><table class="table"><thead><tr><th>Item</th><th>Amount</th><th>Status</th><th>Action</th></tr></thead><tbody><tr><td>Street Light Repair</td><td>₹45,000</td><td><span class="status ongoing">Active</span></td><td><button class="outline-btn" onclick="toast('Edit ready')">Edit</button></td></tr><tr><td>Park Maintenance</td><td>₹80,000</td><td><span class="status ongoing">Active</span></td><td><button class="outline-btn" onclick="toast('Edit ready')">Edit</button></td></tr></tbody></table></div>`;
- else if(p==='work') c.innerHTML=`<div class="hero"><div><h2>Society Work</h2><div class="muted">Ongoing, pending and completed projects.</div></div><button class="primary-btn" onclick="toast('Add work form will be connected to Supabase next.')">+ Add Work</button></div><div class="panel"><table class="table"><thead><tr><th>Project</th><th>Status</th><th>Progress</th><th>Target</th><th>Action</th></tr></thead><tbody>${demo.works.map(w=>`<tr><td><strong>${w[0]}</strong><br><span class="muted">${w[1]}</span></td><td><span class="status ${w[2].toLowerCase()}">${w[2]}</span></td><td>${w[3]}%</td><td>${w[4]}</td><td><button class="outline-btn" onclick="toast('Edit ready')">Edit</button></td></tr>`).join('')}</tbody></table></div>`;
- else if(p==='events') c.innerHTML=`<div class="hero"><div><h2>Events</h2><div class="muted">Add, edit or delete society events.</div></div><button class="primary-btn" onclick="toast('Event form will be connected to Supabase next.')">+ Add Event</button></div><div class="event-grid">${demo.events.map(e=>`<div class="card"><div class="photo">${e[3]}</div><div class="card-body"><div class="event-date">${e[0]}</div><h3>${e[1]}</h3><div class="muted">${e[2]}</div><br><button class="outline-btn" onclick="toast('Edit ready')">Edit</button> <button class="outline-btn" onclick="toast('Delete ready')">Delete</button></div></div>`).join('')}</div>`;
- else if(p==='gallery') c.innerHTML=`<div class="hero"><div><h2>Photo Gallery</h2><div class="muted">Create folders such as Society Meeting, Park Activity and Festival Activity.</div></div><button class="primary-btn" onclick="toast('Folder creation will be connected to Supabase Storage next.')">+ New Folder</button></div><div class="gallery-grid">${demo.gallery.map(g=>`<div class="card"><div class="photo">▧</div><div class="card-body"><strong>${g}</strong><div class="muted">Folder</div><br><button class="outline-btn" onclick="toast('Upload photo ready')">Upload Photos</button></div></div>`).join('')}</div>`;
- else if(p==='members') c.innerHTML=`<div class="hero"><div><h2>Members</h2><div class="muted">Add, edit or remove society members.</div></div><button class="primary-btn" onclick="toast('Add member form will be connected to Supabase next.')">+ Add Member</button></div><div class="panel"><table class="table"><thead><tr><th>Member</th><th>House</th><th>Status</th><th>Action</th></tr></thead><tbody>${demo.members.map(m=>`<tr><td><strong>${m[1]}</strong></td><td>${m[2]}</td><td><span class="status ongoing">Active</span></td><td><button class="outline-btn" onclick="toast('Edit ready')">Edit</button> <button class="outline-btn" onclick="toast('Delete ready')">Delete</button></td></tr>`).join('')}</tbody></table></div>`;
- else if(p==='complaints') c.innerHTML=`<div class="hero"><div><h2>Complaints</h2><div class="muted">Review and update member complaints.</div></div></div><div class="panel"><table class="table"><thead><tr><th>ID</th><th>Category</th><th>Status</th><th>Action</th></tr></thead><tbody><tr><td>#DE-1042</td><td>Street Light</td><td><span class="status ongoing">In Progress</span></td><td><button class="outline-btn" onclick="toast('Complaint update ready')">Update</button></td></tr></tbody></table></div>`;
- else if(p==='map') c.innerHTML=`<div class="hero"><div><h2>Society Map</h2><div class="muted">Upload or replace the society map PDF.</div></div></div><div class="panel"><label>Society Map PDF<input id="mapPdf" type="file" accept="application/pdf"></label><br><button class="primary-btn" onclick="toast('PDF upload will be connected to Supabase Storage next.')">Upload / Replace PDF</button></div>`;
+ else if(p==='finance') c.innerHTML=`<div class="hero"><div><h2>Society Finance</h2><div class="muted">Update the values displayed to members.</div></div></div><div class="panel"><div class="form-grid"><label>Society Fund<input id="adminFund" type="number" min="0" value="1842500"></label><label>Total Expenses<input id="adminExpenses" type="number" min="0" value="684250"></label><label>Active Maintenance<input id="adminMaintenance" type="number" min="0" value="248000"></label><label>Pending Tasks<input id="adminPending" type="number" min="0" value="17"></label></div><div style="margin-top:16px"><button class="primary-btn" onclick="saveFinance()">Save Finance</button></div></div>`;
+ else if(p==='maintenance'){
+ window.__maintenance=window.__maintenance||[{item:'Street Light Repair',amount:45000,status:'Active'},{item:'Park Maintenance',amount:80000,status:'Active'}];
+ c.innerHTML=`<div class="hero"><div><h2>Active Maintenance</h2><div class="muted">Manage active maintenance expenses.</div></div><button class="primary-btn" onclick="adminAddMaintenance()">+ Add Maintenance</button></div><div class="panel"><table class="table"><thead><tr><th>Item</th><th>Amount</th><th>Status</th><th>Action</th></tr></thead><tbody>${window.__maintenance.map((m,i)=>`<tr><td>${m.item}</td><td>₹${Number(m.amount).toLocaleString('en-IN')}</td><td><span class="status ongoing">${m.status}</span></td><td><button class="outline-btn" onclick="adminEditMaintenance(${i})">Edit</button> <button class="outline-btn" onclick="adminDeleteMaintenance(${i})">Delete</button></td></tr>`).join('')}</tbody></table></div>`;
+}
+ else if(p==='work') c.innerHTML=`<div class="hero"><div><h2>Society Work</h2><div class="muted">Ongoing, pending and completed projects.</div></div><button class="primary-btn" onclick="adminAddWork()">+ Add Work</button></div><div class="panel"><table class="table"><thead><tr><th>Project</th><th>Status</th><th>Progress</th><th>Target</th><th>Action</th></tr></thead><tbody>${demo.works.map((w,i)=>`<tr><td><strong>${w[0]}</strong><br><span class="muted">${w[1]}</span></td><td><span class="status ${w[2].toLowerCase()}">${w[2]}</span></td><td>${w[3]}%</td><td>${w[4]}</td><td><button class="outline-btn" onclick="adminEditWork(${i})">Edit</button></td></tr>`).join('')}</tbody></table></div>`;
+ else if(p==='events') c.innerHTML=`<div class="hero"><div><h2>Events</h2><div class="muted">Add, edit or delete society events.</div></div><button class="primary-btn" onclick="adminAddEvent()">+ Add Event</button></div><div class="event-grid">${demo.events.map((e,i)=>`<div class="card"><div class="photo">${e[3]}</div><div class="card-body"><div class="event-date">${e[0]}</div><h3>${e[1]}</h3><div class="muted">${e[2]}</div><br><button class="outline-btn" onclick="adminEditEvent(${i})">Edit</button> <button class="outline-btn" onclick="adminDeleteEvent(${i})">Delete</button></div></div>`).join('')}</div>`;
+ else if(p==='gallery') c.innerHTML=`<div class="hero"><div><h2>Photo Gallery</h2><div class="muted">Create folders such as Society Meeting, Park Activity and Festival Activity.</div></div><button class="primary-btn" onclick="adminAddGalleryFolder()">+ New Folder</button></div><div class="gallery-grid">${demo.gallery.map((g,i)=>`<div class="card"><div class="photo">▧</div><div class="card-body"><strong>${g}</strong><div class="muted">Folder</div><br><button class="outline-btn" onclick="adminUploadGallery(${i})">Upload Photos</button></div></div>`).join('')}</div>`;
+ else if(p==='members') c.innerHTML=`<div class="hero"><div><h2>Members</h2><div class="muted">Add, edit or remove society members.</div></div><button class="primary-btn" onclick="adminAddMember()">+ Add Member</button></div><div class="panel"><table class="table"><thead><tr><th>Member</th><th>House</th><th>Status</th><th>Action</th></tr></thead><tbody>${demo.members.map((m,i)=>`<tr><td><strong>${m[1]}</strong></td><td>${m[2]}</td><td><span class="status ongoing">Active</span></td><td><button class="outline-btn" onclick="adminEditMember(${i})">Edit</button> <button class="outline-btn" onclick="adminDeleteMember(${i})">Delete</button></td></tr>`).join('')}</tbody></table></div>`;
+ else if(p==='complaints') c.innerHTML=`<div class="hero"><div><h2>Complaints</h2><div class="muted">Review and update member complaints.</div></div></div><div class="panel"><table class="table"><thead><tr><th>ID</th><th>Category</th><th>Status</th><th>Action</th></tr></thead><tbody><tr><td>#DE-1042</td><td>Street Light</td><td><span class="status ongoing">In Progress</span></td><td><button class="outline-btn" onclick="adminUpdateComplaint()">Update</button></td></tr></tbody></table></div>`;
+ else if(p==='map') c.innerHTML=`<div class="hero"><div><h2>Society Map</h2><div class="muted">Upload or replace the society map PDF.</div></div></div><div class="panel"><label>Society Map PDF<input id="mapPdf" type="file" accept="application/pdf"></label><br><button class="primary-btn" onclick="adminUploadMap()">Upload / Replace PDF</button><div class="muted" style="margin-top:10px">${window.__societyMapName?'Selected: '+window.__societyMapName:'No map selected'}</div></div>`;
  window.__adminUser=user;
 }
 function openMemberDashboard(user){document.getElementById('public').classList.add('hidden');const app=document.getElementById('memberApp');app.className='app-shell';app.innerHTML=`<aside class="sidebar"><div class="brand"><div class="brand-mark">DE</div><div><strong>Defense Enclave</strong><span>Member Portal</span></div></div><nav><button class="nav-item active" data-p="dash">⌂ <span>Dashboard</span></button><button class="nav-item" data-p="profile">♙ <span>My Profile</span></button><button class="nav-item" data-p="complaints">⚑ <span>Complaints</span></button><button class="nav-item" data-p="work">▣ <span>Society Work</span></button><button class="nav-item" data-p="events">◷ <span>Events</span></button><button class="nav-item" data-p="gallery">▧ <span>Gallery</span></button><button class="nav-item" data-p="public">↩ <span>Public Site</span></button></nav><div class="sidebar-bottom"><div class="user-mini"><div class="avatar">${(user.name||'A J').split(' ').map(x=>x[0]).slice(0,2).join('')}</div><div><strong>${user.name||'Member'}</strong><span>${user.house_no||'Member'}</span></div></div><button class="outline-btn" id="memberLogout">Log out</button></div></aside><main class="main"><header class="topbar"><div><div class="eyebrow">DEFENSE ENCLAVE SOCIETY</div><h1 id="memberTitle">Member Dashboard</h1></div><div class="top-actions"><button class="icon-btn" id="memberTour">?</button><div class="avatar">${(user.name||'A J').split(' ').map(x=>x[0]).slice(0,2).join('')}</div></div></header><section id="memberContent" class="content"></section></main>`;const nav=app.querySelector('nav');nav.onclick=e=>{const b=e.target.closest('.nav-item');if(!b)return;if(b.dataset.p==='public'){app.classList.add('hidden');document.getElementById('public').classList.remove('hidden');return}memberPage(b.dataset.p,user)};document.getElementById('memberLogout').onclick=async()=>{if(sb){const {error}=await sb.auth.signOut();if(error)return toast(error.message)}app.classList.add('hidden');document.getElementById('public').classList.remove('hidden');toast('Logged out')};document.getElementById('memberTour').onclick=()=>toast('Tour: dashboard → profile → complaints → work → events → gallery');memberPage('dash',user)}
