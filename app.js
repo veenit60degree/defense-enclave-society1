@@ -122,35 +122,18 @@ function setupPublicTopNavigation(){
 }
 
 async function login(){
-    const loginValue=document.getElementById('loginEmail').value.trim();
+    const email=document.getElementById('loginEmail').value.trim();
     const password=document.getElementById('loginPassword').value;
-    if(!loginValue||!password)return toast('Please enter phone/email and password');
+    if(!email||!password)return toast('Please enter email and password');
     if(!sb)return toast('Supabase is not configured yet');
-
-    const credentials=loginValue.includes('@')
-        ? {email:loginValue,password}
-        : {phone:loginValue,password};
-
-    const {data,error}=await sb.auth.signInWithPassword(credentials);
+    const {data,error}=await sb.auth.signInWithPassword({email,password});
     if(error)return toast(error.message);
-
     const result=await sb.from('profiles').select('*').eq('id',data.user.id).maybeSingle();
     if(result.error)console.error('Profile loading error:',result.error);
     const profile=result.data;
     authModal.classList.add('hidden');
-
-    const user={
-        ...data.user,
-        name:profile?.full_name||data.user.user_metadata?.full_name||data.user.email?.split('@')[0]||data.user.phone||'Member',
-        email:data.user.email||profile?.email||'',
-        phone:data.user.phone||profile?.phone||'',
-        house_no:profile?.house_number||profile?.house_no||'',
-        address:profile?.address||'',
-        role:String(profile?.role||'member').trim().toLowerCase()
-    };
-
-    if(user.role==='admin') openAdminDashboard(user);
-    else openMemberDashboard(user);
+    const user={...data.user,name:profile?.full_name||data.user.user_metadata?.full_name||data.user.email?.split('@')[0]||'Member',email:data.user.email||'',phone:profile?.phone||'',house_no:profile?.house_number||profile?.house_no||'',address:profile?.address||'',role:String(profile?.role||'member').trim().toLowerCase()};
+    if(user.role==='admin') openAdminDashboard(user); else openMemberDashboard(user);
     toast('Login successful');
 }
 async function register(){
@@ -188,7 +171,6 @@ function openAdminDashboard(user){
  <button class="nav-item" data-a="members">♙ <span>Members</span></button>
  <button class="nav-item" data-a="complaints">⚑ <span>Complaints</span></button>
  <button class="nav-item" data-a="map">⌖ <span>Society Map</span></button>
-  <button class="nav-item" data-a="about">ℹ <span>About</span></button>
  </nav><div class="sidebar-bottom"><div class="user-mini"><div class="avatar">${initials(user.name)}</div><div><strong>${user.name}</strong><span>Administrator</span></div></div><button class="outline-btn" id="adminLogout">Log out</button></div></aside>
  <main class="main"><header class="topbar"><div><div class="eyebrow">DEFENSE ENCLAVE SOCIETY</div><h1 id="adminTitle">Admin Dashboard</h1></div><div class="top-actions"><span class="status ongoing">ADMIN</span><div class="avatar">${initials(user.name)}</div></div></header><section id="adminContent" class="content"></section></main>`;
  const nav=app.querySelector('nav'); nav.onclick=e=>{const b=e.target.closest('.nav-item');if(!b)return;adminPage(b.dataset.a,user)};
@@ -1527,47 +1509,43 @@ async function adminAddMember(){
       </div>
 
       <div style="margin-bottom:15px;">
-        <label for="memberPhone" style="display:block;font-weight:600;margin-bottom:6px;">Phone <span style="color:#d92d20;">*</span></label>
+        <label for="memberPhone" style="display:block;font-weight:600;margin-bottom:6px;">Phone number <span style="color:#d92d20;">*</span></label>
         <input id="memberPhone" type="tel" maxlength="20" placeholder="Enter phone number"
           style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
-        <div style="font-size:12px;color:#667085;margin-top:5px;">Required. Example: +919876543210</div>
+        <div style="font-size:12px;color:#667085;margin-top:5px;">Use international format when possible, e.g. +919876543210</div>
         <div id="memberPhoneError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
       </div>
 
       <div style="margin-bottom:15px;">
         <label for="memberEmail" style="display:block;font-weight:600;margin-bottom:6px;">Email <span style="color:#667085;font-weight:400;">(optional)</span></label>
-        <input id="memberEmail" type="email" maxlength="254" placeholder="Enter email address (optional)"
+        <input id="memberEmail" type="email" maxlength="254" placeholder="Enter email address"
           style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
-        <div style="font-size:12px;color:#667085;margin-top:5px;">User can log in with phone or this email.</div>
         <div id="memberEmailError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
       </div>
 
       <div style="margin-bottom:15px;">
-        <label for="memberPassword" style="display:block;font-weight:600;margin-bottom:6px;">Password <span style="color:#d92d20;">*</span></label>
-        <input id="memberPassword" type="password" minlength="6" maxlength="72" placeholder="Enter password"
+        <label for="memberPassword" style="display:block;font-weight:600;margin-bottom:6px;">Temporary password <span style="color:#d92d20;">*</span></label>
+        <input id="memberPassword" type="password" minlength="6" maxlength="72" autocomplete="new-password" placeholder="Enter password"
           style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
         <div style="font-size:12px;color:#667085;margin-top:5px;">Minimum 6 characters.</div>
         <div id="memberPasswordError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
       </div>
 
       <div style="margin-bottom:15px;">
-        <label for="memberConfirmPassword" style="display:block;font-weight:600;margin-bottom:6px;">Confirm Password <span style="color:#d92d20;">*</span></label>
-        <input id="memberConfirmPassword" type="password" minlength="6" maxlength="72" placeholder="Re-enter password"
-          style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
-        <div id="memberConfirmPasswordError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
-      </div>
-
-      <div style="margin-bottom:20px;">
-        <label for="memberAddress" style="display:block;font-weight:600;margin-bottom:6px;">Address <span style="color:#667085;font-weight:400;">(optional)</span></label>
+        <label for="memberAddress" style="display:block;font-weight:600;margin-bottom:6px;">Address</label>
         <textarea id="memberAddress" rows="3" maxlength="500" placeholder="Enter address"
           style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;resize:vertical;"></textarea>
+      </div>
+
+      <div style="margin-bottom:20px;padding:10px 12px;background:#f8f9fc;border-radius:9px;color:#475467;font-size:13px;">
+        This form creates a <strong>Member</strong> account through the <strong>admin-create-member</strong> Edge Function. The role is fixed to <strong>member</strong> for security.
       </div>
     </form>`;
 
     const {overlay,close}=societyAdminModalShell(
         'memberAddModal',
         'Add Member',
-        'Phone is required. Email is optional. The member can log in with either phone or email and the password.',
+        'Create the member Auth account and profile together.',
         body,
         'Save Member'
     );
@@ -1575,99 +1553,125 @@ async function adminAddMember(){
     overlay.querySelector('#memberAddModalForm').onsubmit=async e=>{
         e.preventDefault();
 
-        [
-          ['memberFullName','memberFullNameError'],
-          ['memberHouse','memberHouseError'],
-          ['memberPhone','memberPhoneError'],
-          ['memberEmail','memberEmailError'],
-          ['memberPassword','memberPasswordError'],
-          ['memberConfirmPassword','memberConfirmPasswordError']
-        ].forEach(x=>societyAdminClearField(overlay,x[0],x[1]));
+        societyAdminClearField(overlay,'memberFullName','memberFullNameError');
+        societyAdminClearField(overlay,'memberHouse','memberHouseError');
+        societyAdminClearField(overlay,'memberPhone','memberPhoneError');
+        societyAdminClearField(overlay,'memberEmail','memberEmailError');
+        societyAdminClearField(overlay,'memberPassword','memberPasswordError');
 
         const full_name=overlay.querySelector('#memberFullName').value.trim();
         const house_number=overlay.querySelector('#memberHouse').value.trim();
         const phone=overlay.querySelector('#memberPhone').value.trim();
-        const email=overlay.querySelector('#memberEmail').value.trim();
+        const email=overlay.querySelector('#memberEmail').value.trim().toLowerCase();
         const password=overlay.querySelector('#memberPassword').value;
-        const confirmPassword=overlay.querySelector('#memberConfirmPassword').value;
         const address=overlay.querySelector('#memberAddress').value.trim();
+
         let valid=true;
 
         if(!full_name){
-          societyAdminFieldError(overlay,'memberFullName','memberFullNameError','Please enter the member name.');
-          valid=false;
+            societyAdminFieldError(overlay,'memberFullName','memberFullNameError','Please enter the member name.');
+            valid=false;
         }
+
         if(!house_number){
-          societyAdminFieldError(overlay,'memberHouse','memberHouseError','Please enter the house / flat number.');
-          valid=false;
+            societyAdminFieldError(overlay,'memberHouse','memberHouseError','Please enter the house / flat number.');
+            valid=false;
         }
+
         if(!phone){
-          societyAdminFieldError(overlay,'memberPhone','memberPhoneError','Phone number is required.');
-          valid=false;
+            societyAdminFieldError(overlay,'memberPhone','memberPhoneError','Please enter the phone number.');
+            valid=false;
         }
-        if(phone && !/^[+0-9][0-9 ()-]{6,19}$/.test(phone)){
-          societyAdminFieldError(overlay,'memberPhone','memberPhoneError','Please enter a valid phone number.');
-          valid=false;
-        }
+
         if(email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
-          societyAdminFieldError(overlay,'memberEmail','memberEmailError','Please enter a valid email address.');
-          valid=false;
+            societyAdminFieldError(overlay,'memberEmail','memberEmailError','Please enter a valid email address.');
+            valid=false;
         }
+
         if(!password){
-          societyAdminFieldError(overlay,'memberPassword','memberPasswordError','Password is required.');
-          valid=false;
+            societyAdminFieldError(overlay,'memberPassword','memberPasswordError','Please enter a password.');
+            valid=false;
         }else if(password.length<6){
-          societyAdminFieldError(overlay,'memberPassword','memberPasswordError','Password must be at least 6 characters.');
-          valid=false;
+            societyAdminFieldError(overlay,'memberPassword','memberPasswordError','Password must be at least 6 characters.');
+            valid=false;
         }
-        if(!confirmPassword){
-          societyAdminFieldError(overlay,'memberConfirmPassword','memberConfirmPasswordError','Please confirm the password.');
-          valid=false;
-        }else if(password!==confirmPassword){
-          societyAdminFieldError(overlay,'memberConfirmPassword','memberConfirmPasswordError','Passwords do not match.');
-          valid=false;
-        }
+
         if(!valid)return;
 
-        const ge=overlay.querySelector('#memberAddGeneralError');
-        ge.style.display='none';
+        const generalError=overlay.querySelector('#memberAddGeneralError');
+        const saveBtn=overlay.querySelector('button[type="submit"]');
+        if(saveBtn){
+            saveBtn.disabled=true;
+            saveBtn.textContent='Saving...';
+            saveBtn.style.opacity='.7';
+        }
 
         try{
-          /*
-           * Creating auth.users requires the Supabase service role and therefore
-           * must happen in an Edge Function, never in this browser JS.
-           *
-           * Deploy an Edge Function named "admin-create-member" that:
-           * 1. verifies the caller is an admin,
-           * 2. calls auth.admin.createUser(),
-           * 3. inserts profiles using the returned auth user id,
-           * 4. rolls back the Auth user if profile creation fails.
-           */
-          const {data:fnData,error:fnError}=await sb.functions.invoke('admin-create-member',{
-            body:{
-              full_name,
-              house_number,
-              phone,
-              email:email||null,
-              password,
-              address:address||null,
-              role:'member'
+            // Make sure the currently logged-in admin session is available.
+            // sb.functions.invoke() will send this access token to the Edge Function.
+            const {data:sessionData,error:sessionError}=await sb.auth.getSession();
+
+            if(sessionError)throw sessionError;
+
+            const accessToken=sessionData?.session?.access_token;
+            if(!accessToken){
+                throw new Error('Admin login session has expired. Please log in again.');
             }
-          });
 
-          if(fnError)throw fnError;
-          if(fnData?.error)throw new Error(fnData.error);
+            const {data,error}=await sb.functions.invoke('admin-create-member',{
+                body:{
+                    full_name,
+                    house_number,
+                    phone,
+                    email:email||null,
+                    password,
+                    address:address||null
+                },
+                headers:{
+                    Authorization:`Bearer ${accessToken}`
+                }
+            });
 
-          close();
-          toast('Member saved successfully');
-          await adminPage('members',window.__adminUser);
+            if(error){
+                console.error('admin-create-member Edge Function error:',error);
+
+                let message=error.message||'Member creation failed.';
+
+                // Supabase FunctionsHttpError can contain the JSON body returned by the function.
+                try{
+                    const response=error.context;
+                    if(response && typeof response.clone==='function'){
+                        const payload=await response.clone().json();
+                        if(payload?.error)message=payload.error;
+                    }
+                }catch(_){
+                    // Keep the original error message when the response is not JSON.
+                }
+
+                throw new Error(message);
+            }
+
+            if(!data?.success){
+                throw new Error(data?.error||'Member was not created.');
+            }
+
+            close();
+            toast('Member saved successfully');
+            await adminPage('members',window.__adminUser);
         }catch(error){
-          console.error('Member save failed:',error);
-          ge.textContent='Member save failed: '+(error?.message||error);
-          ge.style.display='block';
+            console.error('Member save failed:',error);
+            generalError.textContent='Member save failed: '+(error?.message||error);
+            generalError.style.display='block';
+
+            if(saveBtn){
+                saveBtn.disabled=false;
+                saveBtn.textContent='Save Member';
+                saveBtn.style.opacity='1';
+            }
         }
     };
 }
+
 
 async function adminEditMember(i){
     const x=window.__memberRows?.[i];
@@ -1845,68 +1849,10 @@ async function adminUploadMap(){
  }
 }
 
-
-/* ===== ABOUT ADMIN MANAGEMENT ===== */
-async function adminLoadAbout(){
-  if(!sb) throw new Error('Supabase is not configured.');
-  const {data,error}=await sb.from('society_about').select('id,description').eq('id',1).maybeSingle();
-  if(error) throw error;
-  return data || {id:1,description:''};
-}
-async function adminSaveAbout(){
-  const input=document.getElementById('adminAboutDescription');
-  const err=document.getElementById('adminAboutError');
-  const btn=document.getElementById('adminAboutSave');
-  if(!input||!err||!btn)return;
-  input.style.borderColor='#d0d5dd'; err.style.display='none';
-  const description=input.value.trim();
-  if(!description){
-    input.style.borderColor='#d92d20';
-    err.textContent='Please enter the About page description.';
-    err.style.display='block'; input.focus(); return;
-  }
-  btn.disabled=true; btn.textContent='Saving...';
-  try{
-    const {data:existing,error:readError}=await sb.from('society_about').select('id').eq('id',1).maybeSingle();
-    if(readError)throw readError;
-    const result=existing
-      ? await sb.from('society_about').update({description,updated_at:new Date().toISOString()}).eq('id',1)
-      : await sb.from('society_about').insert({id:1,description,updated_at:new Date().toISOString()});
-    if(result.error)throw result.error;
-    toast('About page description updated successfully.');
-    await adminPage('about',window.__adminUser);
-  }catch(e){
-    console.error('About save failed:',e);
-    err.textContent='About save failed: '+(e?.message||e); err.style.display='block';
-  }finally{btn.disabled=false;btn.textContent='Save Description';}
-}
-async function adminAboutPage(c){
-  try{
-    const row=await adminLoadAbout();
-    const esc=String(row?.description||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    c.innerHTML=`<div class="hero"><div><div class="eyebrow">SOCIETY INFORMATION</div><h2>About Society</h2><div class="muted">Update the description shown on the public About page.</div></div></div>
-    <div class="panel">
-      <label for="adminAboutDescription" style="display:block;font-weight:600;margin-bottom:8px">About page description <span style="color:#d92d20">*</span></label>
-      <textarea id="adminAboutDescription" rows="12" maxlength="5000" placeholder="Enter About page description..." style="width:100%;box-sizing:border-box;padding:12px;border:1px solid #d0d5dd;border-radius:9px;line-height:1.5;resize:vertical">${esc}</textarea>
-      <div class="muted" style="font-size:12px;margin-top:6px">Maximum 5000 characters.</div>
-      <div id="adminAboutError" style="display:none;margin-top:10px;padding:10px;border-radius:8px;background:#fff1f1;color:#b42318"></div>
-      <div style="display:flex;justify-content:flex-end;margin-top:14px"><button id="adminAboutSave" class="primary-btn" onclick="adminSaveAbout()">Save Description</button></div>
-    </div>`;
-    document.getElementById('adminAboutDescription').addEventListener('input',function(){
-      this.style.borderColor='#d0d5dd'; document.getElementById('adminAboutError').style.display='none';
-    });
-  }catch(e){
-    c.innerHTML=`<div class="panel"><h2>About Society</h2><p class="muted">Update the description shown on the public About page.</p>
-    <div style="padding:12px;border-radius:8px;background:#fff1f1;color:#b42318">Unable to load About data: ${String(e?.message||e).replace(/</g,'&lt;')}</div>
-    <p class="muted">Required Supabase table: <strong>society_about</strong> with <strong>id</strong>, <strong>description</strong>, and <strong>updated_at</strong>.</p></div>`;
-  }
-}
-
-
 async function adminPage(p,user){
  const c=document.getElementById('adminContent'),t=document.getElementById('adminTitle');
  document.querySelectorAll('#memberApp .nav-item').forEach(b=>b.classList.toggle('active',b.dataset.a===p));
- const titles={dashboard:'Admin Dashboard',finance:'Society Finance',maintenance:'Active Maintenance',work:'Society Work',events:'Events',gallery:'Photo Gallery',members:'Members',complaints:'Complaints',map:'Society Map',about:'About Society'}; t.textContent=titles[p]||'Admin Dashboard';
+ const titles={dashboard:'Admin Dashboard',finance:'Society Finance',maintenance:'Active Maintenance',work:'Society Work',events:'Events',gallery:'Photo Gallery',members:'Members',complaints:'Complaints',map:'Society Map'}; t.textContent=titles[p]||'Admin Dashboard';
  if(p==='dashboard'){
   if(!sb)return toast('Supabase is not configured.');
   const {data:f,error}=await sb.from('society_finance').select('*').eq('id',1).maybeSingle();
@@ -2020,8 +1966,6 @@ else if(p==='maintenance'){
     window.__societyMap=map||null;
     c.innerHTML=`<div class="hero"><div><h2>Society Map</h2><div class="muted">Showing only the Society Map saved in the database.</div></div></div>
     <div class="panel"><label>Society Map PDF<input id="mapPdf" type="file" accept="application/pdf"></label><br><button class="primary-btn" onclick="adminUploadMap()">Upload / Replace PDF</button>${map?.public_url?`<div style="margin-top:16px"><iframe src="${map.public_url}" style="width:100%;height:700px;border:0"></iframe></div><div style="margin-top:10px"><a href="${map.public_url}" target="_blank">Open saved Society Map PDF</a></div>`:`<div class="muted" style="margin-top:16px">No Society Map saved yet.</div>`}</div>`;
-}else if(p==='about'){
-  await adminAboutPage(c);
 }
 }
 function openMemberDashboard(user){document.getElementById('public').classList.add('hidden');const app=document.getElementById('memberApp');app.className='app-shell';app.innerHTML=`<aside class="sidebar"><div class="brand"><div class="brand-mark">DE</div><div><strong>Defense Enclave</strong><span>Member Portal</span></div></div><nav><button class="nav-item active" data-p="dash">⌂ <span>Dashboard</span></button><button class="nav-item" data-p="profile">♙ <span>My Profile</span></button><button class="nav-item" data-p="complaints">⚑ <span>Complaints</span></button><button class="nav-item" data-p="work">▣ <span>Society Work</span></button><button class="nav-item" data-p="events">◷ <span>Events</span></button><button class="nav-item" data-p="gallery">▧ <span>Gallery</span></button><button class="nav-item" data-p="public">↩ <span>Public Site</span></button></nav><div class="sidebar-bottom"><div class="user-mini"><div class="avatar">${(user.name||'A J').split(' ').map(x=>x[0]).slice(0,2).join('')}</div><div><strong>${user.name||'Member'}</strong><span>${user.house_no||'Member'}</span></div></div><button class="outline-btn" id="memberLogout">Log out</button></div></aside><main class="main"><header class="topbar"><div><div class="eyebrow">DEFENSE ENCLAVE SOCIETY</div><h1 id="memberTitle">Member Dashboard</h1></div><div class="top-actions"><button class="icon-btn" id="memberTour">?</button><div class="avatar">${(user.name||'A J').split(' ').map(x=>x[0]).slice(0,2).join('')}</div></div></header><section id="memberContent" class="content"></section></main>`;const nav=app.querySelector('nav');nav.onclick=e=>{const b=e.target.closest('.nav-item');if(!b)return;if(b.dataset.p==='public'){app.classList.add('hidden');document.getElementById('public').classList.remove('hidden');return}memberPage(b.dataset.p,user)};document.getElementById('memberLogout').onclick=async()=>{if(sb){const {error}=await sb.auth.signOut();if(error)return toast(error.message)}app.classList.add('hidden');document.getElementById('public').classList.remove('hidden');setPublicLoginButtonVisible(true);toast('Logged out')};document.getElementById('memberTour').onclick=()=>toast('Tour: dashboard → profile → complaints → work → events → gallery');memberPage('dash',user)}
@@ -2083,7 +2027,6 @@ async function restoreLoginSession(){
         }else{
             await openMemberDashboard(user);
         }
-        setPublicLoginButtonVisible(false);
 
         console.log('Login session restored:',user.email,user.role);
     }catch(e){
@@ -2129,35 +2072,3 @@ if(document.readyState==='loading'){
 }else{
     removePublicAboutFromTopBar();
 }
-
-
-/* ===== REMOVE PUBLIC TOP LINKS / LOGIN VISIBILITY ===== */
-(function(){
-  const PUBLIC_LINKS = new Set(['#home','#members','#work','#events','#gallery','#map']);
-  function isAdminSideMenu(el){
-    return !!el.closest('#adminApp .sidebar,#adminApp .side-menu,#adminSideMenu,#memberApp nav');
-  }
-  function cleanPublicTopBar(){
-    document.querySelectorAll('a[href]').forEach(a=>{
-      const href=(a.getAttribute('href')||'').trim().toLowerCase();
-      if(PUBLIC_LINKS.has(href) && !isAdminSideMenu(a)) a.remove();
-    });
-  }
-  window.setPublicLoginButtonVisible = function(visible){
-    const b=document.getElementById('openLogin');
-    if(!b)return;
-    b.style.display=visible ? '' : 'none';
-    b.hidden=!visible;
-    b.setAttribute('aria-hidden',visible?'false':'true');
-  };
-  function syncLoginButton(){
-    const admin=document.getElementById('adminApp');
-    const member=document.getElementById('memberApp');
-    const loggedIn=!!((admin&&!admin.classList.contains('hidden'))||(member&&!member.classList.contains('hidden')));
-    window.setPublicLoginButtonVisible(!loggedIn);
-  }
-  function cleanAndSync(){ cleanPublicTopBar(); syncLoginButton(); }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',cleanAndSync);
-  else cleanAndSync();
-  new MutationObserver(cleanAndSync).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class']});
-})();
