@@ -171,6 +171,7 @@ function openAdminDashboard(user){
  <button class="nav-item" data-a="members">♙ <span>Members</span></button>
  <button class="nav-item" data-a="complaints">⚑ <span>Complaints</span></button>
  <button class="nav-item" data-a="map">⌖ <span>Society Map</span></button>
+<button class="nav-item" data-a="about">ℹ <span>About</span></button>
  </nav><div class="sidebar-bottom"><div class="user-mini"><div class="avatar">${initials(user.name)}</div><div><strong>${user.name}</strong><span>Administrator</span></div></div><button class="outline-btn" id="adminLogout">Log out</button></div></aside>
  <main class="main"><header class="topbar"><div><div class="eyebrow">DEFENSE ENCLAVE SOCIETY</div><h1 id="adminTitle">Admin Dashboard</h1></div><div class="top-actions"><span class="status ongoing">ADMIN</span><div class="avatar">${initials(user.name)}</div></div></header><section id="adminContent" class="content"></section></main>`;
  const nav=app.querySelector('nav'); nav.onclick=e=>{const b=e.target.closest('.nav-item');if(!b)return;adminPage(b.dataset.a,user)};
@@ -1749,10 +1750,67 @@ async function adminUploadMap(){
  }
 }
 
+
+/* ===== ABOUT ADMIN MANAGEMENT ===== */
+async function adminLoadAbout(){
+  if(!sb) throw new Error('Supabase is not configured.');
+  const {data,error}=await sb.from('society_about').select('id,description').eq('id',1).maybeSingle();
+  if(error) throw error;
+  return data || {id:1,description:''};
+}
+async function adminSaveAbout(){
+  const input=document.getElementById('adminAboutDescription');
+  const err=document.getElementById('adminAboutError');
+  const btn=document.getElementById('adminAboutSave');
+  if(!input||!err||!btn)return;
+  input.style.borderColor='#d0d5dd'; err.style.display='none';
+  const description=input.value.trim();
+  if(!description){
+    input.style.borderColor='#d92d20';
+    err.textContent='Please enter the About page description.';
+    err.style.display='block'; input.focus(); return;
+  }
+  btn.disabled=true; btn.textContent='Saving...';
+  try{
+    const {data:existing,error:readError}=await sb.from('society_about').select('id').eq('id',1).maybeSingle();
+    if(readError)throw readError;
+    const result=existing
+      ? await sb.from('society_about').update({description,updated_at:new Date().toISOString()}).eq('id',1)
+      : await sb.from('society_about').insert({id:1,description,updated_at:new Date().toISOString()});
+    if(result.error)throw result.error;
+    toast('About page description updated successfully.');
+    await adminPage('about',window.__adminUser);
+  }catch(e){
+    console.error('About save failed:',e);
+    err.textContent='About save failed: '+(e?.message||e); err.style.display='block';
+  }finally{btn.disabled=false;btn.textContent='Save Description';}
+}
+async function adminAboutPage(c){
+  try{
+    const row=await adminLoadAbout();
+    const esc=String(row?.description||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    c.innerHTML=`<div class="hero"><div><div class="eyebrow">SOCIETY INFORMATION</div><h2>About Society</h2><div class="muted">Update the description shown on the public About page.</div></div></div>
+    <div class="panel">
+      <label for="adminAboutDescription" style="display:block;font-weight:600;margin-bottom:8px">About page description <span style="color:#d92d20">*</span></label>
+      <textarea id="adminAboutDescription" rows="12" maxlength="5000" placeholder="Enter About page description..." style="width:100%;box-sizing:border-box;padding:12px;border:1px solid #d0d5dd;border-radius:9px;line-height:1.5;resize:vertical">${esc}</textarea>
+      <div class="muted" style="font-size:12px;margin-top:6px">Maximum 5000 characters.</div>
+      <div id="adminAboutError" style="display:none;margin-top:10px;padding:10px;border-radius:8px;background:#fff1f1;color:#b42318"></div>
+      <div style="display:flex;justify-content:flex-end;margin-top:14px"><button id="adminAboutSave" class="primary-btn" onclick="adminSaveAbout()">Save Description</button></div>
+    </div>`;
+    document.getElementById('adminAboutDescription').addEventListener('input',function(){
+      this.style.borderColor='#d0d5dd'; document.getElementById('adminAboutError').style.display='none';
+    });
+  }catch(e){
+    c.innerHTML=`<div class="panel"><h2>About Society</h2><p class="muted">Update the description shown on the public About page.</p>
+    <div style="padding:12px;border-radius:8px;background:#fff1f1;color:#b42318">Unable to load About data: ${String(e?.message||e).replace(/</g,'&lt;')}</div>
+    <p class="muted">Required Supabase table: <strong>society_about</strong> with <strong>id</strong>, <strong>description</strong>, and <strong>updated_at</strong>.</p></div>`;
+  }
+}
+
 async function adminPage(p,user){
  const c=document.getElementById('adminContent'),t=document.getElementById('adminTitle');
  document.querySelectorAll('#memberApp .nav-item').forEach(b=>b.classList.toggle('active',b.dataset.a===p));
- const titles={dashboard:'Admin Dashboard',finance:'Society Finance',maintenance:'Active Maintenance',work:'Society Work',events:'Events',gallery:'Photo Gallery',members:'Members',complaints:'Complaints',map:'Society Map'}; t.textContent=titles[p]||'Admin Dashboard';
+ const titles={dashboard:'Admin Dashboard',finance:'Society Finance',maintenance:'Active Maintenance',work:'Society Work',events:'Events',gallery:'Photo Gallery',members:'Members',complaints:'Complaints',map:'Society Map',about:'About Society'}; t.textContent=titles[p]||'Admin Dashboard';
  if(p==='dashboard'){
   if(!sb)return toast('Supabase is not configured.');
   const {data:f,error}=await sb.from('society_finance').select('*').eq('id',1).maybeSingle();
@@ -1867,7 +1925,10 @@ else if(p==='maintenance'){
     c.innerHTML=`<div class="hero"><div><h2>Society Map</h2><div class="muted">Showing only the Society Map saved in the database.</div></div></div>
     <div class="panel"><label>Society Map PDF<input id="mapPdf" type="file" accept="application/pdf"></label><br><button class="primary-btn" onclick="adminUploadMap()">Upload / Replace PDF</button>${map?.public_url?`<div style="margin-top:16px"><iframe src="${map.public_url}" style="width:100%;height:700px;border:0"></iframe></div><div style="margin-top:10px"><a href="${map.public_url}" target="_blank">Open saved Society Map PDF</a></div>`:`<div class="muted" style="margin-top:16px">No Society Map saved yet.</div>`}</div>`;
 }
-}
+
+else if(p==='about'){
+  await adminAboutPage(c);
+}}
 function openMemberDashboard(user){document.getElementById('public').classList.add('hidden');const app=document.getElementById('memberApp');app.className='app-shell';app.innerHTML=`<aside class="sidebar"><div class="brand"><div class="brand-mark">DE</div><div><strong>Defense Enclave</strong><span>Member Portal</span></div></div><nav><button class="nav-item active" data-p="dash">⌂ <span>Dashboard</span></button><button class="nav-item" data-p="profile">♙ <span>My Profile</span></button><button class="nav-item" data-p="complaints">⚑ <span>Complaints</span></button><button class="nav-item" data-p="work">▣ <span>Society Work</span></button><button class="nav-item" data-p="events">◷ <span>Events</span></button><button class="nav-item" data-p="gallery">▧ <span>Gallery</span></button><button class="nav-item" data-p="public">↩ <span>Public Site</span></button></nav><div class="sidebar-bottom"><div class="user-mini"><div class="avatar">${(user.name||'A J').split(' ').map(x=>x[0]).slice(0,2).join('')}</div><div><strong>${user.name||'Member'}</strong><span>${user.house_no||'Member'}</span></div></div><button class="outline-btn" id="memberLogout">Log out</button></div></aside><main class="main"><header class="topbar"><div><div class="eyebrow">DEFENSE ENCLAVE SOCIETY</div><h1 id="memberTitle">Member Dashboard</h1></div><div class="top-actions"><button class="icon-btn" id="memberTour">?</button><div class="avatar">${(user.name||'A J').split(' ').map(x=>x[0]).slice(0,2).join('')}</div></div></header><section id="memberContent" class="content"></section></main>`;const nav=app.querySelector('nav');nav.onclick=e=>{const b=e.target.closest('.nav-item');if(!b)return;if(b.dataset.p==='public'){app.classList.add('hidden');document.getElementById('public').classList.remove('hidden');return}memberPage(b.dataset.p,user)};document.getElementById('memberLogout').onclick=async()=>{if(sb){const {error}=await sb.auth.signOut();if(error)return toast(error.message)}app.classList.add('hidden');document.getElementById('public').classList.remove('hidden');setPublicLoginButtonVisible(true);toast('Logged out')};document.getElementById('memberTour').onclick=()=>toast('Tour: dashboard → profile → complaints → work → events → gallery');memberPage('dash',user)}
 function memberPage(p,user){const c=document.getElementById('memberContent'),t=document.getElementById('memberTitle');document.querySelectorAll('#memberApp .nav-item').forEach(b=>b.classList.toggle('active',b.dataset.p===p));t.textContent={dash:'Member Dashboard',profile:'My Profile',complaints:'Complaints',work:'Society Work',events:'Events',gallery:'Photo Gallery'}[p];if(p==='dash')c.innerHTML=`<div class="hero"><div><div class="eyebrow">WELCOME BACK</div><h2>Good afternoon, ${user.name||'Member'}!</h2><div class="muted">Your society financial and activity overview.</div></div><button class="primary-btn" id="newComplaint">+ New Complaint</button></div><div class="stats">${[['Society Fund','₹18,42,500','Current balance'],['Total Expenses','₹6,84,250','This year'],['Active Maintenance','₹2,48,000','12 active items'],['Pending Tasks','17','Needs attention']].map(x=>`<div class="stat"><div class="stat-head">${x[0]}<span>●</span></div><div class="value">${x[1]}</div><div class="trend">${x[2]}</div></div>`).join('')}</div><div class="grid-2"><div class="panel"><div class="panel-head"><h3>Society Expenses — Last 6 Months</h3><span class="muted">₹ thousands</span></div><div class="chart">${[86,112,74,138,121,154].map(v=>`<div class="bar" style="height:${v*1.12}px"><span>${v}</span></div>`).join('')}</div><div class="months"><span>Apr</span><span>May</span><span>Jun</span><span>Jul</span><span>Aug</span><span>Sep</span></div></div><div class="panel"><h3>Expense Breakdown</h3><div class="donut-wrap"><div class="donut"></div><div class="legend"><div>● Maintenance 40%</div><div>● Security 25%</div><div>● Utilities 20%</div><div>● Other 15%</div></div></div></div></div><div class="grid-2-equal" style="margin-top:16px"><div class="panel"><h3>Recent Activity</h3><div class="activity"><div class="activity-item"><div class="activity-icon">₹</div><div><strong>Maintenance payment recorded</strong><p>Block B · ₹12,500 · 2 hours ago</p></div></div><div class="activity-item"><div class="activity-icon">✓</div><div><strong>Street light complaint updated</strong><p>Complaint #DE-1042 · In Progress</p></div></div><div class="activity-item"><div class="activity-icon">⚑</div><div><strong>New society announcement</strong><p>Monthly meeting notice · Today</p></div></div></div></div><div class="panel"><h3>Monthly Overview</h3><p class="muted">Revenue ₹3.42L · Expenses ₹1.54L</p><div class="progress"><i style="width:45%"></i></div><p class="muted">45% of monthly collection used</p></div></div>`;else if(p==='profile')c.innerHTML=`<div class="hero"><div><h2>My Profile</h2><div class="muted">Your registered society information.</div></div></div><div class="panel"><div class="form-grid"><label>Name<input value="${user.name||''}" id="profileName"></label><label>Email<input value="${user.email||''}" readonly></label><label>House / Flat<input value="${user.house_no||''}" id="profileHouse"></label><label>Phone<input placeholder="Phone number"></label></div><label>Address<textarea>${user.address||''}</textarea></label><button class="primary-btn" onclick="toast('Profile saved in demo mode')">Save Profile</button></div>`;else if(p==='complaints')c.innerHTML=`<div class="hero"><div><h2>My Complaints</h2><div class="muted">Submit and track society issues.</div></div><button class="primary-btn" id="newComplaint">+ New Complaint</button></div><div class="panel"><table class="table"><thead><tr><th>ID</th><th>Category</th><th>Complaint</th><th>Status</th><th>Date</th></tr></thead><tbody>${demo.works.slice(0,3).map((w,i)=>`<tr><td>#DE-10${42-i}</td><td>${['Street Light','Cleanliness','Water'][i]}</td><td>${w[1]}</td><td><span class="status ${i===1?'completed':i===0?'ongoing':'pending'}">${i===1?'Resolved':i===0?'In Progress':'Submitted'}</span></td><td>15 Sep 2026</td></tr>`).join('')}</tbody></table></div>`;else if(p==='work')c.innerHTML=`<div class="hero"><div><h2>Society Work</h2><div class="muted">Transparent project progress.</div></div></div><div class="panel"><table class="table"><thead><tr><th>Project</th><th>Status</th><th>Progress</th><th>Target</th></tr></thead><tbody>${demo.works.map(w=>`<tr><td><strong>${w[0]}</strong><br><span class="muted">${w[1]}</span></td><td><span class="status ${w[2].toLowerCase()}">${w[2]}</span></td><td><div class="progress"><i style="width:${w[3]}%"></i></div>${w[3]}%</td><td>${w[4]}</td></tr>`).join('')}</tbody></table></div>`;else if(p==='events')c.innerHTML=`<div class="hero"><div><h2>Events</h2><div class="muted">Upcoming society events.</div></div></div><div class="event-grid">${demo.events.map(e=>`<div class="card"><div class="photo">${e[3]}</div><div class="card-body"><div class="event-date">${e[0]}</div><h3>${e[1]}</h3><div class="muted">${e[2]}</div></div></div>`).join('')}</div>`;else if(p==='gallery')c.innerHTML=`<div class="hero"><div><h2>Photo Gallery</h2><div class="muted">Community moments.</div></div></div><div class="gallery-grid">${demo.gallery.map((g,i)=>`<div class="card"><div class="photo">${['◉','★','♧','✦','✓','◎'][i]}</div><div class="card-body"><strong>${g}</strong></div></div>`).join('')}</div>`;document.getElementById('newComplaint')?.addEventListener('click',()=>toast('Complaint form is ready; database connection will persist it in production.'))}
 
@@ -1958,49 +2019,15 @@ document.addEventListener('DOMContentLoaded',()=>{
 
 /* ===== REMOVE ABOUT FROM PUBLIC TOP BAR ONLY ===== */
 function removePublicAboutFromTopBar(){
-    document.querySelectorAll('a').forEach(link=>{
-        if(link.closest('#memberApp'))return;
-        const text=(link.textContent||'').trim().toLowerCase();
-        const href=(link.getAttribute('href')||'').trim().toLowerCase();
-        if(text==='about' || href==='#about'){
-            link.remove();
-        }
-    });
+  document.querySelectorAll('a,button').forEach(el=>{
+    if(el.closest('#adminApp') || el.closest('.admin-sidebar') || el.closest('.sidebar')) return;
+    const text=(el.textContent||'').trim().toLowerCase();
+    const href=(el.getAttribute('href')||'').trim().toLowerCase();
+    if(text==='about' || href==='#about') el.remove();
+  });
 }
 if(document.readyState==='loading'){
     document.addEventListener('DOMContentLoaded',removePublicAboutFromTopBar);
 }else{
     removePublicAboutFromTopBar();
 }
-
-
-/* ===== REMOVE PUBLIC TOP LINKS / LOGIN VISIBILITY ===== */
-(function(){
-  const PUBLIC_LINKS = new Set(['#home','#members','#work','#events','#gallery','#map']);
-  function isAdminSideMenu(el){
-    return !!el.closest('#adminApp .sidebar,#adminApp .side-menu,#adminSideMenu,#memberApp nav');
-  }
-  function cleanPublicTopBar(){
-    document.querySelectorAll('a[href]').forEach(a=>{
-      const href=(a.getAttribute('href')||'').trim().toLowerCase();
-      if(PUBLIC_LINKS.has(href) && !isAdminSideMenu(a)) a.remove();
-    });
-  }
-  window.setPublicLoginButtonVisible = function(visible){
-    const b=document.getElementById('openLogin');
-    if(!b)return;
-    b.style.display=visible ? '' : 'none';
-    b.hidden=!visible;
-    b.setAttribute('aria-hidden',visible?'false':'true');
-  };
-  function syncLoginButton(){
-    const admin=document.getElementById('adminApp');
-    const member=document.getElementById('memberApp');
-    const loggedIn=!!((admin&&!admin.classList.contains('hidden'))||(member&&!member.classList.contains('hidden')));
-    window.setPublicLoginButtonVisible(!loggedIn);
-  }
-  function cleanAndSync(){ cleanPublicTopBar(); syncLoginButton(); }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',cleanAndSync);
-  else cleanAndSync();
-  new MutationObserver(cleanAndSync).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class']});
-})();
