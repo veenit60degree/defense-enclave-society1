@@ -1807,12 +1807,155 @@ async function adminEditMember(i){
 }
 
 
-async function adminDeleteMember(i){
- const x=window.__memberRows?.[i]; if(!x||!confirm('Remove this member?'))return;
- const {error}=await sb.from('profiles').delete().eq('id',x.id);
- if(error)return toast('Member delete failed: '+error.message);
- toast('Member removed'); await adminPage('members',window.__adminUser);
+// async function adminDeleteMember(i){
+//  const x=window.__memberRows?.[i]; if(!x||!confirm('Remove this member?'))return;
+//  const {error}=await sb.from('profiles').delete().eq('id',x.id);
+//  if(error)return toast('Member delete failed: '+error.message);
+//  toast('Member removed'); await adminPage('members',window.__adminUser);
+// }
+
+async function adminDeleteMember(i) {
+    const x = window.__memberRows?.[i];
+
+    if (!x) {
+        return toast('Member not found.');
+    }
+
+    if (!confirm(`Remove "${x.full_name || 'this member'}"?`)) {
+        return;
+    }
+
+    if (!sb) {
+        return toast('Supabase is not configured.');
+    }
+
+    try {
+        // ---------------------------------------------------------
+        // Get current admin session
+        // ---------------------------------------------------------
+        const {
+            data: sessionData,
+            error: sessionError
+        } = await sb.auth.getSession();
+
+        if (sessionError) {
+            throw new Error(
+                'Unable to get admin session: ' +
+                sessionError.message
+            );
+        }
+
+        const session = sessionData?.session;
+
+        if (!session?.access_token) {
+            throw new Error(
+                'Admin session is not available. Please login again.'
+            );
+        }
+
+        console.log('Deleting member:', {
+            memberId: x.id,
+            memberName: x.full_name,
+            adminId: session.user?.id
+        });
+
+        // ---------------------------------------------------------
+        // Delete through Edge Function
+        //
+        // Edge Function will:
+        // 1. Verify current user is admin
+        // 2. Verify target is a member
+        // 3. Delete Auth user
+        // 4. Delete profiles record
+        // ---------------------------------------------------------
+        const {
+            data: fnData,
+            error: fnError
+        } = await sb.functions.invoke(
+            'admin-create-member',
+            {
+                body: {
+                    action: 'delete',
+                    user_id: x.id
+                },
+                headers: {
+                    Authorization:
+                        `Bearer ${session.access_token}`
+                }
+            }
+        );
+
+        if (fnError) {
+            console.error(
+                'admin-create-member delete error:',
+                fnError
+            );
+
+            let message =
+                fnError.message ||
+                'Failed to delete member.';
+
+            // Try to read Edge Function JSON error
+            try {
+                const response = fnError.context;
+
+                if (
+                    response &&
+                    typeof response.clone === 'function'
+                ) {
+                    const payload =
+                        await response.clone().json();
+
+                    if (payload?.error) {
+                        message = payload.error;
+                    }
+                }
+            } catch (_) {
+                // Keep original error message
+            }
+
+            throw new Error(message);
+        }
+
+        if (fnData?.error) {
+            throw new Error(fnData.error);
+        }
+
+        if (!fnData?.success) {
+            throw new Error(
+                'Member was not deleted.'
+            );
+        }
+
+        console.log(
+            'Member deleted successfully:',
+            fnData
+        );
+
+        // ---------------------------------------------------------
+        // Refresh Members page
+        // ---------------------------------------------------------
+        toast('Member removed');
+
+        await adminPage(
+            'members',
+            window.__adminUser
+        );
+
+    } catch (error) {
+        console.error(
+            'Member delete failed:',
+            error
+        );
+
+        toast(
+            'Member delete failed: ' +
+            (error?.message || error)
+        );
+    }
 }
+
+
 
 async function adminUpdateComplaint(i){
  const x=window.__complaintRows?.[i]; if(!x)return;
