@@ -1972,3 +1972,35 @@ if(document.readyState==='loading'){
 }else{
     removePublicAboutFromTopBar();
 }
+
+
+/* ===== REMOVE PUBLIC TOP LINKS / LOGIN VISIBILITY ===== */
+(function(){
+  const PUBLIC_LINKS = new Set(['#home','#members','#work','#events','#gallery','#map']);
+  function isAdminSideMenu(el){
+    return !!el.closest('#adminApp .sidebar,#adminApp .side-menu,#adminSideMenu,#memberApp nav');
+  }
+  function cleanPublicTopBar(){
+    document.querySelectorAll('a[href]').forEach(a=>{
+      const href=(a.getAttribute('href')||'').trim().toLowerCase();
+      if(PUBLIC_LINKS.has(href) && !isAdminSideMenu(a)) a.remove();
+    });
+  }
+  window.setPublicLoginButtonVisible = function(visible){
+    const b=document.getElementById('openLogin');
+    if(!b)return;
+    b.style.display=visible ? '' : 'none';
+    b.hidden=!visible;
+    b.setAttribute('aria-hidden',visible?'false':'true');
+  };
+  function syncLoginButton(){
+    const admin=document.getElementById('adminApp');
+    const member=document.getElementById('memberApp');
+    const loggedIn=!!((admin&&!admin.classList.contains('hidden'))||(member&&!member.classList.contains('hidden')));
+    window.setPublicLoginButtonVisible(!loggedIn);
+  }
+  function cleanAndSync(){ cleanPublicTopBar(); syncLoginButton(); }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',cleanAndSync);
+  else cleanAndSync();
+  new MutationObserver(cleanAndSync).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class']});
+})();
