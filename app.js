@@ -528,133 +528,153 @@ async function adminEditWork(i){
     if(!x)return;
     if(!sb)return toast('Supabase is not configured.');
 
-    const old=document.getElementById('workFormOverlay');
+    const old=document.getElementById('workEditModal');
     if(old)old.remove();
 
-    const currentName=
-        x.name||x.title||x.work_name||x.project_name||x.work_title||
+    const currentName=x.name||x.title||x.work_name||x.project_name||x.work_title||
         x.project||x.work||x.activity||x.task||x.subject||'';
-
     const currentDescription=x.description||x.details||'';
-    const currentStatus=x.status||'Pending';
+    const currentStatus=x.status||'';
     const currentProgress=Number(x.progress??0);
     const currentTarget=x.target_date||x.target||x.due_date||'';
 
+    const toInputDate=(value)=>{
+        if(!value)return '';
+        const v=String(value).trim();
+        if(/^\\d{4}-\\d{2}-\\d{2}$/.test(v))return v;
+        const m=v.match(/^(\\d{2})[\\/\\-](\\d{2})[\\/\\-](\\d{4})$/);
+        if(m)return `${m[3]}-${m[2]}-${m[1]}`;
+        const d=new Date(v);
+        if(Number.isNaN(d.getTime()))return '';
+        return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    };
+
+    const esc=(value)=>{
+        return String(value??'')
+            .replace(/&/g,'&amp;')
+            .replace(/</g,'&lt;')
+            .replace(/>/g,'&gt;')
+            .replace(/"/g,'&quot;')
+            .replace(/'/g,'&#39;');
+    };
+
     const overlay=document.createElement('div');
-    overlay.id='workFormOverlay';
-    overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;';
+    overlay.id='workEditModal';
+    overlay.style.cssText='position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;background:rgba(15,23,42,.58);backdrop-filter:blur(3px);';
 
     overlay.innerHTML=`
-      <div style="width:min(620px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.25);padding:24px;box-sizing:border-box;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
-          <div>
-            <div class="eyebrow">SOCIETY WORK</div>
-            <h2 style="margin:4px 0 0;">Edit Work / Project</h2>
-          </div>
-          <button type="button" id="closeWorkForm" class="outline-btn">✕</button>
+    <div role="dialog" aria-modal="true" aria-labelledby="workEditTitle"
+         style="width:min(560px,100%);max-height:calc(100vh - 40px);overflow:auto;background:#fff;border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.30);padding:24px;box-sizing:border-box;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+        <div>
+          <h2 id="workEditTitle" style="margin:0 0 4px;font-size:22px;">Edit Society Work</h2>
+          <div style="font-size:13px;color:#667085;">Update all work details and save them together.</div>
+        </div>
+        <button type="button" id="workEditModalClose" aria-label="Close"
+          style="width:36px;height:36px;border:0;border-radius:50%;background:#f2f4f7;font-size:24px;line-height:1;cursor:pointer;">&times;</button>
+      </div>
+
+      <form id="workEditForm" novalidate>
+        <div id="workEditGeneralError" style="display:none;margin-bottom:14px;padding:11px 12px;border-radius:9px;background:#fff1f1;color:#b42318;font-size:13px;"></div>
+
+        <div style="margin-bottom:15px;">
+          <label for="editWorkName" style="display:block;font-weight:600;margin-bottom:6px;">Work / project name <span style="color:#d92d20;">*</span></label>
+          <input id="editWorkName" type="text" maxlength="150" value="${esc(currentName)}"
+            placeholder="Enter work / project name"
+            style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
+          <div style="font-size:12px;color:#667085;margin-top:5px;">Example: Park Renovation</div>
+          <div id="editWorkNameError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
         </div>
 
-        <div id="workEditError" class="muted" style="display:none;margin-bottom:12px;"></div>
+        <div style="margin-bottom:15px;">
+          <label for="editWorkDescription" style="display:block;font-weight:600;margin-bottom:6px;">Description</label>
+          <textarea id="editWorkDescription" rows="4" maxlength="2000"
+            placeholder="Enter work details..."
+            style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;resize:vertical;">${esc(currentDescription)}</textarea>
+          <div style="font-size:12px;color:#667085;margin-top:5px;">Optional. Maximum 2000 characters.</div>
+        </div>
 
-        <form id="editWorkForm" novalidate>
-          <div style="margin-bottom:14px;">
-            <label for="editWorkName"><strong>Work / project name</strong></label>
-            <input id="editWorkName" type="text" class="input" value="${escHtml(currentName)}"
-                   placeholder="e.g. Main Gate Repair" style="width:100%;box-sizing:border-box;margin-top:6px;">
-            <div id="editWorkNameError" class="field-error" style="display:none;"></div>
-          </div>
+        <div style="margin-bottom:15px;">
+          <label for="editWorkStatus" style="display:block;font-weight:600;margin-bottom:6px;">Status <span style="color:#d92d20;">*</span></label>
+          <select id="editWorkStatus"
+            style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;background:#fff;">
+            <option value="">Select status</option>
+            <option value="Ongoing" ${currentStatus==='Ongoing'?'selected':''}>Ongoing</option>
+            <option value="Pending" ${currentStatus==='Pending'?'selected':''}>Pending</option>
+            <option value="Completed" ${currentStatus==='Completed'?'selected':''}>Completed</option>
+          </select>
+          <div style="font-size:12px;color:#667085;margin-top:5px;">Select the current work status.</div>
+          <div id="editWorkStatusError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
+        </div>
 
-          <div style="margin-bottom:14px;">
-            <label for="editWorkDescription"><strong>Description</strong></label>
-            <textarea id="editWorkDescription" class="input" rows="4"
-                      placeholder="Describe the work / project" style="width:100%;box-sizing:border-box;margin-top:6px;">${escHtml(currentDescription)}</textarea>
-            <div id="editWorkDescriptionError" class="field-error" style="display:none;"></div>
-          </div>
+        <div style="margin-bottom:15px;">
+          <label for="editWorkProgress" style="display:block;font-weight:600;margin-bottom:6px;">Progress <span style="color:#d92d20;">*</span></label>
+          <select id="editWorkProgress"
+            style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;background:#fff;">
+            <option value="">Select progress</option>
+            ${[0,10,20,30,40,50,60,70,80,90,100].map(v=>`<option value="${v}" ${currentProgress===v?'selected':''}>${v}%</option>`).join('')}
+          </select>
+          <div style="font-size:12px;color:#667085;margin-top:5px;">Select progress from 0% to 100%.</div>
+          <div id="editWorkProgressError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
+        </div>
 
-          <div style="margin-bottom:14px;">
-            <label for="editWorkStatus"><strong>Status</strong></label>
-            <select id="editWorkStatus" class="input" style="width:100%;box-sizing:border-box;margin-top:6px;">
-              <option value="Ongoing" ${currentStatus==='Ongoing'?'selected':''}>Ongoing</option>
-              <option value="Pending" ${currentStatus==='Pending'?'selected':''}>Pending</option>
-              <option value="Completed" ${currentStatus==='Completed'?'selected':''}>Completed</option>
-            </select>
-            <div id="editWorkStatusError" class="field-error" style="display:none;"></div>
-          </div>
+        <div style="margin-bottom:20px;">
+          <label for="editWorkTargetDate" style="display:block;font-weight:600;margin-bottom:6px;">Target date <span style="color:#d92d20;">*</span></label>
+          <input id="editWorkTargetDate" type="date" value="${toInputDate(currentTarget)}"
+            style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
+          <div style="font-size:12px;color:#667085;margin-top:5px;">Select the target completion date.</div>
+          <div id="editWorkTargetDateError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
+        </div>
 
-          <div style="margin-bottom:14px;">
-            <label for="editWorkProgress"><strong>Progress</strong></label>
-            <select id="editWorkProgress" class="input" style="width:100%;box-sizing:border-box;margin-top:6px;">
-              ${[0,10,20,30,40,50,60,70,80,90,100].map(v=>`<option value="${v}" ${currentProgress===v?'selected':''}>${v}%</option>`).join('')}
-            </select>
-            <div id="editWorkProgressError" class="field-error" style="display:none;"></div>
-          </div>
-
-          <div style="margin-bottom:20px;">
-            <label for="editWorkTargetDate"><strong>Target date</strong></label>
-            <input id="editWorkTargetDate" type="date" class="input" value="${toInputDate(currentTarget)}"
-                   style="width:100%;box-sizing:border-box;margin-top:6px;">
-            <div id="editWorkTargetDateError" class="field-error" style="display:none;"></div>
-          </div>
-
-          <div style="display:flex;justify-content:flex-end;gap:10px;">
-            <button type="button" id="cancelEditWork" class="outline-btn">Cancel</button>
-            <button type="submit" class="primary-btn">Update Work</button>
-          </div>
-        </form>
-      </div>`;
+        <div style="display:flex;justify-content:flex-end;gap:10px;">
+          <button type="button" id="workEditCancel"
+            style="padding:10px 16px;border:1px solid #d0d5dd;border-radius:9px;background:#fff;cursor:pointer;">Cancel</button>
+          <button type="submit"
+            style="padding:10px 18px;border:0;border-radius:9px;background:#1d4ed8;color:#fff;cursor:pointer;font-weight:600;">Update Work</button>
+        </div>
+      </form>
+    </div>`;
 
     document.body.appendChild(overlay);
 
     const close=()=>overlay.remove();
-    document.getElementById('closeWorkForm').onclick=close;
-    document.getElementById('cancelEditWork').onclick=close;
+    document.getElementById('workEditModalClose').onclick=close;
+    document.getElementById('workEditCancel').onclick=close;
     overlay.addEventListener('click',e=>{if(e.target===overlay)close();});
 
-    const clearError=(id)=>{
+    const fields=[
+        ['editWorkName','editWorkNameError'],
+        ['editWorkStatus','editWorkStatusError'],
+        ['editWorkProgress','editWorkProgressError'],
+        ['editWorkTargetDate','editWorkTargetDateError']
+    ];
+
+    const clearField=(id,errorId)=>{
         const el=document.getElementById(id);
-        if(el){
-            el.style.display='none';
-            el.textContent='';
-        }
+        const er=document.getElementById(errorId);
+        if(el){el.style.borderColor='#d0d5dd';el.style.boxShadow='none';}
+        if(er){er.textContent='';er.style.display='none';}
     };
-    const showError=(field,errorId,message)=>{
-        const fieldEl=document.getElementById(field);
-        const errorEl=document.getElementById(errorId);
-        if(fieldEl){
-            fieldEl.style.borderColor='#dc2626';
-            fieldEl.style.boxShadow='0 0 0 2px rgba(220,38,38,.10)';
-            fieldEl.focus();
-        }
-        if(errorEl){
-            errorEl.textContent=message;
-            errorEl.style.display='block';
-            errorEl.style.color='#dc2626';
-            errorEl.style.fontSize='13px';
-            errorEl.style.marginTop='5px';
-        }
-    };
-    const clearFieldStyle=(id)=>{
+
+    const showFieldError=(id,errorId,message)=>{
         const el=document.getElementById(id);
+        const er=document.getElementById(errorId);
         if(el){
-            el.style.borderColor='';
-            el.style.boxShadow='';
+            el.style.borderColor='#d92d20';
+            el.style.boxShadow='0 0 0 2px rgba(217,45,32,.10)';
+        }
+        if(er){
+            er.textContent=message;
+            er.style.display='block';
         }
     };
 
-    ['editWorkName','editWorkDescription','editWorkStatus','editWorkProgress','editWorkTargetDate']
-      .forEach((id,idx)=>{
-        const errorIds=['editWorkNameError','editWorkDescriptionError','editWorkStatusError','editWorkProgressError','editWorkTargetDateError'];
-        document.getElementById(id)?.addEventListener('input',()=>{
-            clearFieldStyle(id);
-            clearError(errorIds[idx]);
-        });
-        document.getElementById(id)?.addEventListener('change',()=>{
-            clearFieldStyle(id);
-            clearError(errorIds[idx]);
-        });
-      });
+    fields.forEach(([id,errorId])=>{
+        document.getElementById(id)?.addEventListener('input',()=>clearField(id,errorId));
+        document.getElementById(id)?.addEventListener('change',()=>clearField(id,errorId));
+    });
 
-    document.getElementById('editWorkForm').onsubmit=async(e)=>{
+    document.getElementById('workEditForm').onsubmit=async(e)=>{
         e.preventDefault();
 
         const workName=document.getElementById('editWorkName').value.trim();
@@ -663,31 +683,23 @@ async function adminEditWork(i){
         const progress=Number(document.getElementById('editWorkProgress').value);
         const target_date=document.getElementById('editWorkTargetDate').value;
 
+        fields.forEach(([id,errorId])=>clearField(id,errorId));
         let valid=true;
 
-        ['editWorkName','editWorkDescription','editWorkStatus','editWorkProgress','editWorkTargetDate']
-          .forEach(id=>clearFieldStyle(id));
-        ['editWorkNameError','editWorkDescriptionError','editWorkStatusError','editWorkProgressError','editWorkTargetDateError']
-          .forEach(clearError);
-
         if(!workName){
-            showError('editWorkName','editWorkNameError','Please enter the work / project name.');
-            valid=false;
-        }
-        if(!description){
-            showError('editWorkDescription','editWorkDescriptionError','Please enter a description.');
+            showFieldError('editWorkName','editWorkNameError','Please enter the work / project name.');
             valid=false;
         }
         if(!['Ongoing','Pending','Completed'].includes(status)){
-            showError('editWorkStatus','editWorkStatusError','Please select a valid status.');
+            showFieldError('editWorkStatus','editWorkStatusError','Please select a valid status.');
             valid=false;
         }
         if(![0,10,20,30,40,50,60,70,80,90,100].includes(progress)){
-            showError('editWorkProgress','editWorkProgressError','Please select a progress value.');
+            showFieldError('editWorkProgress','editWorkProgressError','Please select a progress value.');
             valid=false;
         }
         if(!target_date){
-            showError('editWorkTargetDate','editWorkTargetDateError','Please select a target date.');
+            showFieldError('editWorkTargetDate','editWorkTargetDateError','Please select a target date.');
             valid=false;
         }
 
@@ -700,11 +712,14 @@ async function adminEditWork(i){
                 description,
                 status,
                 progress,
-                target_date:target_date||null
+                target_date
             });
 
             if(!titleColumn){
-                return toast('Work update failed: no supported work-name column exists in society_work.');
+                const ge=document.getElementById('workEditGeneralError');
+                ge.textContent='No supported work-name column exists in society_work.';
+                ge.style.display='block';
+                return;
             }
 
             const {error}=await sb.from('society_work')
@@ -713,38 +728,24 @@ async function adminEditWork(i){
 
             if(error){
                 console.error('Work update failed:',error,payload);
-                return toast('Work update failed: '+error.message);
+                const ge=document.getElementById('workEditGeneralError');
+                ge.textContent='Work update failed: '+error.message;
+                ge.style.display='block';
+                return;
             }
 
             close();
             toast('Work updated successfully');
             await adminPage('work',window.__adminUser);
-        }catch(err){
-            console.error('Work update exception:',err);
-            toast('Work update failed: '+(err?.message||err));
+        }catch(e){
+            console.error('Work update exception:',e);
+            const ge=document.getElementById('workEditGeneralError');
+            ge.textContent='Work update failed: '+(e?.message||e);
+            ge.style.display='block';
         }
     };
 }
 
-function escHtml(v){
-    return String(v??'')
-      .replace(/&/g,'&amp;')
-      .replace(/</g,'&lt;')
-      .replace(/>/g,'&gt;')
-      .replace(/"/g,'&quot;')
-      .replace(/'/g,'&#39;');
-}
-
-function toInputDate(v){
-    if(!v)return '';
-    const str=String(v).trim();
-    if(/^\\d{4}-\\d{2}-\\d{2}$/.test(str))return str;
-    const m=str.match(/^(\\d{2})[\\/\\-](\\d{2})[\\/\\-](\\d{4})$/);
-    if(m)return `${m[3]}-${m[2]}-${m[1]}`;
-    const d=new Date(str);
-    if(Number.isNaN(d.getTime()))return '';
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
 
 
 async function adminAddEvent(){
@@ -1589,3 +1590,21 @@ document.addEventListener('DOMContentLoaded',()=>{
     setupPublicTopNavigation();
     setPublicLoginButtonVisible(true);
 });
+
+
+/* ===== REMOVE ABOUT FROM PUBLIC TOP BAR ONLY ===== */
+function removePublicAboutFromTopBar(){
+    document.querySelectorAll('a').forEach(link=>{
+        if(link.closest('#memberApp'))return;
+        const text=(link.textContent||'').trim().toLowerCase();
+        const href=(link.getAttribute('href')||'').trim().toLowerCase();
+        if(text==='about' || href==='#about'){
+            link.remove();
+        }
+    });
+}
+if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',removePublicAboutFromTopBar);
+}else{
+    removePublicAboutFromTopBar();
+}
