@@ -1560,13 +1560,52 @@ async function adminAddMember(){
         if(!['member','admin'].includes(role)){societyAdminFieldError(overlay,'memberRole','memberRoleError','Please select a valid role.');valid=false;}
         if(!valid)return;
 
-        const {error}=await sb.from('profiles').insert({full_name,house_number,phone,address,role});
-        if(error){
+                /*
+         * profiles is protected by RLS. Use the server-side RPC when it is
+         * available; it can safely insert a member while checking admin role.
+         */
+        let saveError=null;
+
+        try{
+            const rpcResult=await sb.rpc('admin_create_member',{
+                p_full_name:full_name,
+                p_house_number:house_number,
+                p_phone:phone||null,
+                p_address:address||null,
+                p_role:role
+            });
+
+            if(!rpcResult.error){
+                saveError=null;
+            }else{
+                const msg=String(rpcResult.error.message||'');
+                const rpcMissing=/admin_create_member.*does not exist|could not find the function|PGRST202/i.test(msg);
+
+                if(rpcMissing){
+                    const direct=await sb.from('profiles').insert({
+                        full_name,
+                        house_number,
+                        phone:phone||null,
+                        address:address||null,
+                        role
+                    });
+                    saveError=direct.error;
+                }else{
+                    saveError=rpcResult.error;
+                }
+            }
+        }catch(e){
+            console.error('admin_create_member RPC error:',e);
+            saveError=e;
+        }
+
+        if(saveError){
             const ge=overlay.querySelector('#memberAddGeneralError');
-            ge.textContent='Member save failed: '+error.message;
+            ge.textContent='Member save failed: '+(saveError.message||saveError);
             ge.style.display='block';
             return;
         }
+
         close();
         toast('Member saved successfully');
         await adminPage('members',window.__adminUser);
