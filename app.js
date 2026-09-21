@@ -246,46 +246,110 @@ async function adminDeleteEvent(i){
  toast('Event deleted'); await adminPage('events',window.__adminUser);
 }
 
+async function adminListGalleryFolders(){
+ if(!sb)return [];
+ try{
+  const {data,error}=await sb.storage.from('society-gallery').list('',{limit:1000,sortBy:{column:'name',order:'asc'}});
+  if(error){ console.error('Gallery folder list error:',error); return []; }
+  return (data||[])
+    .filter(x => x && x.name && !x.name.includes('.'))
+    .map(x => x.name);
+ }catch(e){
+  console.error('Gallery folder list exception:',e);
+  return [];
+ }
+}
+
 async function adminAddGalleryFolder(){
  if(!sb)return toast('Supabase is not configured.');
- const name=prompt('Gallery folder name:'); if(!name)return;
- const folder=String(name).trim();
- const {data:existing,error}=await sb.from('gallery_photos').select('id').eq('folder_name',folder).limit(1);
- if(error)return toast('Gallery folder check failed: '+error.message);
- if(existing?.length)return toast('Folder already exists.');
- toast('Folder will appear after the first photo is saved in it.');
- await adminPage('gallery',window.__adminUser);
+ const name=prompt('Gallery folder name:');
+ if(!name)return;
+ const folder=String(name).trim().replace(/[\/\\]+/g,'-');
+ if(!folder)return;
+
+ try{
+  const {data:existing,error}=await sb.storage.from('society-gallery').list(folder,{limit:1});
+  if(error)return toast('Gallery folder check failed: '+error.message);
+  if((existing||[]).length)return toast('Folder already exists.');
+
+  // Supabase Storage creates folders implicitly when a file is uploaded.
+  // Store a tiny hidden marker so an empty folder can still exist.
+  const marker=new Blob(['gallery-folder'],{type:'text/plain'});
+  const {error:uploadError}=await sb.storage
+    .from('society-gallery')
+    .upload(`${folder}/.folder`,marker,{upsert:false,contentType:'text/plain'});
+
+  if(uploadError)return toast('Gallery folder save failed: '+uploadError.message);
+
+  toast(`Gallery folder "${folder}" created successfully.`);
+  await adminPage('gallery',window.__adminUser);
+ }catch(e){
+  console.error('Gallery folder create error:',e);
+  toast('Gallery folder save failed: '+(e?.message||e));
+ }
 }
 
 async function adminUploadGallery(folderName){
  if(!sb)return toast('Supabase is not configured.');
  if(typeof folderName!=='string' || !folderName.trim())return toast('Gallery folder not found.');
- const input=document.createElement('input'); input.type='file'; input.accept='image/*'; input.multiple=true;
+
+ const input=document.createElement('input');
+ input.type='file';
+ input.accept='image/*';
+ input.multiple=true;
+
  input.onchange=async()=>{
-  const files=Array.from(input.files||[]); if(!files.length)return;
+  const files=Array.from(input.files||[]);
+  if(!files.length)return;
+
   let saved=0,failed=0;
+
   for(const file of files){
    let storagePath=null;
    try{
-    const folder=folderName.trim().replace(/[^a-zA-Z0-9_-]+/g,'_');
+    const folder=folderName.trim().replace(/[\/\\]+/g,'-').replace(/[^a-zA-Z0-9 _-]+/g,'_');
     const ext=(file.name.split('.').pop()||'jpg').toLowerCase();
-    const storageName=`${Date.now()}_${Math.random().toString(36).slice(2,10)}.${ext}`;
+    const base=(file.name.replace(/\.[^/.]+$/,'').replace(/[^a-zA-Z0-9 _-]+/g,'_')||'photo');
+    const storageName=`${Date.now()}_${Math.random().toString(36).slice(2,10)}_${base}.${ext}`;
     storagePath=`${folder}/${storageName}`;
-    const upload=await sb.storage.from('gallery').upload(storagePath,file,{cacheControl:'3600',upsert:false,contentType:file.type||'image/jpeg'});
+
+    const upload=await sb.storage
+      .from('society-gallery')
+      .upload(storagePath,file,{
+        cacheControl:'3600',
+        upsert:false,
+        contentType:file.type||'image/jpeg'
+      });
+
     if(upload.error)throw upload.error;
-    const {data:urlData}=sb.storage.from('gallery').getPublicUrl(storagePath);
-    const db=await sb.from('gallery_photos').insert({folder_name:folderName.trim(),file_name:file.name,storage_path:storagePath,public_url:urlData?.publicUrl||''});
+
+    const {data:urlData}=sb.storage.from('society-gallery').getPublicUrl(storagePath);
+    const publicUrl=urlData?.publicUrl||'';
+
+    // Do NOT use folder_name: the current gallery_photos table does not have that column.
+    const db=await sb.from('gallery_photos').insert({
+      file_name:file.name,
+      storage_path:storagePath,
+      public_url:publicUrl
+    });
+
     if(db.error)throw db.error;
     saved++;
-   }catch(e){console.error(e); if(storagePath)try{await sb.storage.from('gallery').remove([storagePath])}catch(_){} failed++;}
+   }catch(e){
+    console.error('Gallery photo save error:',e);
+    if(storagePath){
+      try{ await sb.storage.from('society-gallery').remove([storagePath]); }catch(_){}
+    }
+    failed++;
+   }
   }
+
   if(!saved)return toast('No photo saved. Check gallery storage/table policies.');
   toast(`${saved} photo(s) saved${failed?`, ${failed} failed`:''}`);
   await adminPage('gallery',window.__adminUser);
  };
  input.click();
 }
-
 async function adminAddMember(){
  if(!sb)return toast('Supabase is not configured.');
  const name=prompt('Member name:'); if(!name)return;
@@ -456,17 +520,36 @@ else if(p==='maintenance'){
     window.__eventRows=rows||[];
     c.innerHTML=`<div class="hero"><div><h2>Events</h2><div class="muted">Showing only events saved in the database.</div></div><button class="primary-btn" onclick="adminAddEvent()">+ Add Event</button></div>
     <div class="event-grid">${(rows||[]).map((x,i)=>`<div class="card"><div class="photo">📅</div><div class="card-body"><div class="event-date">${x.event_date||x.date||''}</div><h3>${x.title||x.name||''}</h3><div class="muted">${x.location||x.place||x.description||''}</div><br><button class="outline-btn" onclick="adminEditEvent(${i})">Edit</button> <button class="outline-btn" onclick="adminDeleteEvent(${i})">Delete</button></div></div>`).join('')}</div>${rows?.length?'':`<div class="panel"><div class="muted">No events saved yet.</div></div>`}`;
-}else if(p==='gallery'){
-    const {data:rows,error}=await sb.from('gallery_photos').select('*').order('created_at',{ascending:false});
+ }else if(p==='gallery'){
+    const {data:rows,error}=await sb.from('gallery_photos').select('*');
     if(error){ console.error('Gallery load error:',error); return toast('Unable to load Gallery: '+error.message); }
-    const folders=[...new Set((rows||[]).map(x=>x.folder_name).filter(Boolean))];
-    c.innerHTML=`<div class="hero"><div><h2>Photo Gallery</h2><div class="muted">Only saved database photos are shown.</div></div></div>
-    <div class="panel"><button class="primary-btn" onclick="adminAddGalleryFolder()">+ Add Folder / Photo</button></div>
+
+    // The current gallery_photos table does not contain folder_name.
+    // Folder is derived from the first segment of storage_path.
+    const normalizedRows=(rows||[]).map(x=>{
+      const path=String(x.storage_path||'').replace(/^\/+/,'');
+      const parts=path.split('/');
+      return {...x,_folder:parts.length>1?parts[0]:'General'};
+    });
+
+    // Also include empty folders created through Storage (.folder marker).
+    const storageFolders=await adminListGalleryFolders();
+    const folders=[...new Set([
+      ...storageFolders,
+      ...normalizedRows.map(x=>x._folder).filter(Boolean)
+    ])].filter(Boolean).sort((a,b)=>a.localeCompare(b));
+
+    window.__galleryRows=normalizedRows;
+
+    c.innerHTML=`<div class="hero"><div><h2>Photo Gallery</h2><div class="muted">Only saved Supabase Gallery photos are shown.</div></div></div>
+    <div class="panel"><button class="primary-btn" onclick="adminAddGalleryFolder()">+ Add Folder</button></div>
     <div class="gallery-grid">${folders.map(folder=>{
-      const photos=(rows||[]).filter(x=>x.folder_name===folder);
-      return `<div class="card"><div class="card-body"><h3>${folder}</h3><div class="muted">${photos.length} saved photo(s)</div><button class="outline-btn" onclick='adminUploadGallery(${JSON.stringify(folder)})'>Add Photos</button>
-      <div class="gallery-grid" style="margin-top:12px">${photos.map(x=>`<div><img src="${x.public_url||''}" alt="${x.file_name||''}" style="width:100%;height:180px;object-fit:cover;border-radius:10px"><div class="muted">${x.file_name||''}</div></div>`).join('')}</div></div></div>`;
-    }).join('')}</div>${folders.length?'':`<div class="panel"><div class="muted">No gallery photos saved yet.</div></div>`}`;
+      const photos=normalizedRows.filter(x=>x._folder===folder && x.file_name!=='.folder');
+      return `<div class="card"><div class="card-body"><h3>${folder}</h3><div class="muted">${photos.length} saved photo(s)</div>
+      <button class="outline-btn" onclick='adminUploadGallery(${JSON.stringify(folder)})'>Add Photos</button>
+      <div class="gallery-grid" style="margin-top:12px">${photos.map(x=>`<div><img src="${x.public_url||''}" alt="${x.file_name||''}" style="width:100%;height:180px;object-fit:cover;border-radius:10px"><div class="muted">${x.file_name||''}</div></div>`).join('')}</div>
+      </div></div>`;
+    }).join('')}</div>${folders.length?'':`<div class="panel"><div class="muted">No gallery folders or photos saved yet.</div></div>`}`;
 }else if(p==='members'){
     const {data:rows,error}=await sb.from('profiles').select('*').order('created_at',{ascending:false});
     if(error){ console.error('Members load error:',error); return toast('Unable to load Members: '+error.message); }
