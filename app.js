@@ -193,40 +193,233 @@ async function adminDeleteMaintenance(i){
     toast('Maintenance deleted'); await adminPage('maintenance',window.__adminUser);
 }
 
-async function adminAddWork(){
- if(!sb)return toast('Supabase is not configured.');
- const name=prompt('Work / project name:'); if(!name)return;
- const description=prompt('Description:','')||'';
- const status=prompt('Status (Ongoing/Pending/Completed):','Pending')||'Pending';
- const progress=Math.max(0,Math.min(100,Number(prompt('Progress %:','0'))||0));
- const target_date=prompt('Target date:','')||null;
- const {error}=await sb.from('society_work').insert({name,description,status,progress,target_date});
- if(error)return toast('Work save failed: '+error.message);
- toast('Work saved successfully'); await adminPage('work',window.__adminUser);
+
+async function getSocietyWorkColumns(){
+    /*
+     * Do NOT try to insert {name: ...} and then fall back.
+     * PostgREST can reject the request at schema-cache level before
+     * any fallback is attempted.
+     *
+     * First read the actual PostgREST OpenAPI schema, then build the
+     * insert/update payload using only columns that really exist.
+     */
+    const columns={};
+
+    try{
+        const base=(CONFIG?.SUPABASE_URL||'').replace(/\/+$/,'');
+        const key=CONFIG?.SUPABASE_ANON_KEY||'';
+
+        if(base && key){
+            const response=await fetch(base+'/rest/v1/',{
+                method:'GET',
+                headers:{
+                    apikey:key,
+                    Authorization:'Bearer '+key,
+                    Accept:'application/openapi+json'
+                },
+                cache:'no-store'
+            });
+
+            if(response.ok){
+                const spec=await response.json();
+                const tableSchema=spec?.definitions?.society_work;
+                const properties=tableSchema?.properties||{};
+
+                Object.keys(properties).forEach(column=>{
+                    columns[column]=true;
+                });
+
+                console.log('Society Work actual DB columns:',Object.keys(properties));
+
+                if(Object.keys(properties).length){
+                    return columns;
+                }
+            }else{
+                console.warn('Could not read PostgREST schema:',response.status);
+            }
+        }
+    }catch(e){
+        console.warn('PostgREST schema discovery failed:',e);
+    }
+
+    /*
+     * Fallback for environments where the OpenAPI endpoint is not
+     * available. Each SELECT is harmless; importantly, no INSERT/UPDATE
+     * containing a nonexistent column is attempted.
+     */
+    const candidates=[
+        'name','title','work_name','project_name','work_title',
+        'project','work','activity','task','subject',
+        'description','details','status','progress',
+        'target_date','target','due_date'
+    ];
+
+    for(const column of candidates){
+        try{
+            const result=await sb.from('society_work').select(column).limit(1);
+            columns[column]=!result.error;
+        }catch(_){
+            columns[column]=false;
+        }
+    }
+
+    return columns;
 }
 
-async function adminDeleteWork(i){
-    if(!requireAdminForDelete())return;
-    const x=window.__workRows?.[i];
-    if(!x)return;
-    if(!confirm(`Delete "${x.name||x.title||x.work_name||x.project_name||x.work_title||'this work'}"?`))return;
+function societyWorkTitleColumn(columns){
+    return [
+        'name','title','work_name','project_name','work_title',
+        'project','work','activity','task','subject'
+    ].find(column=>columns[column]===true) || null;
+}
 
+function societyWorkPayload(columns,values){
+    const payload={};
+    const titleColumn=societyWorkTitleColumn(columns);
+
+    if(titleColumn) payload[titleColumn]=values.name;
+
+    if(columns.description) payload.description=values.description;
+    else if(columns.details) payload.details=values.description;
+
+    if(columns.status) payload.status=values.status;
+    if(columns.progress) payload.progress=values.progress;
+
+    if(columns.target_date) payload.target_date=values.target_date;
+    else if(columns.target) payload.target=values.target_date;
+    else if(columns.due_date) payload.due_date=values.target_date;
+
+    return {payload,titleColumn};
+}
+
+async function adminAddWork(){
+    if(!sb)return toast('Supabase is not configured.');
+
+    const workName=prompt('Work / project name:');
+    if(workName===null || !workName.trim())return;
+
+    const description=prompt('Description:','');
+    if(description===null)return;
+
+    const status=prompt('Status (Ongoing/Pending/Completed):','Pending');
+    if(status===null)return;
+
+    const progressInput=prompt('Progress %:','0');
+    if(progressInput===null)return;
+    const progress=Math.max(0,Math.min(100,Number(progressInput)||0));
+
+    const target_date=prompt('Target date:','');
+    if(target_date===null)return;
+
+    try{
+        const columns=await getSocietyWorkColumns();
+        const built=societyWorkPayload(columns,{
+            name:workName.trim(),
+            description:description.trim(),
+            status:status.trim(),
+            progress,
+            target_date:target_date.trim()||null
+        });
+
+        console.log('Society Work detected columns:',columns);
+        console.log('Society Work insert payload:',built.payload);
+
+        if(!built.titleColumn){
+            return toast(
+                'Work save failed: no work-name/title column was found in society_work. ' +
+                'Check the table columns in Supabase.'
+            );
+        }
+
+        const {error}=await sb.from('society_work').insert(built.payload);
+
+        if(error){
+            console.error('Work save failed:',error,built.payload);
+            return toast('Work save failed: '+error.message);
+        }
+
+        toast('Work saved successfully');
+        await adminPage('work',window.__adminUser);
+    }catch(e){
+        console.error('Work save exception:',e);
+        toast('Work save failed: '+(e?.message||e));
+    }
+}
+
+
+async function adminDeleteWork(i){
+    if(!adminDeleteGuard())return;
+    const x=window.__workRows?.[i];
+    if(!x)return toast('Work not found.');
+    const label=x.name||x.title||x.work_name||x.project_name||x.work_title||x.project||x.work||'this work';
+    if(!confirm(`Delete "${label}"?`))return;
     const {error}=await sb.from('society_work').delete().eq('id',x.id);
     if(error)return toast('Work delete failed: '+error.message);
-
     toast('Work deleted successfully');
     await adminPage('work',window.__adminUser);
 }
+
 async function adminEditWork(i){
- const x=window.__workRows?.[i]; if(!x)return;
- const name=prompt('Work / project name:',x.name||x.title||x.project_name||''); if(name===null)return;
- const description=prompt('Description:',x.description||''); if(description===null)return;
- const status=prompt('Status:',x.status||''); if(status===null)return;
- const progress=Math.max(0,Math.min(100,Number(prompt('Progress %:',x.progress||0))||0));
- const target_date=prompt('Target date:',x.target_date||x.target||''); if(target_date===null)return;
- const {error}=await sb.from('society_work').update({name,description,status,progress,target_date}).eq('id',x.id);
- if(error)return toast('Work update failed: '+error.message);
- toast('Work updated'); await adminPage('work',window.__adminUser);
+    const x=window.__workRows?.[i];
+    if(!x)return;
+
+    const current=
+        x.name||x.title||x.work_name||x.project_name||x.work_title||
+        x.project||x.work||x.activity||x.task||x.subject||'';
+
+    const workName=prompt('Work / project name:',current);
+    if(workName===null)return;
+
+    const description=prompt('Description:',x.description||x.details||'');
+    if(description===null)return;
+
+    const status=prompt('Status:',x.status||'');
+    if(status===null)return;
+
+    const progressInput=prompt('Progress %:',x.progress??0);
+    if(progressInput===null)return;
+    const progress=Math.max(0,Math.min(100,Number(progressInput)||0));
+
+    const targetDate=prompt(
+        'Target date:',
+        x.target_date||x.target||x.due_date||''
+    );
+    if(targetDate===null)return;
+
+    try{
+        const columns=await getSocietyWorkColumns();
+        const built=societyWorkPayload(columns,{
+            name:workName.trim(),
+            description:description.trim(),
+            status:status.trim(),
+            progress,
+            target_date:targetDate.trim()||null
+        });
+
+        console.log('Society Work detected columns:',columns);
+        console.log('Society Work update payload:',built.payload);
+
+        if(!built.titleColumn){
+            return toast(
+                'Work update failed: no work-name/title column was found in society_work.'
+            );
+        }
+
+        const {error}=await sb.from('society_work')
+            .update(built.payload)
+            .eq('id',x.id);
+
+        if(error){
+            console.error('Work update failed:',error,built.payload);
+            return toast('Work update failed: '+error.message);
+        }
+
+        toast('Work updated');
+        await adminPage('work',window.__adminUser);
+    }catch(e){
+        console.error('Work update exception:',e);
+        toast('Work update failed: '+(e?.message||e));
+    }
 }
 
 async function adminAddEvent(){
@@ -494,9 +687,11 @@ async function adminEditEvent(i){
 }
 
 
-function requireAdminForDelete(){
-    const role=String(window.__adminUser?.role||'').toLowerCase();
-    if(role!=='admin'){
+function isCurrentAdmin(){
+    return String(window.__adminUser?.role||'').toLowerCase()==='admin';
+}
+function adminDeleteGuard(){
+    if(!isCurrentAdmin()){
         toast('Only an admin can delete this item.');
         return false;
     }
@@ -504,16 +699,63 @@ function requireAdminForDelete(){
 }
 
 async function adminDeleteEvent(i){
-    if(!requireAdminForDelete())return;
+    if(!adminDeleteGuard())return;
     const x=window.__eventRows?.[i];
-    if(!x)return;
+    if(!x)return toast('Event not found.');
     if(!confirm(`Delete "${x.title||x.name||'this event'}"?`))return;
-
     const {error}=await sb.from('events').delete().eq('id',x.id);
     if(error)return toast('Event delete failed: '+error.message);
-
     toast('Event deleted successfully');
     await adminPage('events',window.__adminUser);
+}
+
+
+async function adminDeleteGalleryPhoto(photoId){
+    if(!adminDeleteGuard())return;
+    const row=(window.__galleryRows||[]).find(x=>String(x.id)===String(photoId));
+    if(!row)return toast('Photo not found.');
+    if(!confirm(`Delete "${row.file_name||'this photo'}"?`))return;
+
+    try{
+        if(row.storage_path){
+            const {error}=await sb.storage.from('society-gallery').remove([row.storage_path]);
+            if(error)throw error;
+        }
+        const {error}=await sb.from('gallery_photos').delete().eq('id',photoId);
+        if(error)throw error;
+        toast('Photo deleted successfully');
+        await adminPage('gallery',window.__adminUser);
+    }catch(e){
+        console.error(e);
+        toast('Photo delete failed: '+(e?.message||e));
+    }
+}
+async function adminDeleteGalleryFolder(folderName){
+    if(!adminDeleteGuard())return;
+    if(!folderName)return;
+    if(!confirm(`Delete folder "${folderName}" and all photos inside it?`))return;
+
+    try{
+        const {data:files,error:listError}=await sb.storage.from('society-gallery').list(folderName,{limit:1000});
+        if(listError)throw listError;
+        const paths=(files||[]).filter(x=>x?.name&&x.name!=='.folder').map(x=>`${folderName}/${x.name}`);
+        if(paths.length){
+            const {error}=await sb.storage.from('society-gallery').remove(paths);
+            if(error)throw error;
+        }
+        const {data:rows,error:qerr}=await sb.from('gallery_photos').select('id,storage_path').like('storage_path',`${folderName}/%`);
+        if(qerr)throw qerr;
+        const ids=(rows||[]).map(x=>x.id).filter(Boolean);
+        if(ids.length){
+            const {error}=await sb.from('gallery_photos').delete().in('id',ids);
+            if(error)throw error;
+        }
+        toast('Folder deleted successfully');
+        await adminPage('gallery',window.__adminUser);
+    }catch(e){
+        console.error(e);
+        toast('Folder delete failed: '+(e?.message||e));
+    }
 }
 
 async function adminListGalleryFolders(){
@@ -620,87 +862,6 @@ async function adminUploadGallery(folderName){
  };
  input.click();
 }
-
-async function adminDeleteGalleryPhoto(photoId){
-    if(!requireAdminForDelete())return;
-    if(!photoId)return;
-    const row=(window.__galleryRows||[]).find(x=>String(x.id)===String(photoId));
-    if(!row)return toast('Photo not found.');
-
-    if(!confirm(`Delete photo "${row.file_name||'this photo'}"?`))return;
-
-    try{
-        const storagePath=row.storage_path;
-        if(storagePath){
-            const {error:storageError}=await sb.storage
-                .from('society-gallery')
-                .remove([storagePath]);
-            if(storageError)throw storageError;
-        }
-
-        const {error:dbError}=await sb
-            .from('gallery_photos')
-            .delete()
-            .eq('id',photoId);
-
-        if(dbError)throw dbError;
-
-        toast('Photo deleted successfully');
-        await adminPage('gallery',window.__adminUser);
-    }catch(error){
-        console.error('Gallery photo delete failed:',error);
-        toast('Photo delete failed: '+(error?.message||error));
-    }
-}
-
-async function adminDeleteGalleryFolder(folderName){
-    if(!requireAdminForDelete())return;
-    if(!folderName)return;
-
-    if(!confirm(`Delete folder "${folderName}" and ALL photos inside it? This cannot be undone.`))return;
-
-    try{
-        const {data:files,error:listError}=await sb.storage
-            .from('society-gallery')
-            .list(folderName,{limit:1000});
-        if(listError)throw listError;
-
-        const paths=(files||[])
-            .filter(x=>x?.name)
-            .map(x=>`${folderName}/${x.name}`);
-
-        if(paths.length){
-            const {error:removeError}=await sb.storage
-                .from('society-gallery')
-                .remove(paths);
-            if(removeError)throw removeError;
-        }
-
-        // Delete DB records for this folder. Current schema uses storage_path
-        // as the source of folder information.
-        const {data:rows,error:queryError}=await sb
-            .from('gallery_photos')
-            .select('id,storage_path')
-            .like('storage_path',folderName.replace(/[%_]/g,'\\$&')+'/%');
-        if(queryError)throw queryError;
-
-        const ids=(rows||[]).map(x=>x.id).filter(Boolean);
-        if(ids.length){
-            const {error:deleteError}=await sb
-                .from('gallery_photos')
-                .delete()
-                .in('id',ids);
-            if(deleteError)throw deleteError;
-        }
-
-        toast(`Folder "${folderName}" deleted successfully`);
-        await adminPage('gallery',window.__adminUser);
-    }catch(error){
-        console.error('Gallery folder delete failed:',error);
-        toast('Folder delete failed: '+(error?.message||error));
-    }
-}
-
 async function adminAddMember(){
  if(!sb)return toast('Supabase is not configured.');
  const name=prompt('Member name:'); if(!name)return;
@@ -863,14 +1024,14 @@ else if(p==='maintenance'){
     window.__workRows=rows||[];
     c.innerHTML=`<div class="hero"><div><h2>Society Work</h2><div class="muted">Showing only records saved in the database.</div></div><button class="primary-btn" onclick="adminAddWork()">+ Add Work</button></div>
     <div class="panel"><div class="table-wrap"><table class="table"><thead><tr><th>Project</th><th>Description</th><th>Status</th><th>Progress</th><th>Target</th><th>Action</th></tr></thead><tbody>
-    ${(rows||[]).map((x,i)=>`<tr><td><strong>${x.name||x.title||x.project_name||''}</strong></td><td>${x.description||''}</td><td>${x.status||''}</td><td>${Number(x.progress||0)}%</td><td>${x.target_date||x.target||''}</td><td><button class="outline-btn" onclick="adminEditWork(${i})">Edit</button> <button class="outline-btn" onclick="adminDeleteWork(${i})">Delete</button></td></tr>`).join('')}
+    ${(rows||[]).map((x,i)=>`<tr><td><strong>${x.name||x.title||x.work_name||x.project_name||x.work_title||x.project||x.work||x.activity||x.task||x.subject||''}</strong></td><td>${x.description||''}</td><td>${x.status||''}</td><td>${Number(x.progress||0)}%</td><td>${x.target_date||x.target||''}</td><td><button class="outline-btn" onclick="adminEditWork(${i})">Edit</button> <button class="outline-btn" onclick="adminDeleteWork(${i})">Delete</button></td></tr>`).join('')}
     </tbody></table></div>${rows?.length?'':`<div class="muted" style="padding:18px">No society work records saved yet.</div>`}</div>`;
 }else if(p==='events'){
     const {data:rows,error}=await sb.from('events').select('*').order('event_date',{ascending:false});
     if(error){ console.error('Events load error:',error); return toast('Unable to load Events: '+error.message); }
     window.__eventRows=rows||[];
     c.innerHTML=`<div class="hero"><div><h2>Events</h2><div class="muted">Showing only events saved in the database.</div></div><button class="primary-btn" onclick="adminAddEvent()">+ Add Event</button></div>
-    <div class="event-grid">${(rows||[]).map((x,i)=>`<div class="card"><div class="photo">📅</div><div class="card-body"><div class="event-date">${x.event_date||x.date||''}</div><h3>${x.title||x.name||''}</h3><div class="muted">${x.location||x.place||x.description||''}</div><br><button class="outline-btn" onclick="adminEditEvent(${i})">Edit</button> <button class="outline-btn" onclick="adminDeleteEvent(${i})">Delete</button></div></div>`).join('')}</div>${rows?.length?'':`<div class="panel"><div class="muted">No events saved yet.</div></div>`}`;
+    <div class="event-grid">${(rows||[]).map((x,i)=>`<div class="card"><div class="photo">📅</div><div class="card-body"><div class="event-date">${x.event_date||x.date||''}</div><h3>${x.title||x.name||''}</h3><div class="muted">${x.location||x.place||x.description||''}</div><br><button class="outline-btn" onclick="adminEditEvent(${i})">Edit</button> <button class="outline-btn" onclick="adminDeleteEvent(${i})">Delete</button> <button class="outline-btn" onclick="adminDeleteEvent(${i})">Delete</button></div></div>`).join('')}</div>${rows?.length?'':`<div class="panel"><div class="muted">No events saved yet.</div></div>`}`;
  }else if(p==='gallery'){
     const {data:rows,error}=await sb.from('gallery_photos').select('*');
     if(error){ console.error('Gallery load error:',error); return toast('Unable to load Gallery: '+error.message); }
@@ -898,7 +1059,7 @@ else if(p==='maintenance'){
       const photos=normalizedRows.filter(x=>x._folder===folder && x.file_name!=='.folder');
       return `<div class="card"><div class="card-body"><h3>${folder}</h3><div class="muted">${photos.length} saved photo(s)</div>
       <button class="outline-btn" onclick='adminUploadGallery(${JSON.stringify(folder)})'>Add Photos</button> <button class="outline-btn" onclick='adminDeleteGalleryFolder(${JSON.stringify(folder)})'>Delete Folder</button>
-      <div class="gallery-grid" style="margin-top:12px">${photos.map(x=>`<div><img src="${x.public_url||''}" alt="${x.file_name||''}" style="width:100%;height:180px;object-fit:cover;border-radius:10px"><div class="muted">${x.file_name||''}</div><button class="outline-btn" style="margin-top:6px;" onclick='adminDeleteGalleryPhoto(${JSON.stringify(x.id)})'>Delete Photo</button></div>`).join('')}</div>
+      <div class="gallery-grid" style="margin-top:12px">${photos.map(x=>`<div><img src="${x.public_url||''}" alt="${x.file_name||''}" style="width:100%;height:180px;object-fit:cover;border-radius:10px"><div class="muted">${x.file_name||''}</div></div>`).join('')}</div>
       </div></div>`;
     }).join('')}</div>${folders.length?'':`<div class="panel"><div class="muted">No gallery folders or photos saved yet.</div></div>`}`;
 }else if(p==='members'){
