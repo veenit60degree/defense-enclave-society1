@@ -1,26 +1,8 @@
 /* Defense Enclave Admin Buttons: 2026-09-19 */
 //const CONFIG={SUPABASE_URL:'https://gujtekpteezejmtaxtcj.supabase.co',SUPABASE_ANON_KEY:'sb_publishable_KvdsKcUr_vuvPrg7xU11Ww_q1H7vhg1'};
 
-const SUPABASE_URL = "https://gujtekpteezejmtaxtcj.supabase.co/rest/v1/";   //https://gujtekpteezejmtaxtcj.supabase.co
-const SUPABASE_KEY = "sb_publishable_KvdsKcUr_vuvPrg7xU11Ww_q1H7vhg1";
-
-
-
-const supabaseClient = window.supabase.createClient(
-    SUPABASE_URL,
-    SUPABASE_KEY
-);
-
-//const CONFIG={SUPABASE_URL:'',SUPABASE_ANON_KEY:''};
-
-//const CONFIG={
-//    SUPABASE_URL:SUPABASE_URL,
-//    SUPABASE_ANON_KEY:SUPABASE_KEY
-//};
-
-
-//let sb=null;if(CONFIG.SUPABASE_URL&&CONFIG.SUPABASE_ANON_KEY&&window.supabase)sb=window.supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_ANON_KEY);
-
+// Use one Supabase client only. Multiple GoTrueClient instances sharing the
+// same browser storage can cause session synchronization problems.
 const CONFIG={SUPABASE_URL:'https://gujtekpteezejmtaxtcj.supabase.co',SUPABASE_ANON_KEY:'sb_publishable_KvdsKcUr_vuvPrg7xU11Ww_q1H7vhg1'};
 
 let sb = null;
@@ -1656,56 +1638,69 @@ async function adminAddMember(){
           // });
 
 
-          const {
-    data: { session },
-    error: sessionError
-} = await sb.auth.getSession();
+          // Read the currently authenticated admin session.
+          const {data:sessionData,error:sessionError}=await sb.auth.getSession();
 
-if (sessionError) {
-    throw new Error(
-        'Unable to get admin session: ' + sessionError.message
-    );
-}
+          if(sessionError){
+            throw new Error('Unable to get admin session: '+sessionError.message);
+          }
 
-if (!session?.access_token) {
-    throw new Error(
-        'Admin session is not available. Please logout and login again.'
-    );
-}
+          const session=sessionData?.session;
+          if(!session?.access_token){
+            throw new Error('Admin session is not available. Please logout and login again.');
+          }
 
-console.log(
-    'Calling admin-create-member with access token:',
-    !!session.access_token
-);
+          // Confirm the session belongs to a real authenticated user before
+          // calling the protected Edge Function.
+          const {data:userData,error:userError}=await sb.auth.getUser(session.access_token);
+          if(userError || !userData?.user){
+            throw new Error('Unable to verify admin session. Please logout and login again.');
+          }
 
-const { data: fnData, error: fnError } =
-    await sb.functions.invoke('admin-create-member', {
-        body: {
-            full_name,
-            house_number,
-            phone,
-            email: email || null,
-            password,
-            address: address || null,
-            role: 'member'
-        },
-        headers: {
-            Authorization: `Bearer ${session.access_token}`
-        }
-    });
+          console.log('Calling admin-create-member:',{
+            userId:userData.user.id,
+            hasAccessToken:!!session.access_token
+          });
 
-if (fnError) {
-    console.error('admin-create-member response:', fnError);
-    throw fnError;
-}
+          const {data:fnData,error:fnError}=await sb.functions.invoke('admin-create-member',{
+            body:{
+              full_name,
+              house_number,
+              phone,
+              email:email||null,
+              password,
+              address:address||null,
+              role:'member'
+            },
+            headers:{
+              Authorization:`Bearer ${session.access_token}`
+            }
+          });
 
-if (fnData?.error) {
-    throw new Error(fnData.error);
-}
+          if(fnError){
+            console.error('admin-create-member Edge Function error:',fnError);
 
+            let message=fnError.message||'Member creation failed.';
+            try{
+              const response=fnError.context;
+              if(response && typeof response.clone==='function'){
+                const payload=await response.clone().json();
+                if(payload?.error)message=payload.error;
+              }
+            }catch(_){
+              // Keep the original error message if the response is not JSON.
+            }
 
-          if(fnError)throw fnError;
-          if(fnData?.error)throw new Error(fnData.error);
+            if(fnError.status===401){
+              message='Admin authentication was rejected by the Edge Function. Please check the Edge Function authentication/claim handling.';
+            }
+
+            throw new Error(message);
+          }
+
+          if(!fnData?.success){
+            throw new Error(fnData?.error||'Member was not created.');
+          }
 
           close();
           toast('Member saved successfully');
