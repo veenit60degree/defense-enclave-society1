@@ -272,39 +272,171 @@ function societyAdminClearField(overlay,field,errorField){
     if(er){er.textContent='';er.style.display='none';}
 }
 
-
-function __modalEsc(v){return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
-function __openFormModal(id,title,subtitle,html,submitText){
-  const old=document.getElementById(id);if(old)old.remove();
-  const o=document.createElement('div');o.id=id;o.style.cssText='position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;background:rgba(15,23,42,.58);backdrop-filter:blur(3px)';
-  o.innerHTML=`<div role="dialog" aria-modal="true" style="width:min(560px,100%);max-height:calc(100vh - 40px);overflow:auto;background:#fff;border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.30);padding:24px;box-sizing:border-box">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px"><div><h2 style="margin:0 0 4px;font-size:22px">${title}</h2><div style="font-size:13px;color:#667085">${subtitle}</div></div><button type="button" data-close style="width:36px;height:36px;border:0;border-radius:50%;background:#f2f4f7;font-size:24px;cursor:pointer">&times;</button></div>
-  ${html}<div style="display:flex;justify-content:flex-end;gap:10px"><button type="button" data-cancel style="padding:10px 16px;border:1px solid #d0d5dd;border-radius:9px;background:#fff;cursor:pointer">Cancel</button><button type="submit" form="${id}Form" style="padding:10px 18px;border:0;border-radius:9px;background:#2563eb;color:#fff;cursor:pointer;font-weight:600">${submitText}</button></div></div>`;
-  document.body.appendChild(o);const close=()=>o.remove();o.querySelector('[data-close]').onclick=close;o.querySelector('[data-cancel]').onclick=close;o.addEventListener('click',e=>{if(e.target===o)close()});return{o,close}
-}
-function __fieldError(o,id,eid,msg){const el=o.querySelector('#'+id),er=o.querySelector('#'+eid);if(el){el.style.borderColor='#d92d20';el.style.boxShadow='0 0 0 2px rgba(217,45,32,.10)';}if(er){er.textContent=msg;er.style.display='block'}}
-function __clearField(o,id,eid){const el=o.querySelector('#'+id),er=o.querySelector('#'+eid);if(el){el.style.borderColor='#d0d5dd';el.style.boxShadow='none'}if(er){er.textContent='';er.style.display='none'}}
-
 async function adminAddMaintenance(){
-  if(!sb)return toast('Supabase is not configured.');
-  const html=`<form id="maintenanceAddModalForm" novalidate>
-  <div id="maintenanceAddErr" style="display:none;margin-bottom:14px;padding:11px;border-radius:9px;background:#fff1f1;color:#b42318;font-size:13px"></div>
-  <div style="margin-bottom:15px"><label for="mItem" style="display:block;font-weight:600;margin-bottom:6px">Maintenance item <span style="color:#d92d20">*</span></label><input id="mItem" type="text" maxlength="150" placeholder="Enter maintenance item" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px"><div style="font-size:12px;color:#667085;margin-top:5px">Example: Street Light Repair</div><div id="mItemE" style="display:none;color:#b42318;font-size:12px;margin-top:5px"></div></div>
-  <div style="margin-bottom:15px"><label for="mAmount" style="display:block;font-weight:600;margin-bottom:6px">Amount <span style="color:#d92d20">*</span></label><input id="mAmount" type="number" min="0" step="0.01" placeholder="Enter amount" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px"><div style="font-size:12px;color:#667085;margin-top:5px">Enter the maintenance expense amount.</div><div id="mAmountE" style="display:none;color:#b42318;font-size:12px;margin-top:5px"></div></div>
-  <div style="margin-bottom:20px"><label for="mStatus" style="display:block;font-weight:600;margin-bottom:6px">Status <span style="color:#d92d20">*</span></label><select id="mStatus" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;background:#fff"><option value="">Select status</option><option>Active</option><option>Pending</option><option>Completed</option></select><div style="font-size:12px;color:#667085;margin-top:5px">Select the current maintenance status.</div><div id="mStatusE" style="display:none;color:#b42318;font-size:12px;margin-top:5px"></div></div></form>`;
-  const{ o,close}=__openFormModal('maintenanceAddModal','Add Maintenance','Enter all maintenance details and save them together.',html,'Save Maintenance');
-  o.querySelector('#maintenanceAddModalForm').onsubmit=async e=>{e.preventDefault();__clearField(o,'mItem','mItemE');__clearField(o,'mAmount','mAmountE');__clearField(o,'mStatus','mStatusE');const item=o.querySelector('#mItem').value.trim(),amount=Number(o.querySelector('#mAmount').value),status=o.querySelector('#mStatus').value;let ok=true;if(!item){__fieldError(o,'mItem','mItemE','Please enter the maintenance item.');ok=false}if(!Number.isFinite(amount)||amount<0){__fieldError(o,'mAmount','mAmountE','Please enter a valid amount.');ok=false}if(!['Active','Pending','Completed'].includes(status)){__fieldError(o,'mStatus','mStatusE','Please select a valid status.');ok=false}if(!ok)return;const{error}=await sb.from('maintenance').insert({item,amount,status});if(error){const z=o.querySelector('#maintenanceAddErr');z.textContent='Maintenance save failed: '+error.message;z.style.display='block';return}close();toast('Maintenance added');await adminPage('maintenance',window.__adminUser)}
+    if(!sb)return toast('Supabase is not configured.');
+
+    const body=`
+    <form id="maintenanceAddModalForm" novalidate>
+      <div id="maintenanceAddGeneralError" style="display:none;margin-bottom:14px;padding:11px 12px;border-radius:9px;background:#fff1f1;color:#b42318;font-size:13px;"></div>
+
+      <div style="margin-bottom:15px;">
+        <label for="maintenanceItem" style="display:block;font-weight:600;margin-bottom:6px;">Maintenance item <span style="color:#d92d20;">*</span></label>
+        <input id="maintenanceItem" type="text" maxlength="150" placeholder="Enter maintenance item"
+          style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
+        <div style="font-size:12px;color:#667085;margin-top:5px;">Example: Street Light Repair</div>
+        <div id="maintenanceItemError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
+      </div>
+
+      <div style="margin-bottom:15px;">
+        <label for="maintenanceAmount" style="display:block;font-weight:600;margin-bottom:6px;">Amount <span style="color:#d92d20;">*</span></label>
+        <input id="maintenanceAmount" type="number" min="0" step="0.01" placeholder="Enter amount"
+          style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
+        <div style="font-size:12px;color:#667085;margin-top:5px;">Enter the maintenance expense amount.</div>
+        <div id="maintenanceAmountError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
+      </div>
+
+      <div style="margin-bottom:20px;">
+        <label for="maintenanceStatus" style="display:block;font-weight:600;margin-bottom:6px;">Status <span style="color:#d92d20;">*</span></label>
+        <select id="maintenanceStatus"
+          style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;background:#fff;">
+          <option value="">Select status</option>
+          <option value="Active">Active</option>
+          <option value="Pending">Pending</option>
+          <option value="Completed">Completed</option>
+        </select>
+        <div style="font-size:12px;color:#667085;margin-top:5px;">Select the current maintenance status.</div>
+        <div id="maintenanceStatusError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
+      </div>
+    </form>`;
+
+    const {overlay,close}=societyAdminModalShell(
+        'maintenanceAddModal',
+        'Add Maintenance',
+        'Enter all maintenance details and save them together.',
+        body,
+        'Save Maintenance'
+    );
+
+    const form=overlay.querySelector('#maintenanceAddModalForm');
+    ['maintenanceItem','maintenanceAmount','maintenanceStatus'].forEach((id,idx)=>{
+        const errors=['maintenanceItemError','maintenanceAmountError','maintenanceStatusError'];
+        overlay.querySelector('#'+id).addEventListener('input',()=>societyAdminClearField(overlay,id,errors[idx]));
+        overlay.querySelector('#'+id).addEventListener('change',()=>societyAdminClearField(overlay,id,errors[idx]));
+    });
+
+    form.onsubmit=async e=>{
+        e.preventDefault();
+        ['maintenanceItem','maintenanceAmount','maintenanceStatus'].forEach((id,idx)=>
+            societyAdminClearField(overlay,id,['maintenanceItemError','maintenanceAmountError','maintenanceStatusError'][idx]));
+
+        const item=overlay.querySelector('#maintenanceItem').value.trim();
+        const amount=Number(overlay.querySelector('#maintenanceAmount').value);
+        const status=overlay.querySelector('#maintenanceStatus').value;
+        let valid=true;
+
+        if(!item){societyAdminFieldError(overlay,'maintenanceItem','maintenanceItemError','Please enter the maintenance item.');valid=false;}
+        if(!Number.isFinite(amount)||amount<0){societyAdminFieldError(overlay,'maintenanceAmount','maintenanceAmountError','Please enter a valid amount.');valid=false;}
+        if(!['Active','Pending','Completed'].includes(status)){societyAdminFieldError(overlay,'maintenanceStatus','maintenanceStatusError','Please select a valid status.');valid=false;}
+        if(!valid)return;
+
+        const {error}=await sb.from('maintenance').insert({item,amount,status});
+        if(error){
+            const ge=overlay.querySelector('#maintenanceAddGeneralError');
+            ge.textContent='Maintenance save failed: '+error.message;
+            ge.style.display='block';
+            return;
+        }
+        close();
+        toast('Maintenance added');
+        await adminPage('maintenance',window.__adminUser);
+    };
 }
+
 
 async function adminEditMaintenance(i){
-  const x=window.__maintenanceRows?.[i];if(!x)return;
-  const html=`<form id="maintenanceEditModalForm" novalidate><div id="maintenanceEditErr" style="display:none;margin-bottom:14px;padding:11px;border-radius:9px;background:#fff1f1;color:#b42318;font-size:13px"></div>
-  <div style="margin-bottom:15px"><label for="emItem" style="display:block;font-weight:600;margin-bottom:6px">Maintenance item <span style="color:#d92d20">*</span></label><input id="emItem" type="text" maxlength="150" value="${__modalEsc(x.item||x.title||x.name||'')}" placeholder="Enter maintenance item" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px"><div style="font-size:12px;color:#667085;margin-top:5px">Example: Street Light Repair</div><div id="emItemE" style="display:none;color:#b42318;font-size:12px;margin-top:5px"></div></div>
-  <div style="margin-bottom:15px"><label for="emAmount" style="display:block;font-weight:600;margin-bottom:6px">Amount <span style="color:#d92d20">*</span></label><input id="emAmount" type="number" min="0" step="0.01" value="${Number(x.amount??0)}" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px"><div style="font-size:12px;color:#667085;margin-top:5px">Enter the maintenance expense amount.</div><div id="emAmountE" style="display:none;color:#b42318;font-size:12px;margin-top:5px"></div></div>
-  <div style="margin-bottom:20px"><label for="emStatus" style="display:block;font-weight:600;margin-bottom:6px">Status <span style="color:#d92d20">*</span></label><select id="emStatus" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;background:#fff"><option value="">Select status</option><option ${x.status==='Active'?'selected':''}>Active</option><option ${x.status==='Pending'?'selected':''}>Pending</option><option ${x.status==='Completed'?'selected':''}>Completed</option></select><div style="font-size:12px;color:#667085;margin-top:5px">Select the current maintenance status.</div><div id="emStatusE" style="display:none;color:#b42318;font-size:12px;margin-top:5px"></div></div></form>`;
-  const{ o,close}=__openFormModal('maintenanceEditModal','Edit Maintenance','Update all maintenance details and save them together.',html,'Update Maintenance');
-  o.querySelector('#maintenanceEditModalForm').onsubmit=async e=>{e.preventDefault();__clearField(o,'emItem','emItemE');__clearField(o,'emAmount','emAmountE');__clearField(o,'emStatus','emStatusE');const item=o.querySelector('#emItem').value.trim(),amount=Number(o.querySelector('#emAmount').value),status=o.querySelector('#emStatus').value;let ok=true;if(!item){__fieldError(o,'emItem','emItemE','Please enter the maintenance item.');ok=false}if(!Number.isFinite(amount)||amount<0){__fieldError(o,'emAmount','emAmountE','Please enter a valid amount.');ok=false}if(!['Active','Pending','Completed'].includes(status)){__fieldError(o,'emStatus','emStatusE','Please select a valid status.');ok=false}if(!ok)return;const{error}=await sb.from('maintenance').update({item,amount,status}).eq('id',x.id);if(error){const z=o.querySelector('#maintenanceEditErr');z.textContent='Maintenance update failed: '+error.message;z.style.display='block';return}close();toast('Maintenance updated');await adminPage('maintenance',window.__adminUser)}
+    const x=window.__maintenanceRows?.[i];
+    if(!x)return;
+    if(!sb)return toast('Supabase is not configured.');
+
+    const body=`
+    <form id="maintenanceEditModalForm" novalidate>
+      <div id="maintenanceEditGeneralError" style="display:none;margin-bottom:14px;padding:11px 12px;border-radius:9px;background:#fff1f1;color:#b42318;font-size:13px;"></div>
+
+      <div style="margin-bottom:15px;">
+        <label for="editMaintenanceItem" style="display:block;font-weight:600;margin-bottom:6px;">Maintenance item <span style="color:#d92d20;">*</span></label>
+        <input id="editMaintenanceItem" type="text" maxlength="150" value="${societyAdminModalEsc(x.item||x.title||x.name||'')}" placeholder="Enter maintenance item"
+          style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
+        <div style="font-size:12px;color:#667085;margin-top:5px;">Example: Street Light Repair</div>
+        <div id="editMaintenanceItemError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
+      </div>
+
+      <div style="margin-bottom:15px;">
+        <label for="editMaintenanceAmount" style="display:block;font-weight:600;margin-bottom:6px;">Amount <span style="color:#d92d20;">*</span></label>
+        <input id="editMaintenanceAmount" type="number" min="0" step="0.01" value="${Number(x.amount??0)}"
+          style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
+        <div style="font-size:12px;color:#667085;margin-top:5px;">Enter the maintenance expense amount.</div>
+        <div id="editMaintenanceAmountError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
+      </div>
+
+      <div style="margin-bottom:20px;">
+        <label for="editMaintenanceStatus" style="display:block;font-weight:600;margin-bottom:6px;">Status <span style="color:#d92d20;">*</span></label>
+        <select id="editMaintenanceStatus"
+          style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;background:#fff;">
+          <option value="">Select status</option>
+          <option value="Active" ${x.status==='Active'?'selected':''}>Active</option>
+          <option value="Pending" ${x.status==='Pending'?'selected':''}>Pending</option>
+          <option value="Completed" ${x.status==='Completed'?'selected':''}>Completed</option>
+        </select>
+        <div style="font-size:12px;color:#667085;margin-top:5px;">Select the current maintenance status.</div>
+        <div id="editMaintenanceStatusError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
+      </div>
+    </form>`;
+
+    const {overlay,close}=societyAdminModalShell(
+        'maintenanceEditModal',
+        'Edit Maintenance',
+        'Update all maintenance details and save them together.',
+        body,
+        'Update Maintenance'
+    );
+
+    const fields=[
+        ['editMaintenanceItem','editMaintenanceItemError'],
+        ['editMaintenanceAmount','editMaintenanceAmountError'],
+        ['editMaintenanceStatus','editMaintenanceStatusError']
+    ];
+    fields.forEach(([id,err])=>{
+        overlay.querySelector('#'+id).addEventListener('input',()=>societyAdminClearField(overlay,id,err));
+        overlay.querySelector('#'+id).addEventListener('change',()=>societyAdminClearField(overlay,id,err));
+    });
+
+    overlay.querySelector('#maintenanceEditModalForm').onsubmit=async e=>{
+        e.preventDefault();
+        fields.forEach(([id,err])=>societyAdminClearField(overlay,id,err));
+
+        const item=overlay.querySelector('#editMaintenanceItem').value.trim();
+        const amount=Number(overlay.querySelector('#editMaintenanceAmount').value);
+        const status=overlay.querySelector('#editMaintenanceStatus').value;
+        let valid=true;
+
+        if(!item){societyAdminFieldError(overlay,'editMaintenanceItem','editMaintenanceItemError','Please enter the maintenance item.');valid=false;}
+        if(!Number.isFinite(amount)||amount<0){societyAdminFieldError(overlay,'editMaintenanceAmount','editMaintenanceAmountError','Please enter a valid amount.');valid=false;}
+        if(!['Active','Pending','Completed'].includes(status)){societyAdminFieldError(overlay,'editMaintenanceStatus','editMaintenanceStatusError','Please select a valid status.');valid=false;}
+        if(!valid)return;
+
+        const {error}=await sb.from('maintenance').update({item,amount,status}).eq('id',x.id);
+        if(error){
+            const ge=overlay.querySelector('#maintenanceEditGeneralError');
+            ge.textContent='Maintenance update failed: '+error.message;
+            ge.style.display='block';
+            return;
+        }
+        close();
+        toast('Maintenance updated');
+        await adminPage('maintenance',window.__adminUser);
+    };
 }
+
 
 async function adminDeleteMaintenance(i){
     const x=window.__maintenanceRows?.[i]; if(!x)return;
@@ -601,18 +733,229 @@ async function adminDeleteWork(i){
 }
 
 async function adminEditWork(i){
-  const x=window.__workRows?.[i];if(!x)return;
-  const target=String(x.target_date||x.target||x.due_date||'');let dateVal=target;
-  const dm=target.match(/^(\d{2})[\/\-](\d{2})[\/\-](\d{4})$/);if(dm)dateVal=`${dm[3]}-${dm[2]}-${dm[1]}`;
-  const html=`<form id="workEditModalForm" novalidate><div id="workEditErr" style="display:none;margin-bottom:14px;padding:11px;border-radius:9px;background:#fff1f1;color:#b42318;font-size:13px"></div>
-  <div style="margin-bottom:15px"><label for="weName" style="display:block;font-weight:600;margin-bottom:6px">Work / project name <span style="color:#d92d20">*</span></label><input id="weName" type="text" maxlength="150" value="${__modalEsc(x.name||x.title||x.work_name||x.project_name||x.work_title||'')}" placeholder="Enter work / project name" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px"><div style="font-size:12px;color:#667085;margin-top:5px">Example: Park Renovation</div><div id="weNameE" style="display:none;color:#b42318;font-size:12px;margin-top:5px"></div></div>
-  <div style="margin-bottom:15px"><label for="weDesc" style="display:block;font-weight:600;margin-bottom:6px">Description</label><textarea id="weDesc" rows="4" maxlength="2000" placeholder="Enter work details..." style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;resize:vertical">${__modalEsc(x.description||x.details||'')}</textarea></div>
-  <div style="margin-bottom:15px"><label for="weStatus" style="display:block;font-weight:600;margin-bottom:6px">Status <span style="color:#d92d20">*</span></label><select id="weStatus" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;background:#fff"><option value="">Select status</option><option ${x.status==='Ongoing'?'selected':''}>Ongoing</option><option ${x.status==='Pending'?'selected':''}>Pending</option><option ${x.status==='Completed'?'selected':''}>Completed</option></select><div id="weStatusE" style="display:none;color:#b42318;font-size:12px;margin-top:5px"></div></div>
-  <div style="margin-bottom:15px"><label for="weProgress" style="display:block;font-weight:600;margin-bottom:6px">Progress <span style="color:#d92d20">*</span></label><select id="weProgress" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;background:#fff">${[0,10,20,30,40,50,60,70,80,90,100].map(v=>`<option value="${v}" ${Number(x.progress??0)===v?'selected':''}>${v}%</option>`).join('')}</select><div id="weProgressE" style="display:none;color:#b42318;font-size:12px;margin-top:5px"></div></div>
-  <div style="margin-bottom:20px"><label for="weDate" style="display:block;font-weight:600;margin-bottom:6px">Target date <span style="color:#d92d20">*</span></label><input id="weDate" type="date" value="${dateVal}" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px"><div id="weDateE" style="display:none;color:#b42318;font-size:12px;margin-top:5px"></div></div></form>`;
-  const{ o,close}=__openFormModal('workEditModal','Edit Society Work','Update all work details and save them together.',html,'Update Work');
-  o.querySelector('#workEditModalForm').onsubmit=async e=>{e.preventDefault();[['weName','weNameE'],['weStatus','weStatusE'],['weProgress','weProgressE'],['weDate','weDateE']].forEach(a=>__clearField(o,a[0],a[1]));const name=o.querySelector('#weName').value.trim(),description=o.querySelector('#weDesc').value.trim(),status=o.querySelector('#weStatus').value,progress=Number(o.querySelector('#weProgress').value),target_date=o.querySelector('#weDate').value;let ok=true;if(!name){__fieldError(o,'weName','weNameE','Please enter the work / project name.');ok=false}if(!['Ongoing','Pending','Completed'].includes(status)){__fieldError(o,'weStatus','weStatusE','Please select a valid status.');ok=false}if(![0,10,20,30,40,50,60,70,80,90,100].includes(progress)){__fieldError(o,'weProgress','weProgressE','Please select a progress value.');ok=false}if(!target_date){__fieldError(o,'weDate','weDateE','Please select a target date.');ok=false}if(!ok)return;try{const columns=await getSocietyWorkColumns();const{payload,titleColumn}=societyWorkPayload(columns,{name,description,status,progress,target_date});if(!titleColumn)throw new Error('No supported work-name column exists in society_work.');const{error}=await sb.from('society_work').update(payload).eq('id',x.id);if(error)throw error;close();toast('Work updated successfully');await adminPage('work',window.__adminUser)}catch(err){const z=o.querySelector('#workEditErr');z.textContent='Work update failed: '+(err?.message||err);z.style.display='block'}};
+    const x=window.__workRows?.[i];
+    if(!x)return;
+    if(!sb)return toast('Supabase is not configured.');
+
+    const old=document.getElementById('workEditModal');
+    if(old)old.remove();
+
+    const currentName=x.name||x.title||x.work_name||x.project_name||x.work_title||
+        x.project||x.work||x.activity||x.task||x.subject||'';
+    const currentDescription=x.description||x.details||'';
+    const currentStatus=x.status||'';
+    const currentProgress=Number(x.progress??0);
+    const currentTarget=x.target_date||x.target||x.due_date||'';
+
+    const toInputDate=(value)=>{
+        if(!value)return '';
+        const v=String(value).trim();
+        if(/^\\d{4}-\\d{2}-\\d{2}$/.test(v))return v;
+        const m=v.match(/^(\\d{2})[\\/\\-](\\d{2})[\\/\\-](\\d{4})$/);
+        if(m)return `${m[3]}-${m[2]}-${m[1]}`;
+        const d=new Date(v);
+        if(Number.isNaN(d.getTime()))return '';
+        return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    };
+
+    const esc=(value)=>{
+        return String(value??'')
+            .replace(/&/g,'&amp;')
+            .replace(/</g,'&lt;')
+            .replace(/>/g,'&gt;')
+            .replace(/"/g,'&quot;')
+            .replace(/'/g,'&#39;');
+    };
+
+    const overlay=document.createElement('div');
+    overlay.id='workEditModal';
+    overlay.style.cssText='position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;background:rgba(15,23,42,.58);backdrop-filter:blur(3px);';
+
+    overlay.innerHTML=`
+    <div role="dialog" aria-modal="true" aria-labelledby="workEditTitle"
+         style="width:min(560px,100%);max-height:calc(100vh - 40px);overflow:auto;background:#fff;border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.30);padding:24px;box-sizing:border-box;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+        <div>
+          <h2 id="workEditTitle" style="margin:0 0 4px;font-size:22px;">Edit Society Work</h2>
+          <div style="font-size:13px;color:#667085;">Update all work details and save them together.</div>
+        </div>
+        <button type="button" id="workEditModalClose" aria-label="Close"
+          style="width:36px;height:36px;border:0;border-radius:50%;background:#f2f4f7;font-size:24px;line-height:1;cursor:pointer;">&times;</button>
+      </div>
+
+      <form id="workEditForm" novalidate>
+        <div id="workEditGeneralError" style="display:none;margin-bottom:14px;padding:11px 12px;border-radius:9px;background:#fff1f1;color:#b42318;font-size:13px;"></div>
+
+        <div style="margin-bottom:15px;">
+          <label for="editWorkName" style="display:block;font-weight:600;margin-bottom:6px;">Work / project name <span style="color:#d92d20;">*</span></label>
+          <input id="editWorkName" type="text" maxlength="150" value="${esc(currentName)}"
+            placeholder="Enter work / project name"
+            style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
+          <div style="font-size:12px;color:#667085;margin-top:5px;">Example: Park Renovation</div>
+          <div id="editWorkNameError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
+        </div>
+
+        <div style="margin-bottom:15px;">
+          <label for="editWorkDescription" style="display:block;font-weight:600;margin-bottom:6px;">Description</label>
+          <textarea id="editWorkDescription" rows="4" maxlength="2000"
+            placeholder="Enter work details..."
+            style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;resize:vertical;">${esc(currentDescription)}</textarea>
+          <div style="font-size:12px;color:#667085;margin-top:5px;">Optional. Maximum 2000 characters.</div>
+        </div>
+
+        <div style="margin-bottom:15px;">
+          <label for="editWorkStatus" style="display:block;font-weight:600;margin-bottom:6px;">Status <span style="color:#d92d20;">*</span></label>
+          <select id="editWorkStatus"
+            style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;background:#fff;">
+            <option value="">Select status</option>
+            <option value="Ongoing" ${currentStatus==='Ongoing'?'selected':''}>Ongoing</option>
+            <option value="Pending" ${currentStatus==='Pending'?'selected':''}>Pending</option>
+            <option value="Completed" ${currentStatus==='Completed'?'selected':''}>Completed</option>
+          </select>
+          <div style="font-size:12px;color:#667085;margin-top:5px;">Select the current work status.</div>
+          <div id="editWorkStatusError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
+        </div>
+
+        <div style="margin-bottom:15px;">
+          <label for="editWorkProgress" style="display:block;font-weight:600;margin-bottom:6px;">Progress <span style="color:#d92d20;">*</span></label>
+          <select id="editWorkProgress"
+            style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;background:#fff;">
+            <option value="">Select progress</option>
+            ${[0,10,20,30,40,50,60,70,80,90,100].map(v=>`<option value="${v}" ${currentProgress===v?'selected':''}>${v}%</option>`).join('')}
+          </select>
+          <div style="font-size:12px;color:#667085;margin-top:5px;">Select progress from 0% to 100%.</div>
+          <div id="editWorkProgressError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
+        </div>
+
+        <div style="margin-bottom:20px;">
+          <label for="editWorkTargetDate" style="display:block;font-weight:600;margin-bottom:6px;">Target date <span style="color:#d92d20;">*</span></label>
+          <input id="editWorkTargetDate" type="date" value="${toInputDate(currentTarget)}"
+            style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
+          <div style="font-size:12px;color:#667085;margin-top:5px;">Select the target completion date.</div>
+          <div id="editWorkTargetDateError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;gap:10px;">
+          <button type="button" id="workEditCancel"
+            style="padding:10px 16px;border:1px solid #d0d5dd;border-radius:9px;background:#fff;cursor:pointer;">Cancel</button>
+          <button type="submit"
+            style="padding:10px 18px;border:0;border-radius:9px;background:#1d4ed8;color:#fff;cursor:pointer;font-weight:600;">Update Work</button>
+        </div>
+      </form>
+    </div>`;
+
+    document.body.appendChild(overlay);
+
+    const close=()=>overlay.remove();
+    document.getElementById('workEditModalClose').onclick=close;
+    document.getElementById('workEditCancel').onclick=close;
+    overlay.addEventListener('click',e=>{if(e.target===overlay)close();});
+
+    const fields=[
+        ['editWorkName','editWorkNameError'],
+        ['editWorkStatus','editWorkStatusError'],
+        ['editWorkProgress','editWorkProgressError'],
+        ['editWorkTargetDate','editWorkTargetDateError']
+    ];
+
+    const clearField=(id,errorId)=>{
+        const el=document.getElementById(id);
+        const er=document.getElementById(errorId);
+        if(el){el.style.borderColor='#d0d5dd';el.style.boxShadow='none';}
+        if(er){er.textContent='';er.style.display='none';}
+    };
+
+    const showFieldError=(id,errorId,message)=>{
+        const el=document.getElementById(id);
+        const er=document.getElementById(errorId);
+        if(el){
+            el.style.borderColor='#d92d20';
+            el.style.boxShadow='0 0 0 2px rgba(217,45,32,.10)';
+        }
+        if(er){
+            er.textContent=message;
+            er.style.display='block';
+        }
+    };
+
+    fields.forEach(([id,errorId])=>{
+        document.getElementById(id)?.addEventListener('input',()=>clearField(id,errorId));
+        document.getElementById(id)?.addEventListener('change',()=>clearField(id,errorId));
+    });
+
+    document.getElementById('workEditForm').onsubmit=async(e)=>{
+        e.preventDefault();
+
+        const workName=document.getElementById('editWorkName').value.trim();
+        const description=document.getElementById('editWorkDescription').value.trim();
+        const status=document.getElementById('editWorkStatus').value;
+        const progress=Number(document.getElementById('editWorkProgress').value);
+        const target_date=document.getElementById('editWorkTargetDate').value;
+
+        fields.forEach(([id,errorId])=>clearField(id,errorId));
+        let valid=true;
+
+        if(!workName){
+            showFieldError('editWorkName','editWorkNameError','Please enter the work / project name.');
+            valid=false;
+        }
+        if(!['Ongoing','Pending','Completed'].includes(status)){
+            showFieldError('editWorkStatus','editWorkStatusError','Please select a valid status.');
+            valid=false;
+        }
+        if(![0,10,20,30,40,50,60,70,80,90,100].includes(progress)){
+            showFieldError('editWorkProgress','editWorkProgressError','Please select a progress value.');
+            valid=false;
+        }
+        if(!target_date){
+            showFieldError('editWorkTargetDate','editWorkTargetDateError','Please select a target date.');
+            valid=false;
+        }
+
+        if(!valid)return;
+
+        try{
+            const columns=await getSocietyWorkColumns();
+            const {payload,titleColumn}=societyWorkPayload(columns,{
+                name:workName,
+                description,
+                status,
+                progress,
+                target_date
+            });
+
+            if(!titleColumn){
+                const ge=document.getElementById('workEditGeneralError');
+                ge.textContent='No supported work-name column exists in society_work.';
+                ge.style.display='block';
+                return;
+            }
+
+            const {error}=await sb.from('society_work')
+                .update(payload)
+                .eq('id',x.id);
+
+            if(error){
+                console.error('Work update failed:',error,payload);
+                const ge=document.getElementById('workEditGeneralError');
+                ge.textContent='Work update failed: '+error.message;
+                ge.style.display='block';
+                return;
+            }
+
+            close();
+            toast('Work updated successfully');
+            await adminPage('work',window.__adminUser);
+        }catch(e){
+            console.error('Work update exception:',e);
+            const ge=document.getElementById('workEditGeneralError');
+            ge.textContent='Work update failed: '+(e?.message||e);
+            ge.style.display='block';
+        }
+    };
 }
+
+
 
 async function adminAddEvent(){
  if(!sb)return toast('Supabase is not configured.');
@@ -1143,28 +1486,182 @@ async function adminUploadGallery(folderName){
  input.click();
 }
 async function adminAddMember(){
-  if(!sb)return toast('Supabase is not configured.');
-  const html=`<form id="memberAddModalForm" novalidate><div id="memberAddErr" style="display:none;margin-bottom:14px;padding:11px;border-radius:9px;background:#fff1f1;color:#b42318;font-size:13px"></div>
-  <div style="margin-bottom:15px"><label for="maName" style="display:block;font-weight:600;margin-bottom:6px">Member name <span style="color:#d92d20">*</span></label><input id="maName" type="text" maxlength="150" placeholder="Enter member full name" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px"><div style="font-size:12px;color:#667085;margin-top:5px">Example: Raj Sharma</div><div id="maNameE" style="display:none;color:#b42318;font-size:12px;margin-top:5px"></div></div>
-  <div style="margin-bottom:15px"><label for="maHouse" style="display:block;font-weight:600;margin-bottom:6px">House / Flat number <span style="color:#d92d20">*</span></label><input id="maHouse" type="text" maxlength="50" placeholder="Enter house / flat number" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px"><div style="font-size:12px;color:#667085;margin-top:5px">Example: A-101</div><div id="maHouseE" style="display:none;color:#b42318;font-size:12px;margin-top:5px"></div></div>
-  <div style="margin-bottom:15px"><label for="maPhone" style="display:block;font-weight:600;margin-bottom:6px">Phone</label><input id="maPhone" type="tel" maxlength="20" placeholder="Enter phone number" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px"></div>
-  <div style="margin-bottom:15px"><label for="maAddress" style="display:block;font-weight:600;margin-bottom:6px">Address</label><textarea id="maAddress" rows="3" maxlength="500" placeholder="Enter address" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;resize:vertical"></textarea></div>
-  <div style="margin-bottom:20px"><label for="maRole" style="display:block;font-weight:600;margin-bottom:6px">Role <span style="color:#d92d20">*</span></label><select id="maRole" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;background:#fff"><option value="member">Member</option><option value="admin">Admin</option></select><div style="font-size:12px;color:#667085;margin-top:5px">Select the user's society role.</div><div id="maRoleE" style="display:none;color:#b42318;font-size:12px;margin-top:5px"></div></div></form>`;
-  const{ o,close}=__openFormModal('memberAddModal','Add Member','Enter all member details and save them together.',html,'Save Member');
-  o.querySelector('#memberAddModalForm').onsubmit=async e=>{e.preventDefault();__clearField(o,'maName','maNameE');__clearField(o,'maHouse','maHouseE');const full_name=o.querySelector('#maName').value.trim(),house_number=o.querySelector('#maHouse').value.trim(),phone=o.querySelector('#maPhone').value.trim(),address=o.querySelector('#maAddress').value.trim(),role=o.querySelector('#maRole').value;let ok=true;if(!full_name){__fieldError(o,'maName','maNameE','Please enter the member name.');ok=false}if(!house_number){__fieldError(o,'maHouse','maHouseE','Please enter the house / flat number.');ok=false}if(!ok)return;const{error}=await sb.from('profiles').insert({full_name,house_number,phone,address,role});if(error){const z=o.querySelector('#memberAddErr');z.textContent='Member save failed: '+error.message;z.style.display='block';return}close();toast('Member saved successfully');await adminPage('members',window.__adminUser)}
+    if(!sb)return toast('Supabase is not configured.');
+
+    const body=`
+    <form id="memberAddModalForm" novalidate>
+      <div id="memberAddGeneralError" style="display:none;margin-bottom:14px;padding:11px 12px;border-radius:9px;background:#fff1f1;color:#b42318;font-size:13px;"></div>
+
+      <div style="margin-bottom:15px;">
+        <label for="memberFullName" style="display:block;font-weight:600;margin-bottom:6px;">Member name <span style="color:#d92d20;">*</span></label>
+        <input id="memberFullName" type="text" maxlength="150" placeholder="Enter member full name"
+          style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
+        <div style="font-size:12px;color:#667085;margin-top:5px;">Example: Raj Sharma</div>
+        <div id="memberFullNameError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
+      </div>
+
+      <div style="margin-bottom:15px;">
+        <label for="memberHouse" style="display:block;font-weight:600;margin-bottom:6px;">House / Flat number <span style="color:#d92d20;">*</span></label>
+        <input id="memberHouse" type="text" maxlength="50" placeholder="Enter house / flat number"
+          style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
+        <div style="font-size:12px;color:#667085;margin-top:5px;">Example: A-101</div>
+        <div id="memberHouseError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
+      </div>
+
+      <div style="margin-bottom:15px;">
+        <label for="memberPhone" style="display:block;font-weight:600;margin-bottom:6px;">Phone</label>
+        <input id="memberPhone" type="tel" maxlength="20" placeholder="Enter phone number"
+          style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
+        <div style="font-size:12px;color:#667085;margin-top:5px;">Example: 9876543210</div>
+      </div>
+
+      <div style="margin-bottom:15px;">
+        <label for="memberAddress" style="display:block;font-weight:600;margin-bottom:6px;">Address</label>
+        <textarea id="memberAddress" rows="3" maxlength="500" placeholder="Enter address"
+          style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;resize:vertical;"></textarea>
+      </div>
+
+      <div style="margin-bottom:20px;">
+        <label for="memberRole" style="display:block;font-weight:600;margin-bottom:6px;">Role <span style="color:#d92d20;">*</span></label>
+        <select id="memberRole"
+          style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;background:#fff;">
+          <option value="member" selected>Member</option>
+          <option value="admin">Admin</option>
+        </select>
+        <div style="font-size:12px;color:#667085;margin-top:5px;">Select the user's society role.</div>
+        <div id="memberRoleError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
+      </div>
+    </form>`;
+
+    const {overlay,close}=societyAdminModalShell(
+        'memberAddModal',
+        'Add Member',
+        'Enter all member details and save them together.',
+        body,
+        'Save Member'
+    );
+
+    overlay.querySelector('#memberAddModalForm').onsubmit=async e=>{
+        e.preventDefault();
+        societyAdminClearField(overlay,'memberFullName','memberFullNameError');
+        societyAdminClearField(overlay,'memberHouse','memberHouseError');
+        societyAdminClearField(overlay,'memberRole','memberRoleError');
+
+        const full_name=overlay.querySelector('#memberFullName').value.trim();
+        const house_number=overlay.querySelector('#memberHouse').value.trim();
+        const phone=overlay.querySelector('#memberPhone').value.trim();
+        const address=overlay.querySelector('#memberAddress').value.trim();
+        const role=overlay.querySelector('#memberRole').value;
+        let valid=true;
+
+        if(!full_name){societyAdminFieldError(overlay,'memberFullName','memberFullNameError','Please enter the member name.');valid=false;}
+        if(!house_number){societyAdminFieldError(overlay,'memberHouse','memberHouseError','Please enter the house / flat number.');valid=false;}
+        if(!['member','admin'].includes(role)){societyAdminFieldError(overlay,'memberRole','memberRoleError','Please select a valid role.');valid=false;}
+        if(!valid)return;
+
+        const {error}=await sb.from('profiles').insert({full_name,house_number,phone,address,role});
+        if(error){
+            const ge=overlay.querySelector('#memberAddGeneralError');
+            ge.textContent='Member save failed: '+error.message;
+            ge.style.display='block';
+            return;
+        }
+        close();
+        toast('Member saved successfully');
+        await adminPage('members',window.__adminUser);
+    };
 }
 
+
 async function adminEditMember(i){
-  const x=window.__memberRows?.[i];if(!x)return;
-  const html=`<form id="memberEditModalForm" novalidate><div id="memberEditErr" style="display:none;margin-bottom:14px;padding:11px;border-radius:9px;background:#fff1f1;color:#b42318;font-size:13px"></div>
-  <div style="margin-bottom:15px"><label for="meName" style="display:block;font-weight:600;margin-bottom:6px">Member name <span style="color:#d92d20">*</span></label><input id="meName" type="text" maxlength="150" value="${__modalEsc(x.full_name||x.name||'')}" placeholder="Enter member full name" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px"><div style="font-size:12px;color:#667085;margin-top:5px">Example: Raj Sharma</div><div id="meNameE" style="display:none;color:#b42318;font-size:12px;margin-top:5px"></div></div>
-  <div style="margin-bottom:15px"><label for="meHouse" style="display:block;font-weight:600;margin-bottom:6px">House / Flat number <span style="color:#d92d20">*</span></label><input id="meHouse" type="text" maxlength="50" value="${__modalEsc(x.house_number||x.house_no||'')}" placeholder="Enter house / flat number" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px"><div style="font-size:12px;color:#667085;margin-top:5px">Example: A-101</div><div id="meHouseE" style="display:none;color:#b42318;font-size:12px;margin-top:5px"></div></div>
-  <div style="margin-bottom:15px"><label for="mePhone" style="display:block;font-weight:600;margin-bottom:6px">Phone</label><input id="mePhone" type="tel" maxlength="20" value="${__modalEsc(x.phone||'')}" placeholder="Enter phone number" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px"></div>
-  <div style="margin-bottom:15px"><label for="meAddress" style="display:block;font-weight:600;margin-bottom:6px">Address</label><textarea id="meAddress" rows="3" maxlength="500" placeholder="Enter address" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;resize:vertical">${__modalEsc(x.address||'')}</textarea></div>
-  <div style="margin-bottom:20px"><label for="meRole" style="display:block;font-weight:600;margin-bottom:6px">Role <span style="color:#d92d20">*</span></label><select id="meRole" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;background:#fff"><option value="member" ${String(x.role||'member').toLowerCase()==='member'?'selected':''}>Member</option><option value="admin" ${String(x.role||'').toLowerCase()==='admin'?'selected':''}>Admin</option></select><div style="font-size:12px;color:#667085;margin-top:5px">Select the user's society role.</div><div id="meRoleE" style="display:none;color:#b42318;font-size:12px;margin-top:5px"></div></div></form>`;
-  const{ o,close}=__openFormModal('memberEditModal','Edit Member','Update all member details and save them together.',html,'Update Member');
-  o.querySelector('#memberEditModalForm').onsubmit=async e=>{e.preventDefault();__clearField(o,'meName','meNameE');__clearField(o,'meHouse','meHouseE');const full_name=o.querySelector('#meName').value.trim(),house_number=o.querySelector('#meHouse').value.trim(),phone=o.querySelector('#mePhone').value.trim(),address=o.querySelector('#meAddress').value.trim(),role=o.querySelector('#meRole').value;let ok=true;if(!full_name){__fieldError(o,'meName','meNameE','Please enter the member name.');ok=false}if(!house_number){__fieldError(o,'meHouse','meHouseE','Please enter the house / flat number.');ok=false}if(!ok)return;const{error}=await sb.from('profiles').update({full_name,house_number,phone,address,role}).eq('id',x.id);if(error){const z=o.querySelector('#memberEditErr');z.textContent='Member update failed: '+error.message;z.style.display='block';return}close();toast('Member updated');await adminPage('members',window.__adminUser)}
+    const x=window.__memberRows?.[i];
+    if(!x)return;
+    if(!sb)return toast('Supabase is not configured.');
+
+    const body=`
+    <form id="memberEditModalForm" novalidate>
+      <div id="memberEditGeneralError" style="display:none;margin-bottom:14px;padding:11px 12px;border-radius:9px;background:#fff1f1;color:#b42318;font-size:13px;"></div>
+
+      <div style="margin-bottom:15px;">
+        <label for="editMemberFullName" style="display:block;font-weight:600;margin-bottom:6px;">Member name <span style="color:#d92d20;">*</span></label>
+        <input id="editMemberFullName" type="text" maxlength="150" value="${societyAdminModalEsc(x.full_name||x.name||'')}" placeholder="Enter member full name"
+          style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
+        <div style="font-size:12px;color:#667085;margin-top:5px;">Example: Raj Sharma</div>
+        <div id="editMemberFullNameError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
+      </div>
+
+      <div style="margin-bottom:15px;">
+        <label for="editMemberHouse" style="display:block;font-weight:600;margin-bottom:6px;">House / Flat number <span style="color:#d92d20;">*</span></label>
+        <input id="editMemberHouse" type="text" maxlength="50" value="${societyAdminModalEsc(x.house_number||x.house_no||'')}" placeholder="Enter house / flat number"
+          style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
+        <div style="font-size:12px;color:#667085;margin-top:5px;">Example: A-101</div>
+        <div id="editMemberHouseError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
+      </div>
+
+      <div style="margin-bottom:15px;">
+        <label for="editMemberPhone" style="display:block;font-weight:600;margin-bottom:6px;">Phone</label>
+        <input id="editMemberPhone" type="tel" maxlength="20" value="${societyAdminModalEsc(x.phone||'')}" placeholder="Enter phone number"
+          style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
+        <div style="font-size:12px;color:#667085;margin-top:5px;">Example: 9876543210</div>
+      </div>
+
+      <div style="margin-bottom:15px;">
+        <label for="editMemberAddress" style="display:block;font-weight:600;margin-bottom:6px;">Address</label>
+        <textarea id="editMemberAddress" rows="3" maxlength="500" placeholder="Enter address"
+          style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;resize:vertical;">${societyAdminModalEsc(x.address||'')}</textarea>
+      </div>
+
+      <div style="margin-bottom:20px;">
+        <label for="editMemberRole" style="display:block;font-weight:600;margin-bottom:6px;">Role <span style="color:#d92d20;">*</span></label>
+        <select id="editMemberRole"
+          style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;background:#fff;">
+          <option value="member" ${String(x.role||'member').toLowerCase()==='member'?'selected':''}>Member</option>
+          <option value="admin" ${String(x.role||'').toLowerCase()==='admin'?'selected':''}>Admin</option>
+        </select>
+        <div style="font-size:12px;color:#667085;margin-top:5px;">Select the user's society role.</div>
+        <div id="editMemberRoleError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
+      </div>
+    </form>`;
+
+    const {overlay,close}=societyAdminModalShell(
+        'memberEditModal',
+        'Edit Member',
+        'Update all member details and save them together.',
+        body,
+        'Update Member'
+    );
+
+    overlay.querySelector('#memberEditModalForm').onsubmit=async e=>{
+        e.preventDefault();
+        societyAdminClearField(overlay,'editMemberFullName','editMemberFullNameError');
+        societyAdminClearField(overlay,'editMemberHouse','editMemberHouseError');
+        societyAdminClearField(overlay,'editMemberRole','editMemberRoleError');
+
+        const full_name=overlay.querySelector('#editMemberFullName').value.trim();
+        const house_number=overlay.querySelector('#editMemberHouse').value.trim();
+        const phone=overlay.querySelector('#editMemberPhone').value.trim();
+        const address=overlay.querySelector('#editMemberAddress').value.trim();
+        const role=overlay.querySelector('#editMemberRole').value;
+        let valid=true;
+
+        if(!full_name){societyAdminFieldError(overlay,'editMemberFullName','editMemberFullNameError','Please enter the member name.');valid=false;}
+        if(!house_number){societyAdminFieldError(overlay,'editMemberHouse','editMemberHouseError','Please enter the house / flat number.');valid=false;}
+        if(!['member','admin'].includes(role)){societyAdminFieldError(overlay,'editMemberRole','editMemberRoleError','Please select a valid role.');valid=false;}
+        if(!valid)return;
+
+        const {error}=await sb.from('profiles').update({full_name,house_number,phone,address,role}).eq('id',x.id);
+        if(error){
+            const ge=overlay.querySelector('#memberEditGeneralError');
+            ge.textContent='Member update failed: '+error.message;
+            ge.style.display='block';
+            return;
+        }
+        close();
+        toast('Member updated');
+        await adminPage('members',window.__adminUser);
+    };
 }
+
 
 async function adminDeleteMember(i){
  const x=window.__memberRows?.[i]; if(!x||!confirm('Remove this member?'))return;
@@ -1475,18 +1972,3 @@ if(document.readyState==='loading'){
 }else{
     removePublicAboutFromTopBar();
 }
-
-/* TARGETED PUBLIC ABOUT REMOVAL */
-(function(){
-  function removePublicAbout(){
-    document.querySelectorAll('a').forEach(function(a){
-      var h=(a.getAttribute('href')||'').trim().toLowerCase();
-      var t=(a.textContent||'').trim().toLowerCase();
-      var side=a.closest('.sidebar,.side-menu,#adminSideMenu,[data-side-menu]');
-      if((h==='#about'||t==='about')&&!side)a.remove();
-    });
-  }
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',removePublicAbout);
-  else removePublicAbout();
-  new MutationObserver(removePublicAbout).observe(document.body,{childList:true,subtree:true});
-})();
