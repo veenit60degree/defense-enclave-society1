@@ -195,66 +195,26 @@ async function adminDeleteMaintenance(i){
 
 async function adminAddWork(){
  if(!sb)return toast('Supabase is not configured.');
- const workName=prompt('Work / project name:'); if(!workName)return;
+ const name=prompt('Work / project name:'); if(!name)return;
  const description=prompt('Description:','')||'';
  const status=prompt('Status (Ongoing/Pending/Completed):','Pending')||'Pending';
  const progress=Math.max(0,Math.min(100,Number(prompt('Progress %:','0'))||0));
  const target_date=prompt('Target date:','')||null;
-
- const candidates=[
-   {name:workName,description,status,progress,target_date},
-   {title:workName,description,status,progress,target_date},
-   {work_name:workName,description,status,progress,target_date},
-   {project_name:workName,description,status,progress,target_date},
-   {work_title:workName,description,status,progress,target_date}
- ];
-
- let lastError=null;
- for(const payload of candidates){
-   const {error}=await sb.from('society_work').insert(payload);
-   if(!error){
-      toast('Work saved successfully');
-      await adminPage('work',window.__adminUser);
-      return;
-   }
-   lastError=error;
-   const msg=(error.message||'').toLowerCase();
-   if(!(msg.includes('column')||msg.includes('schema cache')||msg.includes('could not find'))) break;
- }
- console.error('Work save error:',lastError);
- toast('Work save failed: '+(lastError?.message||'Unknown error'));
+ const {error}=await sb.from('society_work').insert({name,description,status,progress,target_date});
+ if(error)return toast('Work save failed: '+error.message);
+ toast('Work saved successfully'); await adminPage('work',window.__adminUser);
 }
 
 async function adminEditWork(i){
  const x=window.__workRows?.[i]; if(!x)return;
- const current=x.name||x.title||x.work_name||x.project_name||x.work_title||'';
- const workName=prompt('Work / project name:',current); if(workName===null)return;
+ const name=prompt('Work / project name:',x.name||x.title||x.project_name||''); if(name===null)return;
  const description=prompt('Description:',x.description||''); if(description===null)return;
  const status=prompt('Status:',x.status||''); if(status===null)return;
  const progress=Math.max(0,Math.min(100,Number(prompt('Progress %:',x.progress||0))||0));
  const target_date=prompt('Target date:',x.target_date||x.target||''); if(target_date===null)return;
-
- const candidates=[
-   {name:workName,description,status,progress,target_date},
-   {title:workName,description,status,progress,target_date},
-   {work_name:workName,description,status,progress,target_date},
-   {project_name:workName,description,status,progress,target_date},
-   {work_title:workName,description,status,progress,target_date}
- ];
- let lastError=null;
- for(const payload of candidates){
-   const {error}=await sb.from('society_work').update(payload).eq('id',x.id);
-   if(!error){
-      toast('Work updated');
-      await adminPage('work',window.__adminUser);
-      return;
-   }
-   lastError=error;
-   const msg=(error.message||'').toLowerCase();
-   if(!(msg.includes('column')||msg.includes('schema cache')||msg.includes('could not find'))) break;
- }
- console.error('Work update error:',lastError);
- toast('Work update failed: '+(lastError?.message||'Unknown error'));
+ const {error}=await sb.from('society_work').update({name,description,status,progress,target_date}).eq('id',x.id);
+ if(error)return toast('Work update failed: '+error.message);
+ toast('Work updated'); await adminPage('work',window.__adminUser);
 }
 
 async function adminAddEvent(){
@@ -370,16 +330,69 @@ async function adminUploadMap(){
  if(!file)return toast('Please select a PDF first.');
  if(file.type!=='application/pdf')return toast('Only PDF files are allowed.');
  if(file.size>10*1024*1024)return toast('PDF must be 10 MB or smaller.');
- let storagePath=null;
+
  try{
-  storagePath=`society-map/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
-  const upload=await sb.storage.from('society-documents').upload(storagePath,file,{upsert:true,contentType:'application/pdf'});
+  // Store the PDF in the existing public Supabase bucket.
+  const safeName=file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+  const storagePath=`society-map/${Date.now()}_${safeName}`;
+
+  const upload=await sb.storage
+    .from('society-documents')
+    .upload(storagePath,file,{upsert:true,contentType:'application/pdf'});
+
   if(upload.error)throw upload.error;
-  const {data:urlData}=sb.storage.from('society-documents').getPublicUrl(storagePath);
-  const {error}=await sb.from('society_map').upsert({id:1,file_name:file.name,storage_path:storagePath,public_url:urlData?.publicUrl||'',updated_at:new Date().toISOString()},{onConflict:'id'});
-  if(error)throw error;
-  toast('Society Map saved successfully'); await adminPage('map',window.__adminUser);
- }catch(e){console.error('Map upload error:',e);toast('Map save failed: '+e.message);}
+
+  const {data:urlData}=sb.storage
+    .from('society-documents')
+    .getPublicUrl(storagePath);
+
+  const publicUrl=urlData?.publicUrl||'';
+  if(!publicUrl)throw new Error('Could not create the public PDF URL.');
+
+  // IMPORTANT: society_map does NOT have a storage_path column.
+  // Save only the columns used by the current table.
+  const payload={
+    id:1,
+    file_name:file.name,
+    public_url:publicUrl,
+    updated_at:new Date().toISOString()
+  };
+
+  const {data:existing,error:readError}=await sb
+    .from('society_map')
+    .select('id')
+    .eq('id',1)
+    .maybeSingle();
+
+  if(readError)throw readError;
+
+  let saveError=null;
+
+  if(existing){
+    const result=await sb
+      .from('society_map')
+      .update({
+        file_name:payload.file_name,
+        public_url:payload.public_url,
+        updated_at:payload.updated_at
+      })
+      .eq('id',1);
+    saveError=result.error;
+  }else{
+    const result=await sb
+      .from('society_map')
+      .insert(payload);
+    saveError=result.error;
+  }
+
+  if(saveError)throw saveError;
+
+  toast('Society Map saved successfully');
+  await adminPage('map',window.__adminUser);
+ }catch(e){
+  console.error('Map upload error:',e);
+  toast('Map save failed: '+(e?.message||'Unknown error'));
+ }
 }
 
 async function adminPage(p,user){
@@ -435,7 +448,7 @@ else if(p==='maintenance'){
     window.__workRows=rows||[];
     c.innerHTML=`<div class="hero"><div><h2>Society Work</h2><div class="muted">Showing only records saved in the database.</div></div><button class="primary-btn" onclick="adminAddWork()">+ Add Work</button></div>
     <div class="panel"><div class="table-wrap"><table class="table"><thead><tr><th>Project</th><th>Description</th><th>Status</th><th>Progress</th><th>Target</th><th>Action</th></tr></thead><tbody>
-    ${(rows||[]).map((x,i)=>`<tr><td><strong>${x.name||x.title||x.work_name||x.project_name||x.work_title||''}</strong></td><td>${x.description||''}</td><td>${x.status||''}</td><td>${Number(x.progress||0)}%</td><td>${x.target_date||x.target||''}</td><td><button class="outline-btn" onclick="adminEditWork(${i})">Edit</button></td></tr>`).join('')}
+    ${(rows||[]).map((x,i)=>`<tr><td><strong>${x.name||x.title||x.project_name||''}</strong></td><td>${x.description||''}</td><td>${x.status||''}</td><td>${Number(x.progress||0)}%</td><td>${x.target_date||x.target||''}</td><td><button class="outline-btn" onclick="adminEditWork(${i})">Edit</button></td></tr>`).join('')}
     </tbody></table></div>${rows?.length?'':`<div class="muted" style="padding:18px">No society work records saved yet.</div>`}</div>`;
 }else if(p==='events'){
     const {data:rows,error}=await sb.from('events').select('*').order('event_date',{ascending:false});
@@ -471,7 +484,7 @@ else if(p==='maintenance'){
     ${(rows||[]).map((x,i)=>`<tr><td>${x.complaint_no||x.ticket_no||x.id||''}</td><td>${x.category||''}</td><td>${x.subject||x.title||x.description||x.message||''}</td><td>${x.status||''}</td><td>${x.created_at?new Date(x.created_at).toLocaleDateString('en-IN'):''}</td><td><button class="outline-btn" onclick="adminUpdateComplaint(${i})">Update</button></td></tr>`).join('')}
     </tbody></table></div>${rows?.length?'':`<div class="muted" style="padding:18px">No complaints saved yet.</div>`}</div>`;
 }else if(p==='map'){
-    const {data:rows,error}=await sb.from('society_map').select('*').order('created_at',{ascending:false}).limit(1);
+    const {data:rows,error}=await sb.from('society_map').select('*').limit(1);
     if(error){ console.error('Society Map load error:',error); return toast('Unable to load Society Map: '+error.message); }
     const map=rows?.[0];
     window.__societyMap=map||null;
