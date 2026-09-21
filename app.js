@@ -1704,6 +1704,10 @@ async function adminAddMember(){
 
           close();
           toast('Member saved successfully');
+
+          // Clear the previous member list and reload fresh data from Supabase.
+          window.__memberRows = [];
+          console.log('Member created successfully. Refreshing Members list...');
           await adminPage('members',window.__adminUser);
         }catch(error){
           console.error('Member save failed:',error);
@@ -2042,9 +2046,15 @@ else if(p==='maintenance'){
       </div></div>`;
     }).join('')}</div>${folders.length?'':`<div class="panel"><div class="muted">No gallery folders or photos saved yet.</div></div>`}`;
 }else if(p==='members'){
-    const {data:rows,error}=await sb.from('profiles').select('*').order('created_at',{ascending:false});
+   // const {data:rows,error}=await sb.from('profiles').select('*').order('created_at',{ascending:false});
+     const { data: rows, error } = await sb
+      .from('profiles')
+      .select('*')
+      .eq('role', 'member')
+      .order('created_at', { ascending: false });
     if(error){ console.error('Members load error:',error); return toast('Unable to load Members: '+error.message); }
     window.__memberRows=rows||[];
+    console.log('Members list refreshed. Member count:', window.__memberRows.length);
     c.innerHTML=`<div class="hero"><div><h2>Members</h2><div class="muted">Showing only member profiles saved in the database.</div></div><button class="primary-btn" onclick="adminAddMember()">+ Add Member</button></div>
     <div class="panel"><div class="table-wrap"><table class="table"><thead><tr><th>Member</th><th>House</th><th>Phone</th><th>Role</th><th>Action</th></tr></thead><tbody>
     ${(rows||[]).map((x,i)=>`<tr><td><strong>${x.full_name||x.name||x.email||''}</strong><br><span class="muted">${x.email||''}</span></td><td>${x.house_number||x.house_no||''}</td><td>${x.phone||''}</td><td>${x.role||'member'}</td><td><button class="outline-btn" onclick="adminEditMember(${i})">Edit</button> <button class="outline-btn" onclick="adminDeleteMember(${i})">Delete</button></td></tr>`).join('')}
