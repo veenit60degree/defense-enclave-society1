@@ -346,19 +346,6 @@ async function adminAddWork(){
     }
 }
 
-
-async function adminDeleteWork(i){
-    if(!adminDeleteGuard())return;
-    const x=window.__workRows?.[i];
-    if(!x)return toast('Work not found.');
-    const label=x.name||x.title||x.work_name||x.project_name||x.work_title||x.project||x.work||'this work';
-    if(!confirm(`Delete "${label}"?`))return;
-    const {error}=await sb.from('society_work').delete().eq('id',x.id);
-    if(error)return toast('Work delete failed: '+error.message);
-    toast('Work deleted successfully');
-    await adminPage('work',window.__adminUser);
-}
-
 async function adminEditWork(i){
     const x=window.__workRows?.[i];
     if(!x)return;
@@ -687,73 +674,166 @@ async function adminEditEvent(i){
 }
 
 
-function isCurrentAdmin(){
-    return String(window.__adminUser?.role||'').toLowerCase()==='admin';
-}
-function adminDeleteGuard(){
-    if(!isCurrentAdmin()){
-        toast('Only an admin can delete this item.');
+async function requireAdminForDelete(){
+    try{
+        if(!sb?.auth){
+            toast('Authentication is not available.');
+            return false;
+        }
+
+        const {data,error}=await sb.auth.getSession();
+        const authUser=data?.session?.user;
+
+        if(error || !authUser){
+            toast('Admin session not found. Please sign in again.');
+            return false;
+        }
+
+        const {data:profile,error:profileError}=await sb
+            .from('profiles')
+            .select('role')
+            .eq('id',authUser.id)
+            .maybeSingle();
+
+        if(profileError){
+            console.error('Admin role verification failed:',profileError);
+            toast('Unable to verify admin role.');
+            return false;
+        }
+
+        const role=String(profile?.role||'').trim().toLowerCase();
+
+        // Keep the same authenticated user/role everywhere.
+        window.__adminUser={
+            ...(window.__adminUser||{}),
+            ...authUser,
+            id:authUser.id,
+            email:authUser.email||'',
+            role
+        };
+
+        console.log('Delete permission check:',{
+            userId:authUser.id,
+            email:authUser.email,
+            profileRole:profile?.role,
+            normalizedRole:role
+        });
+
+        if(role!=='admin'){
+            toast('Only an admin can delete this item.');
+            return false;
+        }
+
+        return true;
+    }catch(e){
+        console.error('Admin delete permission exception:',e);
+        toast('Unable to verify admin role.');
         return false;
     }
-    return true;
+}
+
+async function adminDeleteWork(i){
+    if(!(await requireAdminForDelete()))return;
+    const x=window.__workRows?.[i];
+    if(!x)return toast('Work not found.');
+
+    const title=x.name||x.title||x.work_name||x.project_name||x.work_title||x.project||x.work||'this work';
+    if(!confirm(`Delete "${title}"?`))return;
+
+    const {error}=await sb.from('society_work').delete().eq('id',x.id);
+    if(error)return toast('Work delete failed: '+error.message);
+
+    toast('Work deleted successfully');
+    await adminPage('work',window.__adminUser);
 }
 
 async function adminDeleteEvent(i){
-    if(!adminDeleteGuard())return;
+    if(!(await requireAdminForDelete()))return;
     const x=window.__eventRows?.[i];
     if(!x)return toast('Event not found.');
     if(!confirm(`Delete "${x.title||x.name||'this event'}"?`))return;
+
     const {error}=await sb.from('events').delete().eq('id',x.id);
     if(error)return toast('Event delete failed: '+error.message);
+
     toast('Event deleted successfully');
     await adminPage('events',window.__adminUser);
 }
 
-
 async function adminDeleteGalleryPhoto(photoId){
-    if(!adminDeleteGuard())return;
+    if(!(await requireAdminForDelete()))return;
+
     const row=(window.__galleryRows||[]).find(x=>String(x.id)===String(photoId));
     if(!row)return toast('Photo not found.');
     if(!confirm(`Delete "${row.file_name||'this photo'}"?`))return;
 
     try{
         if(row.storage_path){
-            const {error}=await sb.storage.from('society-gallery').remove([row.storage_path]);
-            if(error)throw error;
+            const {error:storageError}=await sb.storage
+                .from('society-gallery')
+                .remove([row.storage_path]);
+            if(storageError)throw storageError;
         }
-        const {error}=await sb.from('gallery_photos').delete().eq('id',photoId);
-        if(error)throw error;
+
+        const {error:dbError}=await sb
+            .from('gallery_photos')
+            .delete()
+            .eq('id',photoId);
+
+        if(dbError)throw dbError;
+
         toast('Photo deleted successfully');
         await adminPage('gallery',window.__adminUser);
     }catch(e){
-        console.error(e);
+        console.error('Gallery photo delete failed:',e);
         toast('Photo delete failed: '+(e?.message||e));
     }
 }
+
 async function adminDeleteGalleryFolder(folderName){
-    if(!adminDeleteGuard())return;
+    if(!(await requireAdminForDelete()))return;
     if(!folderName)return;
-    if(!confirm(`Delete folder "${folderName}" and all photos inside it?`))return;
+
+    if(!confirm(`Delete folder "${folderName}" and all photos inside it? This cannot be undone.`))return;
 
     try{
-        const {data:files,error:listError}=await sb.storage.from('society-gallery').list(folderName,{limit:1000});
+        const {data:files,error:listError}=await sb.storage
+            .from('society-gallery')
+            .list(folderName,{limit:1000});
+
         if(listError)throw listError;
-        const paths=(files||[]).filter(x=>x?.name&&x.name!=='.folder').map(x=>`${folderName}/${x.name}`);
+
+        const paths=(files||[])
+            .filter(x=>x?.name && x.name!=='.folder')
+            .map(x=>`${folderName}/${x.name}`);
+
         if(paths.length){
-            const {error}=await sb.storage.from('society-gallery').remove(paths);
-            if(error)throw error;
+            const {error:removeError}=await sb.storage
+                .from('society-gallery')
+                .remove(paths);
+            if(removeError)throw removeError;
         }
-        const {data:rows,error:qerr}=await sb.from('gallery_photos').select('id,storage_path').like('storage_path',`${folderName}/%`);
-        if(qerr)throw qerr;
+
+        const {data:rows,error:queryError}=await sb
+            .from('gallery_photos')
+            .select('id,storage_path')
+            .like('storage_path',`${folderName}/%`);
+
+        if(queryError)throw queryError;
+
         const ids=(rows||[]).map(x=>x.id).filter(Boolean);
         if(ids.length){
-            const {error}=await sb.from('gallery_photos').delete().in('id',ids);
-            if(error)throw error;
+            const {error:deleteError}=await sb
+                .from('gallery_photos')
+                .delete()
+                .in('id',ids);
+            if(deleteError)throw deleteError;
         }
+
         toast('Folder deleted successfully');
         await adminPage('gallery',window.__adminUser);
     }catch(e){
-        console.error(e);
+        console.error('Gallery folder delete failed:',e);
         toast('Folder delete failed: '+(e?.message||e));
     }
 }
@@ -1031,7 +1111,7 @@ else if(p==='maintenance'){
     if(error){ console.error('Events load error:',error); return toast('Unable to load Events: '+error.message); }
     window.__eventRows=rows||[];
     c.innerHTML=`<div class="hero"><div><h2>Events</h2><div class="muted">Showing only events saved in the database.</div></div><button class="primary-btn" onclick="adminAddEvent()">+ Add Event</button></div>
-    <div class="event-grid">${(rows||[]).map((x,i)=>`<div class="card"><div class="photo">📅</div><div class="card-body"><div class="event-date">${x.event_date||x.date||''}</div><h3>${x.title||x.name||''}</h3><div class="muted">${x.location||x.place||x.description||''}</div><br><button class="outline-btn" onclick="adminEditEvent(${i})">Edit</button> <button class="outline-btn" onclick="adminDeleteEvent(${i})">Delete</button> <button class="outline-btn" onclick="adminDeleteEvent(${i})">Delete</button></div></div>`).join('')}</div>${rows?.length?'':`<div class="panel"><div class="muted">No events saved yet.</div></div>`}`;
+    <div class="event-grid">${(rows||[]).map((x,i)=>`<div class="card"><div class="photo">📅</div><div class="card-body"><div class="event-date">${x.event_date||x.date||''}</div><h3>${x.title||x.name||''}</h3><div class="muted">${x.location||x.place||x.description||''}</div><br><button class="outline-btn" onclick="adminEditEvent(${i})">Edit</button> <button class="outline-btn" onclick="adminDeleteEvent(${i})">Delete</button></div></div>`).join('')}</div>${rows?.length?'':`<div class="panel"><div class="muted">No events saved yet.</div></div>`}`;
  }else if(p==='gallery'){
     const {data:rows,error}=await sb.from('gallery_photos').select('*');
     if(error){ console.error('Gallery load error:',error); return toast('Unable to load Gallery: '+error.message); }
@@ -1058,8 +1138,11 @@ else if(p==='maintenance'){
     <div class="gallery-grid">${folders.map(folder=>{
       const photos=normalizedRows.filter(x=>x._folder===folder && x.file_name!=='.folder');
       return `<div class="card"><div class="card-body"><h3>${folder}</h3><div class="muted">${photos.length} saved photo(s)</div>
-      <button class="outline-btn" onclick='adminUploadGallery(${JSON.stringify(folder)})'>Add Photos</button> <button class="outline-btn" onclick='adminDeleteGalleryFolder(${JSON.stringify(folder)})'>Delete Folder</button>
-      <div class="gallery-grid" style="margin-top:12px">${photos.map(x=>`<div><img src="${x.public_url||''}" alt="${x.file_name||''}" style="width:100%;height:180px;object-fit:cover;border-radius:10px"><div class="muted">${x.file_name||''}</div></div>`).join('')}</div>
+      <button class="outline-btn" onclick='adminUploadGallery(${JSON.stringify(folder)})'>Add Photos</button>
+      <button class="outline-btn" onclick='adminDeleteGalleryFolder(${JSON.stringify(folder)})'>Delete Folder</button>
+      <div class="gallery-grid" style="margin-top:12px">${photos.map(x=>`<div><img src="${x.public_url||''}" alt="${x.file_name||''}" style="width:100%;height:180px;object-fit:cover;border-radius:10px"><div class="muted">${x.file_name||''}</div>
+      <button class="outline-btn" style="margin-top:6px;" onclick='adminDeleteGalleryPhoto(${JSON.stringify(x.id)})'>Delete Photo</button>
+      </div>`).join('')}</div>
       </div></div>`;
     }).join('')}</div>${folders.length?'':`<div class="panel"><div class="muted">No gallery folders or photos saved yet.</div></div>`}`;
 }else if(p==='members'){
