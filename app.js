@@ -193,335 +193,40 @@ async function adminDeleteMaintenance(i){
     toast('Maintenance deleted'); await adminPage('maintenance',window.__adminUser);
 }
 
-
-async function getSocietyWorkColumns(){
-    const candidates = [
-        'name','title','work_name','project_name','work_title',
-        'project','work','activity','task','subject',
-        'description','details','status','progress',
-        'target_date','target','due_date'
-    ];
-
-    const columns = {};
-    for(const column of candidates){
-        try{
-            const result = await sb.from('society_work').select(column).limit(1);
-            columns[column] = !result.error;
-        }catch(_){
-            columns[column] = false;
-        }
-    }
-    return columns;
-}
-
-function societyWorkTitleColumn(columns){
-    return [
-        'name','title','work_name','project_name','work_title',
-        'project','work','activity','task','subject'
-    ].find(column => columns[column] === true) || null;
-}
-
-function societyWorkPayload(columns, values){
-    const payload = {};
-    const titleColumn = societyWorkTitleColumn(columns);
-
-    if(titleColumn) payload[titleColumn] = values.name;
-
-    if(columns.description) payload.description = values.description;
-    else if(columns.details) payload.details = values.description;
-
-    if(columns.status) payload.status = values.status;
-    if(columns.progress) payload.progress = values.progress;
-
-    if(columns.target_date) payload.target_date = values.target_date;
-    else if(columns.target) payload.target = values.target_date;
-    else if(columns.due_date) payload.due_date = values.target_date;
-
-    return {payload, titleColumn};
-}
-
 async function adminAddWork(){
-    if(!sb)return toast('Supabase is not configured.');
-
-    const old=document.getElementById('workAddModal');
-    if(old)old.remove();
-
-    const overlay=document.createElement('div');
-    overlay.id='workAddModal';
-    overlay.style.cssText='position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;background:rgba(15,23,42,.58);backdrop-filter:blur(3px);';
-
-    overlay.innerHTML=`
-    <div role="dialog" aria-modal="true" aria-labelledby="workAddTitle"
-         style="width:min(560px,100%);max-height:calc(100vh - 40px);overflow:auto;background:#fff;border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.30);padding:24px;box-sizing:border-box;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
-        <div>
-          <h2 id="workAddTitle" style="margin:0 0 4px;font-size:22px;">Add Society Work</h2>
-          <div style="font-size:13px;color:#667085;">Enter all work details and save them together.</div>
-        </div>
-        <button type="button" id="workModalClose" aria-label="Close"
-          style="width:36px;height:36px;border:0;border-radius:50%;background:#f2f4f7;font-size:24px;line-height:1;cursor:pointer;">&times;</button>
-      </div>
-
-      <form id="workAddForm" novalidate>
-        <div id="workGeneralError" style="display:none;margin-bottom:14px;padding:11px 12px;border-radius:9px;background:#fff1f1;color:#b42318;font-size:13px;"></div>
-
-        <div style="margin-bottom:15px;">
-          <label for="workName" style="display:block;font-weight:600;margin-bottom:6px;">Work / project name <span style="color:#d92d20;">*</span></label>
-          <input id="workName" type="text" maxlength="150" placeholder="Enter work / project name"
-            style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
-          <div style="font-size:12px;color:#667085;margin-top:5px;">Example: Park Renovation</div>
-          <div id="workNameError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
-        </div>
-
-        <div style="margin-bottom:15px;">
-          <label for="workDescription" style="display:block;font-weight:600;margin-bottom:6px;">Description</label>
-          <textarea id="workDescription" rows="4" maxlength="2000" placeholder="Enter work details..."
-            style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;resize:vertical;"></textarea>
-          <div style="font-size:12px;color:#667085;margin-top:5px;">Optional. Maximum 2000 characters.</div>
-        </div>
-
-        <div style="margin-bottom:15px;">
-          <label for="workStatus" style="display:block;font-weight:600;margin-bottom:6px;">Status <span style="color:#d92d20;">*</span></label>
-          <select id="workStatus"
-            style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;background:#fff;">
-            <option value="">Select status</option>
-            <option value="Ongoing">Ongoing</option>
-            <option value="Pending">Pending</option>
-            <option value="Completed">Completed</option>
-          </select>
-          <div style="font-size:12px;color:#667085;margin-top:5px;">Select the current work status.</div>
-          <div id="workStatusError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
-        </div>
-
-        <div style="margin-bottom:15px;">
-          <label for="workProgress" style="display:block;font-weight:600;margin-bottom:6px;">Progress <span style="color:#d92d20;">*</span></label>
-          <select id="workProgress"
-            style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;background:#fff;">
-            <option value="">Select progress</option>
-            <option value="0">0%</option>
-            <option value="10">10%</option>
-            <option value="20">20%</option>
-            <option value="30">30%</option>
-            <option value="40">40%</option>
-            <option value="50">50%</option>
-            <option value="60">60%</option>
-            <option value="70">70%</option>
-            <option value="80">80%</option>
-            <option value="90">90%</option>
-            <option value="100">100%</option>
-          </select>
-          <div style="font-size:12px;color:#667085;margin-top:5px;">Select progress from 0% to 100%.</div>
-          <div id="workProgressError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
-        </div>
-
-        <div style="margin-bottom:20px;">
-          <label for="workTargetDate" style="display:block;font-weight:600;margin-bottom:6px;">Target date</label>
-          <input id="workTargetDate" type="text" inputmode="numeric" placeholder="DD/MM/YYYY" autocomplete="off"
-            style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
-          <div style="font-size:12px;color:#667085;margin-top:5px;">Format: DD/MM/YYYY &nbsp; Example: 25/09/2026</div>
-          <div id="workTargetDateError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
-        </div>
-
-        <div style="display:flex;justify-content:flex-end;gap:10px;padding-top:4px;border-top:1px solid #eaecf0;">
-          <button type="button" id="workModalCancel"
-            style="margin-top:15px;padding:11px 18px;border:1px solid #d0d5dd;border-radius:9px;background:#fff;cursor:pointer;font-size:14px;">Cancel</button>
-          <button type="submit" id="workModalSave"
-            style="margin-top:15px;padding:11px 20px;border:0;border-radius:9px;background:#2563eb;color:#fff;cursor:pointer;font-weight:600;font-size:14px;">Save Work</button>
-        </div>
-      </form>
-    </div>`;
-
-    document.body.appendChild(overlay);
-
-    const form=overlay.querySelector('#workAddForm');
-    const nameEl=overlay.querySelector('#workName');
-    const descriptionEl=overlay.querySelector('#workDescription');
-    const statusEl=overlay.querySelector('#workStatus');
-    const progressEl=overlay.querySelector('#workProgress');
-    const targetEl=overlay.querySelector('#workTargetDate');
-    const generalEl=overlay.querySelector('#workGeneralError');
-    const saveBtn=overlay.querySelector('#workModalSave');
-
-    const close=()=>overlay.remove();
-
-    const setError=(el,errorId,message)=>{
-        const errorEl=overlay.querySelector('#'+errorId);
-        errorEl.textContent=message||'';
-        errorEl.style.display=message?'block':'none';
-        el.style.borderColor=message?'#d92d20':'#d0d5dd';
-        el.style.backgroundColor=message?'#fff8f7':'#fff';
-    };
-
-    const clearErrors=()=>{
-        generalEl.style.display='none';
-        generalEl.textContent='';
-        setError(nameEl,'workNameError','');
-        setError(statusEl,'workStatusError','');
-        setError(progressEl,'workProgressError','');
-        setError(targetEl,'workTargetDateError','');
-    };
-
-    const parseDate=(value)=>{
-        const m=String(value||'').trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-        if(!m)return null;
-        const day=Number(m[1]),month=Number(m[2]),year=Number(m[3]);
-        const d=new Date(Date.UTC(year,month-1,day));
-        if(d.getUTCFullYear()!==year||d.getUTCMonth()!==month-1||d.getUTCDate()!==day)return null;
-        return `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-    };
-
-    overlay.querySelector('#workModalClose').onclick=close;
-    overlay.querySelector('#workModalCancel').onclick=close;
-    overlay.addEventListener('click',e=>{if(e.target===overlay)close();});
-
-    const keyHandler=e=>{
-        if(!document.getElementById('workAddModal')){
-            document.removeEventListener('keydown',keyHandler);
-            return;
-        }
-        if(e.key==='Escape')close();
-    };
-    document.addEventListener('keydown',keyHandler);
-
-    form.onsubmit=async e=>{
-        e.preventDefault();
-        clearErrors();
-
-        const workName=nameEl.value.trim();
-        const description=descriptionEl.value.trim();
-        const status=statusEl.value;
-        const progressValue=progressEl.value;
-        const targetInput=targetEl.value.trim();
-
-        let firstInvalid=null;
-        const target_date=targetInput?parseDate(targetInput):null;
-
-        if(!workName){
-            setError(nameEl,'workNameError','Work / project name is required.');
-            firstInvalid=firstInvalid||nameEl;
-        }
-        if(!status){
-            setError(statusEl,'workStatusError','Please select a status.');
-            firstInvalid=firstInvalid||statusEl;
-        }
-        if(!progressValue){
-            setError(progressEl,'workProgressError','Please select the progress.');
-            firstInvalid=firstInvalid||progressEl;
-        }
-        if(targetInput && !target_date){
-            setError(targetEl,'workTargetDateError','Please enter a valid date in DD/MM/YYYY format.');
-            firstInvalid=firstInvalid||targetEl;
-        }
-
-        if(firstInvalid){
-            generalEl.textContent='Please correct the highlighted field(s).';
-            generalEl.style.display='block';
-            firstInvalid.focus();
-            return;
-        }
-
-        saveBtn.disabled=true;
-        saveBtn.textContent='Saving...';
-        saveBtn.style.opacity='.7';
-
-        try{
-            const columns=await getSocietyWorkColumns();
-            const built=societyWorkPayload(columns,{
-                name:workName,
-                description,
-                status,
-                progress:Number(progressValue),
-                target_date
-            });
-
-            console.log('Society Work detected columns:',columns);
-            console.log('Society Work insert payload:',built.payload);
-
-            if(!built.titleColumn){
-                throw new Error('No work-name/title column was found in society_work.');
-            }
-
-            const {error}=await sb.from('society_work').insert(built.payload);
-            if(error)throw error;
-
-            toast('Work saved successfully');
-            close();
-            await adminPage('work',window.__adminUser);
-        }catch(error){
-            console.error('Work save failed:',error);
-            saveBtn.disabled=false;
-            saveBtn.textContent='Save Work';
-            saveBtn.style.opacity='1';
-            generalEl.textContent='Work save failed: '+(error?.message||error);
-            generalEl.style.display='block';
-        }
-    };
-
-    setTimeout(()=>nameEl.focus(),50);
+ if(!sb)return toast('Supabase is not configured.');
+ const name=prompt('Work / project name:'); if(!name)return;
+ const description=prompt('Description:','')||'';
+ const status=prompt('Status (Ongoing/Pending/Completed):','Pending')||'Pending';
+ const progress=Math.max(0,Math.min(100,Number(prompt('Progress %:','0'))||0));
+ const target_date=prompt('Target date:','')||null;
+ const {error}=await sb.from('society_work').insert({name,description,status,progress,target_date});
+ if(error)return toast('Work save failed: '+error.message);
+ toast('Work saved successfully'); await adminPage('work',window.__adminUser);
 }
 
-async function adminEditWork(i){
+async function adminDeleteWork(i){
+    if(!requireAdminForDelete())return;
     const x=window.__workRows?.[i];
     if(!x)return;
+    if(!confirm(`Delete "${x.name||x.title||x.work_name||x.project_name||x.work_title||'this work'}"?`))return;
 
-    const current=
-        x.name||x.title||x.work_name||x.project_name||x.work_title||
-        x.project||x.work||x.activity||x.task||x.subject||'';
+    const {error}=await sb.from('society_work').delete().eq('id',x.id);
+    if(error)return toast('Work delete failed: '+error.message);
 
-    const workName=prompt('Work / project name:',current);
-    if(workName===null)return;
-
-    const description=prompt('Description:',x.description||x.details||'');
-    if(description===null)return;
-
-    const status=prompt('Status:',x.status||'');
-    if(status===null)return;
-
-    const progressInput=prompt('Progress %:',x.progress??0);
-    if(progressInput===null)return;
-
-    const progress=Math.max(0,Math.min(100,Number(progressInput)||0));
-
-    const target_date=prompt(
-        'Target date:',
-        x.target_date||x.target||x.due_date||''
-    );
-    if(target_date===null)return;
-
-    try{
-        const columns=await getSocietyWorkColumns();
-        const {payload,titleColumn}=societyWorkPayload(columns,{
-            name:workName.trim(),
-            description,
-            status,
-            progress,
-            target_date:target_date||null
-        });
-
-        console.log('Society Work detected columns:',columns);
-        console.log('Society Work update payload:',payload);
-
-        if(!titleColumn){
-            return toast(
-                'Work update failed: no supported work-name column exists in society_work.'
-            );
-        }
-
-        const {error}=await sb.from('society_work')
-            .update(payload)
-            .eq('id',x.id);
-
-        if(error){
-            console.error('Work update failed:',error,payload);
-            return toast('Work update failed: '+error.message);
-        }
-
-        toast('Work updated');
-        await adminPage('work',window.__adminUser);
-    }catch(e){
-        console.error('Work update exception:',e);
-        toast('Work update failed: '+(e?.message||e));
-    }
+    toast('Work deleted successfully');
+    await adminPage('work',window.__adminUser);
+}
+async function adminEditWork(i){
+ const x=window.__workRows?.[i]; if(!x)return;
+ const name=prompt('Work / project name:',x.name||x.title||x.project_name||''); if(name===null)return;
+ const description=prompt('Description:',x.description||''); if(description===null)return;
+ const status=prompt('Status:',x.status||''); if(status===null)return;
+ const progress=Math.max(0,Math.min(100,Number(prompt('Progress %:',x.progress||0))||0));
+ const target_date=prompt('Target date:',x.target_date||x.target||''); if(target_date===null)return;
+ const {error}=await sb.from('society_work').update({name,description,status,progress,target_date}).eq('id',x.id);
+ if(error)return toast('Work update failed: '+error.message);
+ toast('Work updated'); await adminPage('work',window.__adminUser);
 }
 
 async function adminAddEvent(){
@@ -788,11 +493,27 @@ async function adminEditEvent(i){
  };
 }
 
+
+function requireAdminForDelete(){
+    const role=String(window.__adminUser?.role||'').toLowerCase();
+    if(role!=='admin'){
+        toast('Only an admin can delete this item.');
+        return false;
+    }
+    return true;
+}
+
 async function adminDeleteEvent(i){
- const x=window.__eventRows?.[i]; if(!x||!confirm('Delete this event?'))return;
- const {error}=await sb.from('events').delete().eq('id',x.id);
- if(error)return toast('Event delete failed: '+error.message);
- toast('Event deleted'); await adminPage('events',window.__adminUser);
+    if(!requireAdminForDelete())return;
+    const x=window.__eventRows?.[i];
+    if(!x)return;
+    if(!confirm(`Delete "${x.title||x.name||'this event'}"?`))return;
+
+    const {error}=await sb.from('events').delete().eq('id',x.id);
+    if(error)return toast('Event delete failed: '+error.message);
+
+    toast('Event deleted successfully');
+    await adminPage('events',window.__adminUser);
 }
 
 async function adminListGalleryFolders(){
@@ -899,6 +620,87 @@ async function adminUploadGallery(folderName){
  };
  input.click();
 }
+
+async function adminDeleteGalleryPhoto(photoId){
+    if(!requireAdminForDelete())return;
+    if(!photoId)return;
+    const row=(window.__galleryRows||[]).find(x=>String(x.id)===String(photoId));
+    if(!row)return toast('Photo not found.');
+
+    if(!confirm(`Delete photo "${row.file_name||'this photo'}"?`))return;
+
+    try{
+        const storagePath=row.storage_path;
+        if(storagePath){
+            const {error:storageError}=await sb.storage
+                .from('society-gallery')
+                .remove([storagePath]);
+            if(storageError)throw storageError;
+        }
+
+        const {error:dbError}=await sb
+            .from('gallery_photos')
+            .delete()
+            .eq('id',photoId);
+
+        if(dbError)throw dbError;
+
+        toast('Photo deleted successfully');
+        await adminPage('gallery',window.__adminUser);
+    }catch(error){
+        console.error('Gallery photo delete failed:',error);
+        toast('Photo delete failed: '+(error?.message||error));
+    }
+}
+
+async function adminDeleteGalleryFolder(folderName){
+    if(!requireAdminForDelete())return;
+    if(!folderName)return;
+
+    if(!confirm(`Delete folder "${folderName}" and ALL photos inside it? This cannot be undone.`))return;
+
+    try{
+        const {data:files,error:listError}=await sb.storage
+            .from('society-gallery')
+            .list(folderName,{limit:1000});
+        if(listError)throw listError;
+
+        const paths=(files||[])
+            .filter(x=>x?.name)
+            .map(x=>`${folderName}/${x.name}`);
+
+        if(paths.length){
+            const {error:removeError}=await sb.storage
+                .from('society-gallery')
+                .remove(paths);
+            if(removeError)throw removeError;
+        }
+
+        // Delete DB records for this folder. Current schema uses storage_path
+        // as the source of folder information.
+        const {data:rows,error:queryError}=await sb
+            .from('gallery_photos')
+            .select('id,storage_path')
+            .like('storage_path',folderName.replace(/[%_]/g,'\\$&')+'/%');
+        if(queryError)throw queryError;
+
+        const ids=(rows||[]).map(x=>x.id).filter(Boolean);
+        if(ids.length){
+            const {error:deleteError}=await sb
+                .from('gallery_photos')
+                .delete()
+                .in('id',ids);
+            if(deleteError)throw deleteError;
+        }
+
+        toast(`Folder "${folderName}" deleted successfully`);
+        await adminPage('gallery',window.__adminUser);
+    }catch(error){
+        console.error('Gallery folder delete failed:',error);
+        toast('Folder delete failed: '+(error?.message||error));
+    }
+}
+
 async function adminAddMember(){
  if(!sb)return toast('Supabase is not configured.');
  const name=prompt('Member name:'); if(!name)return;
@@ -1061,7 +863,7 @@ else if(p==='maintenance'){
     window.__workRows=rows||[];
     c.innerHTML=`<div class="hero"><div><h2>Society Work</h2><div class="muted">Showing only records saved in the database.</div></div><button class="primary-btn" onclick="adminAddWork()">+ Add Work</button></div>
     <div class="panel"><div class="table-wrap"><table class="table"><thead><tr><th>Project</th><th>Description</th><th>Status</th><th>Progress</th><th>Target</th><th>Action</th></tr></thead><tbody>
-    ${(rows||[]).map((x,i)=>`<tr><td><strong>${x.name||x.title||x.work_name||x.project_name||x.work_title||x.project||x.work||x.activity||x.task||x.subject||''}</strong></td><td>${x.description||''}</td><td>${x.status||''}</td><td>${Number(x.progress||0)}%</td><td>${x.target_date||x.target||''}</td><td><button class="outline-btn" onclick="adminEditWork(${i})">Edit</button></td></tr>`).join('')}
+    ${(rows||[]).map((x,i)=>`<tr><td><strong>${x.name||x.title||x.project_name||''}</strong></td><td>${x.description||''}</td><td>${x.status||''}</td><td>${Number(x.progress||0)}%</td><td>${x.target_date||x.target||''}</td><td><button class="outline-btn" onclick="adminEditWork(${i})">Edit</button> <button class="outline-btn" onclick="adminDeleteWork(${i})">Delete</button></td></tr>`).join('')}
     </tbody></table></div>${rows?.length?'':`<div class="muted" style="padding:18px">No society work records saved yet.</div>`}</div>`;
 }else if(p==='events'){
     const {data:rows,error}=await sb.from('events').select('*').order('event_date',{ascending:false});
@@ -1095,8 +897,8 @@ else if(p==='maintenance'){
     <div class="gallery-grid">${folders.map(folder=>{
       const photos=normalizedRows.filter(x=>x._folder===folder && x.file_name!=='.folder');
       return `<div class="card"><div class="card-body"><h3>${folder}</h3><div class="muted">${photos.length} saved photo(s)</div>
-      <button class="outline-btn" onclick='adminUploadGallery(${JSON.stringify(folder)})'>Add Photos</button>
-      <div class="gallery-grid" style="margin-top:12px">${photos.map(x=>`<div><img src="${x.public_url||''}" alt="${x.file_name||''}" style="width:100%;height:180px;object-fit:cover;border-radius:10px"><div class="muted">${x.file_name||''}</div></div>`).join('')}</div>
+      <button class="outline-btn" onclick='adminUploadGallery(${JSON.stringify(folder)})'>Add Photos</button> <button class="outline-btn" onclick='adminDeleteGalleryFolder(${JSON.stringify(folder)})'>Delete Folder</button>
+      <div class="gallery-grid" style="margin-top:12px">${photos.map(x=>`<div><img src="${x.public_url||''}" alt="${x.file_name||''}" style="width:100%;height:180px;object-fit:cover;border-radius:10px"><div class="muted">${x.file_name||''}</div><button class="outline-btn" style="margin-top:6px;" onclick='adminDeleteGalleryPhoto(${JSON.stringify(x.id)})'>Delete Photo</button></div>`).join('')}</div>
       </div></div>`;
     }).join('')}</div>${folders.length?'':`<div class="panel"><div class="muted">No gallery folders or photos saved yet.</div></div>`}`;
 }else if(p==='members'){
