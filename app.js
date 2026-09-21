@@ -1643,23 +1643,66 @@ async function adminAddMember(){
            * 3. inserts profiles using the returned auth user id,
            * 4. rolls back the Auth user if profile creation fails.
            */
-          const {data:{session},error:sessionError}=await sb.auth.getSession();
-          if(sessionError)throw sessionError;
-          if(!session?.access_token)throw new Error('Admin session expired. Please login again.');
+          // const {data:fnData,error:fnError}=await sb.functions.invoke('admin-create-member',{
+          //   body:{
+          //     full_name,
+          //     house_number,
+          //     phone,
+          //     email:email||null,
+          //     password,
+          //     address:address||null,
+          //     role:'member'
+          //   }
+          // });
 
-          const {data:fnData,error:fnError}=await sb.functions.invoke('admin-create-member',{
-            body:{
-              full_name,
-              house_number,
-              phone,
-              email:email||null,
-              password,
-              address:address||null
-            },
-            headers:{
-              Authorization:`Bearer ${session.access_token}`
-            }
-          });
+
+          const {
+    data: { session },
+    error: sessionError
+} = await sb.auth.getSession();
+
+if (sessionError) {
+    throw new Error(
+        'Unable to get admin session: ' + sessionError.message
+    );
+}
+
+if (!session?.access_token) {
+    throw new Error(
+        'Admin session is not available. Please logout and login again.'
+    );
+}
+
+console.log(
+    'Calling admin-create-member with access token:',
+    !!session.access_token
+);
+
+const { data: fnData, error: fnError } =
+    await sb.functions.invoke('admin-create-member', {
+        body: {
+            full_name,
+            house_number,
+            phone,
+            email: email || null,
+            password,
+            address: address || null,
+            role: 'member'
+        },
+        headers: {
+            Authorization: `Bearer ${session.access_token}`
+        }
+    });
+
+if (fnError) {
+    console.error('admin-create-member response:', fnError);
+    throw fnError;
+}
+
+if (fnData?.error) {
+    throw new Error(fnData.error);
+}
+
 
           if(fnError)throw fnError;
           if(fnData?.error)throw new Error(fnData.error);
