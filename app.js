@@ -195,74 +195,22 @@ async function adminDeleteMaintenance(i){
 
 
 async function getSocietyWorkColumns(){
-    /*
-     * Do NOT try to insert {name: ...} and then fall back.
-     * PostgREST can reject the request at schema-cache level before
-     * any fallback is attempted.
-     *
-     * First read the actual PostgREST OpenAPI schema, then build the
-     * insert/update payload using only columns that really exist.
-     */
-    const columns={};
-
-    try{
-        const base=(CONFIG?.SUPABASE_URL||'').replace(/\/+$/,'');
-        const key=CONFIG?.SUPABASE_ANON_KEY||'';
-
-        if(base && key){
-            const response=await fetch(base+'/rest/v1/',{
-                method:'GET',
-                headers:{
-                    apikey:key,
-                    Authorization:'Bearer '+key,
-                    Accept:'application/openapi+json'
-                },
-                cache:'no-store'
-            });
-
-            if(response.ok){
-                const spec=await response.json();
-                const tableSchema=spec?.definitions?.society_work;
-                const properties=tableSchema?.properties||{};
-
-                Object.keys(properties).forEach(column=>{
-                    columns[column]=true;
-                });
-
-                console.log('Society Work actual DB columns:',Object.keys(properties));
-
-                if(Object.keys(properties).length){
-                    return columns;
-                }
-            }else{
-                console.warn('Could not read PostgREST schema:',response.status);
-            }
-        }
-    }catch(e){
-        console.warn('PostgREST schema discovery failed:',e);
-    }
-
-    /*
-     * Fallback for environments where the OpenAPI endpoint is not
-     * available. Each SELECT is harmless; importantly, no INSERT/UPDATE
-     * containing a nonexistent column is attempted.
-     */
-    const candidates=[
+    const candidates = [
         'name','title','work_name','project_name','work_title',
         'project','work','activity','task','subject',
         'description','details','status','progress',
         'target_date','target','due_date'
     ];
 
+    const columns = {};
     for(const column of candidates){
         try{
-            const result=await sb.from('society_work').select(column).limit(1);
-            columns[column]=!result.error;
+            const result = await sb.from('society_work').select(column).limit(1);
+            columns[column] = !result.error;
         }catch(_){
-            columns[column]=false;
+            columns[column] = false;
         }
     }
-
     return columns;
 }
 
@@ -270,80 +218,246 @@ function societyWorkTitleColumn(columns){
     return [
         'name','title','work_name','project_name','work_title',
         'project','work','activity','task','subject'
-    ].find(column=>columns[column]===true) || null;
+    ].find(column => columns[column] === true) || null;
 }
 
-function societyWorkPayload(columns,values){
-    const payload={};
-    const titleColumn=societyWorkTitleColumn(columns);
+function societyWorkPayload(columns, values){
+    const payload = {};
+    const titleColumn = societyWorkTitleColumn(columns);
 
-    if(titleColumn) payload[titleColumn]=values.name;
+    if(titleColumn) payload[titleColumn] = values.name;
 
-    if(columns.description) payload.description=values.description;
-    else if(columns.details) payload.details=values.description;
+    if(columns.description) payload.description = values.description;
+    else if(columns.details) payload.details = values.description;
 
-    if(columns.status) payload.status=values.status;
-    if(columns.progress) payload.progress=values.progress;
+    if(columns.status) payload.status = values.status;
+    if(columns.progress) payload.progress = values.progress;
 
-    if(columns.target_date) payload.target_date=values.target_date;
-    else if(columns.target) payload.target=values.target_date;
-    else if(columns.due_date) payload.due_date=values.target_date;
+    if(columns.target_date) payload.target_date = values.target_date;
+    else if(columns.target) payload.target = values.target_date;
+    else if(columns.due_date) payload.due_date = values.target_date;
 
-    return {payload,titleColumn};
+    return {payload, titleColumn};
 }
 
 async function adminAddWork(){
     if(!sb)return toast('Supabase is not configured.');
 
-    const workName=prompt('Work / project name:');
-    if(workName===null || !workName.trim())return;
+    const old=document.getElementById('workAddModal');
+    if(old)old.remove();
 
-    const description=prompt('Description:','');
-    if(description===null)return;
+    const overlay=document.createElement('div');
+    overlay.id='workAddModal';
+    overlay.style.cssText='position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;background:rgba(15,23,42,.58);backdrop-filter:blur(3px);';
 
-    const status=prompt('Status (Ongoing/Pending/Completed):','Pending');
-    if(status===null)return;
+    overlay.innerHTML=`
+    <div role="dialog" aria-modal="true" aria-labelledby="workAddTitle"
+         style="width:min(560px,100%);max-height:calc(100vh - 40px);overflow:auto;background:#fff;border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.30);padding:24px;box-sizing:border-box;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+        <div>
+          <h2 id="workAddTitle" style="margin:0 0 4px;font-size:22px;">Add Society Work</h2>
+          <div style="font-size:13px;color:#667085;">Enter all work details and save them together.</div>
+        </div>
+        <button type="button" id="workModalClose" aria-label="Close"
+          style="width:36px;height:36px;border:0;border-radius:50%;background:#f2f4f7;font-size:24px;line-height:1;cursor:pointer;">&times;</button>
+      </div>
 
-    const progressInput=prompt('Progress %:','0');
-    if(progressInput===null)return;
-    const progress=Math.max(0,Math.min(100,Number(progressInput)||0));
+      <form id="workAddForm" novalidate>
+        <div id="workGeneralError" style="display:none;margin-bottom:14px;padding:11px 12px;border-radius:9px;background:#fff1f1;color:#b42318;font-size:13px;"></div>
 
-    const target_date=prompt('Target date:','');
-    if(target_date===null)return;
+        <div style="margin-bottom:15px;">
+          <label for="workName" style="display:block;font-weight:600;margin-bottom:6px;">Work / project name <span style="color:#d92d20;">*</span></label>
+          <input id="workName" type="text" maxlength="150" placeholder="Enter work / project name"
+            style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
+          <div style="font-size:12px;color:#667085;margin-top:5px;">Example: Park Renovation</div>
+          <div id="workNameError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
+        </div>
 
-    try{
-        const columns=await getSocietyWorkColumns();
-        const built=societyWorkPayload(columns,{
-            name:workName.trim(),
-            description:description.trim(),
-            status:status.trim(),
-            progress,
-            target_date:target_date.trim()||null
-        });
+        <div style="margin-bottom:15px;">
+          <label for="workDescription" style="display:block;font-weight:600;margin-bottom:6px;">Description</label>
+          <textarea id="workDescription" rows="4" maxlength="2000" placeholder="Enter work details..."
+            style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;resize:vertical;"></textarea>
+          <div style="font-size:12px;color:#667085;margin-top:5px;">Optional. Maximum 2000 characters.</div>
+        </div>
 
-        console.log('Society Work detected columns:',columns);
-        console.log('Society Work insert payload:',built.payload);
+        <div style="margin-bottom:15px;">
+          <label for="workStatus" style="display:block;font-weight:600;margin-bottom:6px;">Status <span style="color:#d92d20;">*</span></label>
+          <select id="workStatus"
+            style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;background:#fff;">
+            <option value="">Select status</option>
+            <option value="Ongoing">Ongoing</option>
+            <option value="Pending">Pending</option>
+            <option value="Completed">Completed</option>
+          </select>
+          <div style="font-size:12px;color:#667085;margin-top:5px;">Select the current work status.</div>
+          <div id="workStatusError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
+        </div>
 
-        if(!built.titleColumn){
-            return toast(
-                'Work save failed: no work-name/title column was found in society_work. ' +
-                'Check the table columns in Supabase.'
-            );
+        <div style="margin-bottom:15px;">
+          <label for="workProgress" style="display:block;font-weight:600;margin-bottom:6px;">Progress <span style="color:#d92d20;">*</span></label>
+          <select id="workProgress"
+            style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;background:#fff;">
+            <option value="">Select progress</option>
+            <option value="0">0%</option>
+            <option value="10">10%</option>
+            <option value="20">20%</option>
+            <option value="30">30%</option>
+            <option value="40">40%</option>
+            <option value="50">50%</option>
+            <option value="60">60%</option>
+            <option value="70">70%</option>
+            <option value="80">80%</option>
+            <option value="90">90%</option>
+            <option value="100">100%</option>
+          </select>
+          <div style="font-size:12px;color:#667085;margin-top:5px;">Select progress from 0% to 100%.</div>
+          <div id="workProgressError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
+        </div>
+
+        <div style="margin-bottom:20px;">
+          <label for="workTargetDate" style="display:block;font-weight:600;margin-bottom:6px;">Target date</label>
+          <input id="workTargetDate" type="text" inputmode="numeric" placeholder="DD/MM/YYYY" autocomplete="off"
+            style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
+          <div style="font-size:12px;color:#667085;margin-top:5px;">Format: DD/MM/YYYY &nbsp; Example: 25/09/2026</div>
+          <div id="workTargetDateError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;gap:10px;padding-top:4px;border-top:1px solid #eaecf0;">
+          <button type="button" id="workModalCancel"
+            style="margin-top:15px;padding:11px 18px;border:1px solid #d0d5dd;border-radius:9px;background:#fff;cursor:pointer;font-size:14px;">Cancel</button>
+          <button type="submit" id="workModalSave"
+            style="margin-top:15px;padding:11px 20px;border:0;border-radius:9px;background:#2563eb;color:#fff;cursor:pointer;font-weight:600;font-size:14px;">Save Work</button>
+        </div>
+      </form>
+    </div>`;
+
+    document.body.appendChild(overlay);
+
+    const form=overlay.querySelector('#workAddForm');
+    const nameEl=overlay.querySelector('#workName');
+    const descriptionEl=overlay.querySelector('#workDescription');
+    const statusEl=overlay.querySelector('#workStatus');
+    const progressEl=overlay.querySelector('#workProgress');
+    const targetEl=overlay.querySelector('#workTargetDate');
+    const generalEl=overlay.querySelector('#workGeneralError');
+    const saveBtn=overlay.querySelector('#workModalSave');
+
+    const close=()=>overlay.remove();
+
+    const setError=(el,errorId,message)=>{
+        const errorEl=overlay.querySelector('#'+errorId);
+        errorEl.textContent=message||'';
+        errorEl.style.display=message?'block':'none';
+        el.style.borderColor=message?'#d92d20':'#d0d5dd';
+        el.style.backgroundColor=message?'#fff8f7':'#fff';
+    };
+
+    const clearErrors=()=>{
+        generalEl.style.display='none';
+        generalEl.textContent='';
+        setError(nameEl,'workNameError','');
+        setError(statusEl,'workStatusError','');
+        setError(progressEl,'workProgressError','');
+        setError(targetEl,'workTargetDateError','');
+    };
+
+    const parseDate=(value)=>{
+        const m=String(value||'').trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+        if(!m)return null;
+        const day=Number(m[1]),month=Number(m[2]),year=Number(m[3]);
+        const d=new Date(Date.UTC(year,month-1,day));
+        if(d.getUTCFullYear()!==year||d.getUTCMonth()!==month-1||d.getUTCDate()!==day)return null;
+        return `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    };
+
+    overlay.querySelector('#workModalClose').onclick=close;
+    overlay.querySelector('#workModalCancel').onclick=close;
+    overlay.addEventListener('click',e=>{if(e.target===overlay)close();});
+
+    const keyHandler=e=>{
+        if(!document.getElementById('workAddModal')){
+            document.removeEventListener('keydown',keyHandler);
+            return;
+        }
+        if(e.key==='Escape')close();
+    };
+    document.addEventListener('keydown',keyHandler);
+
+    form.onsubmit=async e=>{
+        e.preventDefault();
+        clearErrors();
+
+        const workName=nameEl.value.trim();
+        const description=descriptionEl.value.trim();
+        const status=statusEl.value;
+        const progressValue=progressEl.value;
+        const targetInput=targetEl.value.trim();
+
+        let firstInvalid=null;
+        const target_date=targetInput?parseDate(targetInput):null;
+
+        if(!workName){
+            setError(nameEl,'workNameError','Work / project name is required.');
+            firstInvalid=firstInvalid||nameEl;
+        }
+        if(!status){
+            setError(statusEl,'workStatusError','Please select a status.');
+            firstInvalid=firstInvalid||statusEl;
+        }
+        if(!progressValue){
+            setError(progressEl,'workProgressError','Please select the progress.');
+            firstInvalid=firstInvalid||progressEl;
+        }
+        if(targetInput && !target_date){
+            setError(targetEl,'workTargetDateError','Please enter a valid date in DD/MM/YYYY format.');
+            firstInvalid=firstInvalid||targetEl;
         }
 
-        const {error}=await sb.from('society_work').insert(built.payload);
-
-        if(error){
-            console.error('Work save failed:',error,built.payload);
-            return toast('Work save failed: '+error.message);
+        if(firstInvalid){
+            generalEl.textContent='Please correct the highlighted field(s).';
+            generalEl.style.display='block';
+            firstInvalid.focus();
+            return;
         }
 
-        toast('Work saved successfully');
-        await adminPage('work',window.__adminUser);
-    }catch(e){
-        console.error('Work save exception:',e);
-        toast('Work save failed: '+(e?.message||e));
-    }
+        saveBtn.disabled=true;
+        saveBtn.textContent='Saving...';
+        saveBtn.style.opacity='.7';
+
+        try{
+            const columns=await getSocietyWorkColumns();
+            const built=societyWorkPayload(columns,{
+                name:workName,
+                description,
+                status,
+                progress:Number(progressValue),
+                target_date
+            });
+
+            console.log('Society Work detected columns:',columns);
+            console.log('Society Work insert payload:',built.payload);
+
+            if(!built.titleColumn){
+                throw new Error('No work-name/title column was found in society_work.');
+            }
+
+            const {error}=await sb.from('society_work').insert(built.payload);
+            if(error)throw error;
+
+            toast('Work saved successfully');
+            close();
+            await adminPage('work',window.__adminUser);
+        }catch(error){
+            console.error('Work save failed:',error);
+            saveBtn.disabled=false;
+            saveBtn.textContent='Save Work';
+            saveBtn.style.opacity='1';
+            generalEl.textContent='Work save failed: '+(error?.message||error);
+            generalEl.style.display='block';
+        }
+    };
+
+    setTimeout(()=>nameEl.focus(),50);
 }
 
 async function adminEditWork(i){
@@ -365,39 +479,40 @@ async function adminEditWork(i){
 
     const progressInput=prompt('Progress %:',x.progress??0);
     if(progressInput===null)return;
+
     const progress=Math.max(0,Math.min(100,Number(progressInput)||0));
 
-    const targetDate=prompt(
+    const target_date=prompt(
         'Target date:',
         x.target_date||x.target||x.due_date||''
     );
-    if(targetDate===null)return;
+    if(target_date===null)return;
 
     try{
         const columns=await getSocietyWorkColumns();
-        const built=societyWorkPayload(columns,{
+        const {payload,titleColumn}=societyWorkPayload(columns,{
             name:workName.trim(),
-            description:description.trim(),
-            status:status.trim(),
+            description,
+            status,
             progress,
-            target_date:targetDate.trim()||null
+            target_date:target_date||null
         });
 
         console.log('Society Work detected columns:',columns);
-        console.log('Society Work update payload:',built.payload);
+        console.log('Society Work update payload:',payload);
 
-        if(!built.titleColumn){
+        if(!titleColumn){
             return toast(
-                'Work update failed: no work-name/title column was found in society_work.'
+                'Work update failed: no supported work-name column exists in society_work.'
             );
         }
 
         const {error}=await sb.from('society_work')
-            .update(built.payload)
+            .update(payload)
             .eq('id',x.id);
 
         if(error){
-            console.error('Work update failed:',error,built.payload);
+            console.error('Work update failed:',error,payload);
             return toast('Work update failed: '+error.message);
         }
 
