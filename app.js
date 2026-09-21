@@ -77,7 +77,7 @@ async function renderPublic(){
 }
 renderPublic().catch(e=>console.error('Initial public render:',e));
 const authModal=document.getElementById('authModal');const showLogin=()=>{document.getElementById('authHeading').textContent='Member Login';document.getElementById('authLogin').classList.remove('hidden');document.getElementById('authRegister').classList.add('hidden');authModal.classList.remove('hidden')};const showReg=()=>{document.getElementById('authHeading').textContent='Create Member Account';document.getElementById('authLogin').classList.add('hidden');document.getElementById('authRegister').classList.remove('hidden');authModal.classList.remove('hidden')};document.getElementById('openLogin').onclick=showLogin;document.getElementById('openRegister').onclick=showReg;document.getElementById('authClose').onclick=()=>authModal.classList.add('hidden');
-document.getElementById('switchRegister').onclick=showReg;document.getElementById('switchLogin').onclick=showLogin;
+    setPublicLoginButtonVisible(false);document.getElementById('switchRegister').onclick=showReg;document.getElementById('switchLogin').onclick=showLogin;
 
 /* ===== PUBLIC TOP NAVIGATION FIX ===== */
 function setPublicLoginButtonVisible(visible){
@@ -132,7 +132,6 @@ async function login(){
     if(result.error)console.error('Profile loading error:',result.error);
     const profile=result.data;
     authModal.classList.add('hidden');
-    setPublicLoginButtonVisible(false);
     const user={...data.user,name:profile?.full_name||data.user.user_metadata?.full_name||data.user.email?.split('@')[0]||'Member',email:data.user.email||'',phone:profile?.phone||'',house_no:profile?.house_number||profile?.house_no||'',address:profile?.address||'',role:String(profile?.role||'member').trim().toLowerCase()};
     if(user.role==='admin') openAdminDashboard(user); else openMemberDashboard(user);
     toast('Login successful');
@@ -153,7 +152,6 @@ async function register(){
     const profileResult=await sb.from('profiles').update({full_name:name,email:data.user.email||email,phone:phone||null,house_number:house_no,address:address||null}).eq('id',data.user.id);
     if(profileResult.error){console.error('Profile update error:',profileResult.error);return toast('Account created, but profile details could not be saved');}
     authModal.classList.add('hidden');
-    if(data.session) setPublicLoginButtonVisible(false);
     if(!data.session){showLogin();return toast('Registration successful. Please verify your email before login.');}
     openMemberDashboard({...data.user,name,email,phone,house_no,address,role:'member'});
     toast('Registration complete');
@@ -173,7 +171,6 @@ function openAdminDashboard(user){
  <button class="nav-item" data-a="members">♙ <span>Members</span></button>
  <button class="nav-item" data-a="complaints">⚑ <span>Complaints</span></button>
  <button class="nav-item" data-a="map">⌖ <span>Society Map</span></button>
- <button class="nav-item" data-a="about">ⓘ <span>About</span></button>
  </nav><div class="sidebar-bottom"><div class="user-mini"><div class="avatar">${initials(user.name)}</div><div><strong>${user.name}</strong><span>Administrator</span></div></div><button class="outline-btn" id="adminLogout">Log out</button></div></aside>
  <main class="main"><header class="topbar"><div><div class="eyebrow">DEFENSE ENCLAVE SOCIETY</div><h1 id="adminTitle">Admin Dashboard</h1></div><div class="top-actions"><span class="status ongoing">ADMIN</span><div class="avatar">${initials(user.name)}</div></div></header><section id="adminContent" class="content"></section></main>`;
  const nav=app.querySelector('nav'); nav.onclick=e=>{const b=e.target.closest('.nav-item');if(!b)return;adminPage(b.dataset.a,user)};
@@ -529,66 +526,226 @@ async function adminDeleteWork(i){
 async function adminEditWork(i){
     const x=window.__workRows?.[i];
     if(!x)return;
+    if(!sb)return toast('Supabase is not configured.');
 
-    const current=
+    const old=document.getElementById('workFormOverlay');
+    if(old)old.remove();
+
+    const currentName=
         x.name||x.title||x.work_name||x.project_name||x.work_title||
         x.project||x.work||x.activity||x.task||x.subject||'';
 
-    const workName=prompt('Work / project name:',current);
-    if(workName===null)return;
+    const currentDescription=x.description||x.details||'';
+    const currentStatus=x.status||'Pending';
+    const currentProgress=Number(x.progress??0);
+    const currentTarget=x.target_date||x.target||x.due_date||'';
 
-    const description=prompt('Description:',x.description||x.details||'');
-    if(description===null)return;
+    const overlay=document.createElement('div');
+    overlay.id='workFormOverlay';
+    overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;';
 
-    const status=prompt('Status:',x.status||'');
-    if(status===null)return;
+    overlay.innerHTML=`
+      <div style="width:min(620px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.25);padding:24px;box-sizing:border-box;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+          <div>
+            <div class="eyebrow">SOCIETY WORK</div>
+            <h2 style="margin:4px 0 0;">Edit Work / Project</h2>
+          </div>
+          <button type="button" id="closeWorkForm" class="outline-btn">✕</button>
+        </div>
 
-    const progressInput=prompt('Progress %:',x.progress??0);
-    if(progressInput===null)return;
+        <div id="workEditError" class="muted" style="display:none;margin-bottom:12px;"></div>
 
-    const progress=Math.max(0,Math.min(100,Number(progressInput)||0));
+        <form id="editWorkForm" novalidate>
+          <div style="margin-bottom:14px;">
+            <label for="editWorkName"><strong>Work / project name</strong></label>
+            <input id="editWorkName" type="text" class="input" value="${escHtml(currentName)}"
+                   placeholder="e.g. Main Gate Repair" style="width:100%;box-sizing:border-box;margin-top:6px;">
+            <div id="editWorkNameError" class="field-error" style="display:none;"></div>
+          </div>
 
-    const target_date=prompt(
-        'Target date:',
-        x.target_date||x.target||x.due_date||''
-    );
-    if(target_date===null)return;
+          <div style="margin-bottom:14px;">
+            <label for="editWorkDescription"><strong>Description</strong></label>
+            <textarea id="editWorkDescription" class="input" rows="4"
+                      placeholder="Describe the work / project" style="width:100%;box-sizing:border-box;margin-top:6px;">${escHtml(currentDescription)}</textarea>
+            <div id="editWorkDescriptionError" class="field-error" style="display:none;"></div>
+          </div>
 
-    try{
-        const columns=await getSocietyWorkColumns();
-        const {payload,titleColumn}=societyWorkPayload(columns,{
-            name:workName.trim(),
-            description,
-            status,
-            progress,
-            target_date:target_date||null
+          <div style="margin-bottom:14px;">
+            <label for="editWorkStatus"><strong>Status</strong></label>
+            <select id="editWorkStatus" class="input" style="width:100%;box-sizing:border-box;margin-top:6px;">
+              <option value="Ongoing" ${currentStatus==='Ongoing'?'selected':''}>Ongoing</option>
+              <option value="Pending" ${currentStatus==='Pending'?'selected':''}>Pending</option>
+              <option value="Completed" ${currentStatus==='Completed'?'selected':''}>Completed</option>
+            </select>
+            <div id="editWorkStatusError" class="field-error" style="display:none;"></div>
+          </div>
+
+          <div style="margin-bottom:14px;">
+            <label for="editWorkProgress"><strong>Progress</strong></label>
+            <select id="editWorkProgress" class="input" style="width:100%;box-sizing:border-box;margin-top:6px;">
+              ${[0,10,20,30,40,50,60,70,80,90,100].map(v=>`<option value="${v}" ${currentProgress===v?'selected':''}>${v}%</option>`).join('')}
+            </select>
+            <div id="editWorkProgressError" class="field-error" style="display:none;"></div>
+          </div>
+
+          <div style="margin-bottom:20px;">
+            <label for="editWorkTargetDate"><strong>Target date</strong></label>
+            <input id="editWorkTargetDate" type="date" class="input" value="${toInputDate(currentTarget)}"
+                   style="width:100%;box-sizing:border-box;margin-top:6px;">
+            <div id="editWorkTargetDateError" class="field-error" style="display:none;"></div>
+          </div>
+
+          <div style="display:flex;justify-content:flex-end;gap:10px;">
+            <button type="button" id="cancelEditWork" class="outline-btn">Cancel</button>
+            <button type="submit" class="primary-btn">Update Work</button>
+          </div>
+        </form>
+      </div>`;
+
+    document.body.appendChild(overlay);
+
+    const close=()=>overlay.remove();
+    document.getElementById('closeWorkForm').onclick=close;
+    document.getElementById('cancelEditWork').onclick=close;
+    overlay.addEventListener('click',e=>{if(e.target===overlay)close();});
+
+    const clearError=(id)=>{
+        const el=document.getElementById(id);
+        if(el){
+            el.style.display='none';
+            el.textContent='';
+        }
+    };
+    const showError=(field,errorId,message)=>{
+        const fieldEl=document.getElementById(field);
+        const errorEl=document.getElementById(errorId);
+        if(fieldEl){
+            fieldEl.style.borderColor='#dc2626';
+            fieldEl.style.boxShadow='0 0 0 2px rgba(220,38,38,.10)';
+            fieldEl.focus();
+        }
+        if(errorEl){
+            errorEl.textContent=message;
+            errorEl.style.display='block';
+            errorEl.style.color='#dc2626';
+            errorEl.style.fontSize='13px';
+            errorEl.style.marginTop='5px';
+        }
+    };
+    const clearFieldStyle=(id)=>{
+        const el=document.getElementById(id);
+        if(el){
+            el.style.borderColor='';
+            el.style.boxShadow='';
+        }
+    };
+
+    ['editWorkName','editWorkDescription','editWorkStatus','editWorkProgress','editWorkTargetDate']
+      .forEach((id,idx)=>{
+        const errorIds=['editWorkNameError','editWorkDescriptionError','editWorkStatusError','editWorkProgressError','editWorkTargetDateError'];
+        document.getElementById(id)?.addEventListener('input',()=>{
+            clearFieldStyle(id);
+            clearError(errorIds[idx]);
         });
+        document.getElementById(id)?.addEventListener('change',()=>{
+            clearFieldStyle(id);
+            clearError(errorIds[idx]);
+        });
+      });
 
-        console.log('Society Work detected columns:',columns);
-        console.log('Society Work update payload:',payload);
+    document.getElementById('editWorkForm').onsubmit=async(e)=>{
+        e.preventDefault();
 
-        if(!titleColumn){
-            return toast(
-                'Work update failed: no supported work-name column exists in society_work.'
-            );
+        const workName=document.getElementById('editWorkName').value.trim();
+        const description=document.getElementById('editWorkDescription').value.trim();
+        const status=document.getElementById('editWorkStatus').value;
+        const progress=Number(document.getElementById('editWorkProgress').value);
+        const target_date=document.getElementById('editWorkTargetDate').value;
+
+        let valid=true;
+
+        ['editWorkName','editWorkDescription','editWorkStatus','editWorkProgress','editWorkTargetDate']
+          .forEach(id=>clearFieldStyle(id));
+        ['editWorkNameError','editWorkDescriptionError','editWorkStatusError','editWorkProgressError','editWorkTargetDateError']
+          .forEach(clearError);
+
+        if(!workName){
+            showError('editWorkName','editWorkNameError','Please enter the work / project name.');
+            valid=false;
+        }
+        if(!description){
+            showError('editWorkDescription','editWorkDescriptionError','Please enter a description.');
+            valid=false;
+        }
+        if(!['Ongoing','Pending','Completed'].includes(status)){
+            showError('editWorkStatus','editWorkStatusError','Please select a valid status.');
+            valid=false;
+        }
+        if(![0,10,20,30,40,50,60,70,80,90,100].includes(progress)){
+            showError('editWorkProgress','editWorkProgressError','Please select a progress value.');
+            valid=false;
+        }
+        if(!target_date){
+            showError('editWorkTargetDate','editWorkTargetDateError','Please select a target date.');
+            valid=false;
         }
 
-        const {error}=await sb.from('society_work')
-            .update(payload)
-            .eq('id',x.id);
+        if(!valid)return;
 
-        if(error){
-            console.error('Work update failed:',error,payload);
-            return toast('Work update failed: '+error.message);
+        try{
+            const columns=await getSocietyWorkColumns();
+            const {payload,titleColumn}=societyWorkPayload(columns,{
+                name:workName,
+                description,
+                status,
+                progress,
+                target_date:target_date||null
+            });
+
+            if(!titleColumn){
+                return toast('Work update failed: no supported work-name column exists in society_work.');
+            }
+
+            const {error}=await sb.from('society_work')
+                .update(payload)
+                .eq('id',x.id);
+
+            if(error){
+                console.error('Work update failed:',error,payload);
+                return toast('Work update failed: '+error.message);
+            }
+
+            close();
+            toast('Work updated successfully');
+            await adminPage('work',window.__adminUser);
+        }catch(err){
+            console.error('Work update exception:',err);
+            toast('Work update failed: '+(err?.message||err));
         }
-
-        toast('Work updated');
-        await adminPage('work',window.__adminUser);
-    }catch(e){
-        console.error('Work update exception:',e);
-        toast('Work update failed: '+(e?.message||e));
-    }
+    };
 }
+
+function escHtml(v){
+    return String(v??'')
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;')
+      .replace(/'/g,'&#39;');
+}
+
+function toInputDate(v){
+    if(!v)return '';
+    const str=String(v).trim();
+    if(/^\\d{4}-\\d{2}-\\d{2}$/.test(str))return str;
+    const m=str.match(/^(\\d{2})[\\/\\-](\\d{2})[\\/\\-](\\d{4})$/);
+    if(m)return `${m[3]}-${m[2]}-${m[1]}`;
+    const d=new Date(str);
+    if(Number.isNaN(d.getTime()))return '';
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
 
 async function adminAddEvent(){
  if(!sb)return toast('Supabase is not configured.');
@@ -1230,13 +1387,7 @@ async function adminUploadMap(){
 async function adminPage(p,user){
  const c=document.getElementById('adminContent'),t=document.getElementById('adminTitle');
  document.querySelectorAll('#memberApp .nav-item').forEach(b=>b.classList.toggle('active',b.dataset.a===p));
- if(p==='about'){
-  c.innerHTML=`<div class="hero"><div><div class="eyebrow">DEFENSE ENCLAVE SOCIETY</div><h2>About</h2><div class="muted">Society information and administration details.</div></div></div>
-  <div class="panel"><h3>Defense Enclave Society</h3><p class="muted">Society management portal for members, society work, events, gallery, complaints, finance and society information.</p></div>`;
-  return;
- }
-
- const titles={dashboard:'Admin Dashboard',finance:'Society Finance',maintenance:'Active Maintenance',work:'Society Work',events:'Events',gallery:'Photo Gallery',members:'Members',complaints:'Complaints',map:'Society Map',about:'About'}; t.textContent=titles[p]||'Admin Dashboard';
+ const titles={dashboard:'Admin Dashboard',finance:'Society Finance',maintenance:'Active Maintenance',work:'Society Work',events:'Events',gallery:'Photo Gallery',members:'Members',complaints:'Complaints',map:'Society Map'}; t.textContent=titles[p]||'Admin Dashboard';
  if(p==='dashboard'){
   if(!sb)return toast('Supabase is not configured.');
   const {data:f,error}=await sb.from('society_finance').select('*').eq('id',1).maybeSingle();
@@ -1405,7 +1556,6 @@ async function restoreLoginSession(){
 
         document.getElementById('authModal')?.classList.add('hidden');
         document.getElementById('authOverlay')?.classList.add('hidden');
-        setPublicLoginButtonVisible(false);
 
         if(user.role==='admin'){
             await openAdminDashboard(user);
@@ -1439,26 +1589,3 @@ document.addEventListener('DOMContentLoaded',()=>{
     setupPublicTopNavigation();
     setPublicLoginButtonVisible(true);
 });
-
-
-/* ===== PUBLIC TOP BAR =====
-   Remove only: Home, Members, Work, Events, Gallery, Map.
-   Member Login is intentionally preserved and controlled separately. */
-function removeOnlyPublicTopLinks(){
-    const labels=new Set(['home','members','work','events','gallery','map']);
-    document.querySelectorAll('a').forEach(a=>{
-        if(a.closest('#memberApp')) return;
-
-        const text=(a.textContent||'').trim().toLowerCase();
-        const href=(a.getAttribute('href')||'').trim().toLowerCase();
-
-        if(labels.has(text) || /^#(home|members|work|events|gallery|map)$/.test(href)){
-            a.remove();
-        }
-    });
-}
-if(document.readyState==='loading'){
-    document.addEventListener('DOMContentLoaded',removeOnlyPublicTopLinks);
-}else{
-    removeOnlyPublicTopLinks();
-}
