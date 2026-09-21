@@ -220,180 +220,161 @@ async function adminEditWork(i){
 async function adminAddEvent(){
  if(!sb)return toast('Supabase is not configured.');
 
- const old=document.getElementById('eventFormOverlay');
+ const old=document.getElementById('eventAddModal');
  if(old)old.remove();
 
  const overlay=document.createElement('div');
- overlay.id='eventFormOverlay';
- overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;';
+ overlay.id='eventAddModal';
+ overlay.style.cssText='position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;background:rgba(15,23,42,.58);backdrop-filter:blur(3px);';
 
  overlay.innerHTML=`
-  <div style="width:min(620px,100%);max-height:90vh;overflow:auto;background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.25);padding:24px;box-sizing:border-box;">
-   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
-    <h2 style="margin:0;font-size:22px;">Add Event</h2>
-    <button type="button" id="eventCancelTop" style="border:0;background:transparent;font-size:26px;cursor:pointer;">&times;</button>
+ <div role="dialog" aria-modal="true" aria-labelledby="eventAddTitle"
+      style="width:min(560px,100%);max-height:calc(100vh - 40px);overflow:auto;background:#fff;border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.30);padding:24px;box-sizing:border-box;">
+   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+     <div>
+       <h2 id="eventAddTitle" style="margin:0 0 4px;font-size:22px;">Add Event</h2>
+       <div style="font-size:13px;color:#667085;">Enter all event details and save them together.</div>
+     </div>
+     <button type="button" id="eventModalClose" aria-label="Close"
+       style="width:36px;height:36px;border:0;border-radius:50%;background:#f2f4f7;font-size:24px;line-height:1;cursor:pointer;">&times;</button>
    </div>
 
-   <form id="eventCreateForm" novalidate>
-    <div id="eventFormError" style="display:none;margin-bottom:14px;padding:10px 12px;border-radius:8px;background:#fff1f1;color:#b42318;font-size:14px;"></div>
+   <form id="eventAddForm" novalidate>
+     <div id="eventGeneralError" style="display:none;margin-bottom:14px;padding:11px 12px;border-radius:9px;background:#fff1f1;color:#b42318;font-size:13px;"></div>
 
-    <label style="display:block;margin-bottom:14px;">
-      <span style="display:block;font-weight:600;margin-bottom:6px;">Event date *</span>
-      <input id="eventDateInput" type="text" placeholder="DD/MM/YYYY" autocomplete="off"
-        style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #cfd4dc;border-radius:8px;font-size:15px;">
-      <small style="display:block;margin-top:5px;color:#667085;">Format: DD/MM/YYYY &nbsp; Example: 25/09/2026</small>
-      <span class="event-field-error" id="eventDateError"></span>
-    </label>
+     <div style="margin-bottom:15px;">
+       <label for="eventDate" style="display:block;font-weight:600;margin-bottom:6px;">Event date <span style="color:#d92d20;">*</span></label>
+       <input id="eventDate" type="text" inputmode="numeric" placeholder="DD/MM/YYYY" autocomplete="off"
+         style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
+       <div style="font-size:12px;color:#667085;margin-top:5px;">Format: DD/MM/YYYY &nbsp; Example: 25/09/2026</div>
+       <div id="eventDateError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
+     </div>
 
-    <label style="display:block;margin-bottom:14px;">
-      <span style="display:block;font-weight:600;margin-bottom:6px;">Event title *</span>
-      <input id="eventTitleInput" type="text" placeholder="Enter event title" maxlength="150"
-        style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #cfd4dc;border-radius:8px;font-size:15px;">
-      <small style="display:block;margin-top:5px;color:#667085;">Example: Society Annual Meeting</small>
-      <span class="event-field-error" id="eventTitleError"></span>
-    </label>
+     <div style="margin-bottom:15px;">
+       <label for="eventTitle" style="display:block;font-weight:600;margin-bottom:6px;">Event title <span style="color:#d92d20;">*</span></label>
+       <input id="eventTitle" type="text" maxlength="150" placeholder="Enter event title"
+         style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
+       <div style="font-size:12px;color:#667085;margin-top:5px;">Example: Society Annual Meeting</div>
+       <div id="eventTitleError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
+     </div>
 
-    <label style="display:block;margin-bottom:14px;">
-      <span style="display:block;font-weight:600;margin-bottom:6px;">Location / time</span>
-      <input id="eventLocationInput" type="text" placeholder="Example: Community Hall, 6:00 PM"
-        maxlength="200"
-        style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #cfd4dc;border-radius:8px;font-size:15px;">
-      <small style="display:block;margin-top:5px;color:#667085;">Example: Society Park, 5:30 PM</small>
-      <span class="event-field-error" id="eventLocationError"></span>
-    </label>
+     <div style="margin-bottom:15px;">
+       <label for="eventLocation" style="display:block;font-weight:600;margin-bottom:6px;">Location / time</label>
+       <input id="eventLocation" type="text" maxlength="200" placeholder="Example: Community Hall, 6:00 PM"
+         style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
+       <div style="font-size:12px;color:#667085;margin-top:5px;">Enter the venue and/or event time.</div>
+     </div>
 
-    <label style="display:block;margin-bottom:20px;">
-      <span style="display:block;font-weight:600;margin-bottom:6px;">Description</span>
-      <textarea id="eventDescriptionInput" rows="5" maxlength="2000" placeholder="Enter event details..."
-        style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #cfd4dc;border-radius:8px;font-size:15px;resize:vertical;"></textarea>
-      <small style="display:block;margin-top:5px;color:#667085;">Optional. Maximum 2000 characters.</small>
-      <span class="event-field-error" id="eventDescriptionError"></span>
-    </label>
+     <div style="margin-bottom:20px;">
+       <label for="eventDescription" style="display:block;font-weight:600;margin-bottom:6px;">Description</label>
+       <textarea id="eventDescription" rows="4" maxlength="2000" placeholder="Enter event details..."
+         style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;resize:vertical;"></textarea>
+       <div style="font-size:12px;color:#667085;margin-top:5px;">Optional. Maximum 2000 characters.</div>
+     </div>
 
-    <div style="display:flex;justify-content:flex-end;gap:10px;">
-      <button type="button" id="eventCancelBtn" style="padding:11px 18px;border:1px solid #d0d5dd;border-radius:8px;background:#fff;cursor:pointer;">Cancel</button>
-      <button type="submit" id="eventSaveBtn" style="padding:11px 20px;border:0;border-radius:8px;background:#2563eb;color:#fff;cursor:pointer;font-weight:600;">Save Event</button>
-    </div>
+     <div style="display:flex;justify-content:flex-end;gap:10px;padding-top:4px;border-top:1px solid #eaecf0;">
+       <button type="button" id="eventModalCancel"
+         style="margin-top:15px;padding:11px 18px;border:1px solid #d0d5dd;border-radius:9px;background:#fff;cursor:pointer;font-size:14px;">Cancel</button>
+       <button type="submit" id="eventModalSave"
+         style="margin-top:15px;padding:11px 20px;border:0;border-radius:9px;background:#2563eb;color:#fff;cursor:pointer;font-weight:600;font-size:14px;">Save Event</button>
+     </div>
    </form>
-  </div>`;
+ </div>`;
 
  document.body.appendChild(overlay);
 
- const form=overlay.querySelector('#eventCreateForm');
- const dateInput=overlay.querySelector('#eventDateInput');
- const titleInput=overlay.querySelector('#eventTitleInput');
- const locationInput=overlay.querySelector('#eventLocationInput');
- const descriptionInput=overlay.querySelector('#eventDescriptionInput');
- const generalError=overlay.querySelector('#eventFormError');
- const saveBtn=overlay.querySelector('#eventSaveBtn');
+ const form=overlay.querySelector('#eventAddForm');
+ const dateEl=overlay.querySelector('#eventDate');
+ const titleEl=overlay.querySelector('#eventTitle');
+ const locationEl=overlay.querySelector('#eventLocation');
+ const descriptionEl=overlay.querySelector('#eventDescription');
+ const generalEl=overlay.querySelector('#eventGeneralError');
+ const saveBtn=overlay.querySelector('#eventModalSave');
 
- const setError=(input,errorEl,message)=>{
-   errorEl.textContent=message||'';
-   errorEl.style.display=message?'block':'none';
-   errorEl.style.cssText += message
-     ? ';color:#b42318;font-size:13px;margin-top:5px;'
-     : ';';
-   input.style.borderColor=message?'#d92d20':'#cfd4dc';
-   input.style.backgroundColor=message?'#fff8f7':'#fff';
+ const close=()=>overlay.remove();
+
+ const setFieldError=(el,errorId,message)=>{
+   const err=overlay.querySelector('#'+errorId);
+   err.textContent=message||'';
+   err.style.display=message?'block':'none';
+   el.style.borderColor=message?'#d92d20':'#d0d5dd';
+   el.style.backgroundColor=message?'#fff8f7':'#fff';
  };
 
  const clearErrors=()=>{
-   generalError.style.display='none';
-   [dateInput,titleInput,locationInput,descriptionInput].forEach((el)=>{
-     el.style.borderColor='#cfd4dc';
-     el.style.backgroundColor='#fff';
-   });
-   overlay.querySelectorAll('.event-field-error').forEach(e=>{e.textContent='';e.style.display='none';});
+   generalEl.style.display='none';
+   generalEl.textContent='';
+   setFieldError(dateEl,'eventDateError','');
+   setFieldError(titleEl,'eventTitleError','');
  };
 
- const parseDate=(value)=>{
-   const v=value.trim();
-   let m=v.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-   if(!m)m=v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+ const toDate=(value)=>{
+   const m=String(value||'').trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
    if(!m)return null;
-
-   const day=v.match(/^(\d{2})\/(\d{2})\/(\d{4})$/) ? Number(m[1]) : Number(m[3]);
-   const month=v.match(/^(\d{2})\/(\d{2})\/(\d{4})$/) ? Number(m[2]) : Number(m[2]);
-   const year=v.match(/^(\d{2})\/(\d{2})\/(\d{4})$/) ? Number(m[3]) : Number(m[1]);
-
+   const day=Number(m[1]), month=Number(m[2]), year=Number(m[3]);
    const d=new Date(Date.UTC(year,month-1,day));
-   if(d.getUTCFullYear()!==year || d.getUTCMonth()!==month-1 || d.getUTCDate()!==day)return null;
-
+   if(d.getUTCFullYear()!==year||d.getUTCMonth()!==month-1||d.getUTCDate()!==day)return null;
    return `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
  };
 
- const close=()=>overlay.remove();
- overlay.querySelector('#eventCancelBtn').onclick=close;
- overlay.querySelector('#eventCancelTop').onclick=close;
+ overlay.querySelector('#eventModalClose').onclick=close;
+ overlay.querySelector('#eventModalCancel').onclick=close;
  overlay.addEventListener('click',e=>{if(e.target===overlay)close();});
 
- dateInput.addEventListener('input',()=>{ if(dateInput.value.trim())setError(dateInput,overlay.querySelector('#eventDateError'),''); });
- titleInput.addEventListener('input',()=>{ if(titleInput.value.trim())setError(titleInput,overlay.querySelector('#eventTitleError'),''); });
+ const keyHandler=e=>{
+   if(!document.getElementById('eventAddModal')){
+     document.removeEventListener('keydown',keyHandler);
+     return;
+   }
+   if(e.key==='Escape')close();
+ };
+ document.addEventListener('keydown',keyHandler);
 
- form.onsubmit=async(e)=>{
+ form.onsubmit=async e=>{
    e.preventDefault();
    clearErrors();
 
-   const eventDate=parseDate(dateInput.value);
-   const title=titleInput.value.trim();
-   const location=locationInput.value.trim();
-   const description=descriptionInput.value.trim();
+   const event_date=toDate(dateEl.value);
+   const title=titleEl.value.trim();
+   const location=locationEl.value.trim();
+   const description=descriptionEl.value.trim();
 
    let firstInvalid=null;
 
-   if(!eventDate){
-     setError(dateInput,overlay.querySelector('#eventDateError'),'Enter a valid date in DD/MM/YYYY format.');
-     firstInvalid=firstInvalid||dateInput;
+   if(!event_date){
+     setFieldError(dateEl,'eventDateError','Please enter a valid date in DD/MM/YYYY format.');
+     firstInvalid=firstInvalid||dateEl;
    }
-
    if(!title){
-     setError(titleInput,overlay.querySelector('#eventTitleError'),'Event title is required.');
-     firstInvalid=firstInvalid||titleInput;
-   } else if(title.length<2){
-     setError(titleInput,overlay.querySelector('#eventTitleError'),'Event title must contain at least 2 characters.');
-     firstInvalid=firstInvalid||titleInput;
-   }
-
-   if(location.length>200){
-     setError(locationInput,overlay.querySelector('#eventLocationError'),'Location / time is too long.');
-     firstInvalid=firstInvalid||locationInput;
-   }
-
-   if(description.length>2000){
-     setError(descriptionInput,overlay.querySelector('#eventDescriptionError'),'Description is too long.');
-     firstInvalid=firstInvalid||descriptionInput;
+     setFieldError(titleEl,'eventTitleError','Event title is required.');
+     firstInvalid=firstInvalid||titleEl;
    }
 
    if(firstInvalid){
+     generalEl.textContent='Please correct the highlighted field(s).';
+     generalEl.style.display='block';
      firstInvalid.focus();
-     generalError.textContent='Please correct the highlighted field(s).';
-     generalError.style.display='block';
      return;
    }
 
    saveBtn.disabled=true;
    saveBtn.textContent='Saving...';
+   saveBtn.style.opacity='.7';
 
-   // Keep the DB payload typed correctly. event_date is YYYY-MM-DD.
-   const payload={event_date:eventDate,title,location,description};
-
-   console.log('EVENT SAVE PAYLOAD:',payload);
-
-   const {error}=await sb.from('events').insert(payload);
+   const {error}=await sb.from('events').insert({event_date,title,location,description});
 
    if(error){
      console.error('Event save failed:',error);
      saveBtn.disabled=false;
      saveBtn.textContent='Save Event';
+     saveBtn.style.opacity='1';
+     generalEl.textContent='Event save failed: '+error.message;
+     generalEl.style.display='block';
 
-     generalError.textContent='Save failed: '+error.message;
-     generalError.style.display='block';
-
-     // Highlight date if PostgreSQL reports a date/timestamp problem.
      const msg=(error.message||'').toLowerCase();
-     if(msg.includes('date')||msg.includes('timestamp')||msg.includes('time zone')){
-       setError(dateInput,overlay.querySelector('#eventDateError'),'The event date could not be saved. Please use DD/MM/YYYY.');
-       dateInput.focus();
+     if(msg.includes('timestamp')||msg.includes('date/time')||msg.includes('date')){
+       setFieldError(dateEl,'eventDateError','Please enter the date as DD/MM/YYYY.');
+       dateEl.focus();
      }
      return;
    }
@@ -402,83 +383,19 @@ async function adminAddEvent(){
    close();
    await adminPage('events',window.__adminUser);
  };
- titleInput.focus();
+
+ setTimeout(()=>titleEl.focus(),50);
 }
 
 async function adminEditEvent(i){
  const x=window.__eventRows?.[i]; if(!x)return;
-
- const old=document.getElementById('eventFormOverlay');
- if(old)old.remove();
-
- const overlay=document.createElement('div');
- overlay.id='eventFormOverlay';
- overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;';
- overlay.innerHTML=`
-  <div style="width:min(620px,100%);max-height:90vh;overflow:auto;background:#fff;border-radius:16px;padding:24px;box-sizing:border-box;">
-   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
-    <h2 style="margin:0;">Edit Event</h2><button type="button" id="eventEditClose" style="border:0;background:none;font-size:26px;cursor:pointer;">&times;</button>
-   </div>
-   <form id="eventEditForm" novalidate>
-    <div id="eventEditGeneral" style="display:none;margin-bottom:14px;padding:10px 12px;border-radius:8px;background:#fff1f1;color:#b42318;font-size:14px;"></div>
-    <label style="display:block;margin-bottom:14px;"><b>Event date *</b>
-      <input id="eeDate" type="text" value="${String(x.event_date||x.date||'').replace(/"/g,'&quot;')}" placeholder="DD/MM/YYYY" style="display:block;width:100%;box-sizing:border-box;margin-top:6px;padding:11px;border:1px solid #cfd4dc;border-radius:8px;">
-      <small style="color:#667085;">Format: DD/MM/YYYY</small><span id="eeDateErr" style="display:none;color:#b42318;font-size:13px;margin-top:4px;"></span>
-    </label>
-    <label style="display:block;margin-bottom:14px;"><b>Event title *</b>
-      <input id="eeTitle" type="text" value="${String(x.title||x.name||'').replace(/"/g,'&quot;')}" placeholder="Enter event title" style="display:block;width:100%;box-sizing:border-box;margin-top:6px;padding:11px;border:1px solid #cfd4dc;border-radius:8px;">
-      <span id="eeTitleErr" style="display:none;color:#b42318;font-size:13px;margin-top:4px;"></span>
-    </label>
-    <label style="display:block;margin-bottom:14px;"><b>Location / time</b>
-      <input id="eeLocation" type="text" value="${String(x.location||x.place||'').replace(/"/g,'&quot;')}" placeholder="Example: Community Hall, 6:00 PM" style="display:block;width:100%;box-sizing:border-box;margin-top:6px;padding:11px;border:1px solid #cfd4dc;border-radius:8px;">
-    </label>
-    <label style="display:block;margin-bottom:20px;"><b>Description</b>
-      <textarea id="eeDescription" rows="5" placeholder="Enter event details..." style="display:block;width:100%;box-sizing:border-box;margin-top:6px;padding:11px;border:1px solid #cfd4dc;border-radius:8px;resize:vertical;">${String(x.description||'').replace(/</g,'&lt;')}</textarea>
-    </label>
-    <div style="display:flex;justify-content:flex-end;gap:10px;">
-      <button type="button" id="eeCancel" style="padding:11px 18px;border:1px solid #d0d5dd;border-radius:8px;background:#fff;">Cancel</button>
-      <button type="submit" id="eeSave" style="padding:11px 20px;border:0;border-radius:8px;background:#2563eb;color:#fff;font-weight:600;">Save Changes</button>
-    </div>
-   </form>
-  </div>`;
- document.body.appendChild(overlay);
-
- const date=overlay.querySelector('#eeDate'), title=overlay.querySelector('#eeTitle');
- const location=overlay.querySelector('#eeLocation'), description=overlay.querySelector('#eeDescription');
- const parse=(v)=>{
-   const m=v.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/)||v.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
-   if(!m)return null;
-   const slash=v.trim().includes('/');
-   const day=Number(slash?m[1]:m[3]), month=Number(m[2]), year=Number(slash?m[3]:m[1]);
-   const d=new Date(Date.UTC(year,month-1,day));
-   return d.getUTCFullYear()===year&&d.getUTCMonth()===month-1&&d.getUTCDate()===day
-     ? `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}` : null;
- };
- const close=()=>overlay.remove();
- overlay.querySelector('#eeCancel').onclick=close;
- overlay.querySelector('#eventEditClose').onclick=close;
-
- overlay.querySelector('#eventEditForm').onsubmit=async e=>{
-   e.preventDefault();
-   const d=parse(date.value), t=title.value.trim();
-   const ge=overlay.querySelector('#eventEditGeneral'), de=overlay.querySelector('#eeDateErr'), te=overlay.querySelector('#eeTitleErr');
-   de.textContent='';te.textContent='';de.style.display='none';te.style.display='none';ge.style.display='none';
-   date.style.borderColor='#cfd4dc';title.style.borderColor='#cfd4dc';
-   let bad=null;
-   if(!d){de.textContent='Enter a valid date in DD/MM/YYYY format.';de.style.display='block';date.style.borderColor='#d92d20';bad=date;}
-   if(!t){te.textContent='Event title is required.';te.style.display='block';title.style.borderColor='#d92d20';bad=bad||title;}
-   if(bad){ge.textContent='Please correct the highlighted field(s).';ge.style.display='block';bad.focus();return;}
-
-   const btn=overlay.querySelector('#eeSave');btn.disabled=true;btn.textContent='Saving...';
-   const {error}=await sb.from('events').update({
-     event_date:d,title:t,location:location.value.trim(),description:description.value.trim()
-   }).eq('id',x.id);
-   if(error){
-     btn.disabled=false;btn.textContent='Save Changes';
-     ge.textContent='Save failed: '+error.message;ge.style.display='block';return;
-   }
-   toast('Event updated');close();await adminPage('events',window.__adminUser);
- };
+ const event_date=prompt('Event date:',x.event_date||x.date||''); if(event_date===null)return;
+ const title=prompt('Event title:',x.title||x.name||''); if(title===null)return;
+ const location=prompt('Location / time:',x.location||x.place||''); if(location===null)return;
+ const description=prompt('Description:',x.description||''); if(description===null)return;
+ const {error}=await sb.from('events').update({event_date,title,location,description}).eq('id',x.id);
+ if(error)return toast('Event update failed: '+error.message);
+ toast('Event updated'); await adminPage('events',window.__adminUser);
 }
 
 async function adminDeleteEvent(i){
