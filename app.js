@@ -195,22 +195,74 @@ async function adminDeleteMaintenance(i){
 
 
 async function getSocietyWorkColumns(){
-    const candidates = [
+    /*
+     * Do NOT try to insert {name: ...} and then fall back.
+     * PostgREST can reject the request at schema-cache level before
+     * any fallback is attempted.
+     *
+     * First read the actual PostgREST OpenAPI schema, then build the
+     * insert/update payload using only columns that really exist.
+     */
+    const columns={};
+
+    try{
+        const base=(CONFIG?.SUPABASE_URL||'').replace(/\/+$/,'');
+        const key=CONFIG?.SUPABASE_ANON_KEY||'';
+
+        if(base && key){
+            const response=await fetch(base+'/rest/v1/',{
+                method:'GET',
+                headers:{
+                    apikey:key,
+                    Authorization:'Bearer '+key,
+                    Accept:'application/openapi+json'
+                },
+                cache:'no-store'
+            });
+
+            if(response.ok){
+                const spec=await response.json();
+                const tableSchema=spec?.definitions?.society_work;
+                const properties=tableSchema?.properties||{};
+
+                Object.keys(properties).forEach(column=>{
+                    columns[column]=true;
+                });
+
+                console.log('Society Work actual DB columns:',Object.keys(properties));
+
+                if(Object.keys(properties).length){
+                    return columns;
+                }
+            }else{
+                console.warn('Could not read PostgREST schema:',response.status);
+            }
+        }
+    }catch(e){
+        console.warn('PostgREST schema discovery failed:',e);
+    }
+
+    /*
+     * Fallback for environments where the OpenAPI endpoint is not
+     * available. Each SELECT is harmless; importantly, no INSERT/UPDATE
+     * containing a nonexistent column is attempted.
+     */
+    const candidates=[
         'name','title','work_name','project_name','work_title',
         'project','work','activity','task','subject',
         'description','details','status','progress',
         'target_date','target','due_date'
     ];
 
-    const columns = {};
     for(const column of candidates){
         try{
-            const result = await sb.from('society_work').select(column).limit(1);
-            columns[column] = !result.error;
+            const result=await sb.from('society_work').select(column).limit(1);
+            columns[column]=!result.error;
         }catch(_){
-            columns[column] = false;
+            columns[column]=false;
         }
     }
+
     return columns;
 }
 
@@ -218,68 +270,71 @@ function societyWorkTitleColumn(columns){
     return [
         'name','title','work_name','project_name','work_title',
         'project','work','activity','task','subject'
-    ].find(column => columns[column] === true) || null;
+    ].find(column=>columns[column]===true) || null;
 }
 
-function societyWorkPayload(columns, values){
-    const payload = {};
-    const titleColumn = societyWorkTitleColumn(columns);
+function societyWorkPayload(columns,values){
+    const payload={};
+    const titleColumn=societyWorkTitleColumn(columns);
 
-    if(titleColumn) payload[titleColumn] = values.name;
+    if(titleColumn) payload[titleColumn]=values.name;
 
-    if(columns.description) payload.description = values.description;
-    else if(columns.details) payload.details = values.description;
+    if(columns.description) payload.description=values.description;
+    else if(columns.details) payload.details=values.description;
 
-    if(columns.status) payload.status = values.status;
-    if(columns.progress) payload.progress = values.progress;
+    if(columns.status) payload.status=values.status;
+    if(columns.progress) payload.progress=values.progress;
 
-    if(columns.target_date) payload.target_date = values.target_date;
-    else if(columns.target) payload.target = values.target_date;
-    else if(columns.due_date) payload.due_date = values.target_date;
+    if(columns.target_date) payload.target_date=values.target_date;
+    else if(columns.target) payload.target=values.target_date;
+    else if(columns.due_date) payload.due_date=values.target_date;
 
-    return {payload, titleColumn};
+    return {payload,titleColumn};
 }
 
 async function adminAddWork(){
     if(!sb)return toast('Supabase is not configured.');
 
     const workName=prompt('Work / project name:');
-    if(!workName || !workName.trim())return;
+    if(workName===null || !workName.trim())return;
 
-    const description=prompt('Description:','')||'';
-    const status=prompt('Status (Ongoing/Pending/Completed):','Pending')||'Pending';
+    const description=prompt('Description:','');
+    if(description===null)return;
+
+    const status=prompt('Status (Ongoing/Pending/Completed):','Pending');
+    if(status===null)return;
 
     const progressInput=prompt('Progress %:','0');
     if(progressInput===null)return;
-
     const progress=Math.max(0,Math.min(100,Number(progressInput)||0));
 
-    const target_date=prompt('Target date:','')||null;
+    const target_date=prompt('Target date:','');
+    if(target_date===null)return;
 
     try{
         const columns=await getSocietyWorkColumns();
-        const {payload,titleColumn}=societyWorkPayload(columns,{
+        const built=societyWorkPayload(columns,{
             name:workName.trim(),
-            description,
-            status,
+            description:description.trim(),
+            status:status.trim(),
             progress,
-            target_date
+            target_date:target_date.trim()||null
         });
 
         console.log('Society Work detected columns:',columns);
-        console.log('Society Work insert payload:',payload);
+        console.log('Society Work insert payload:',built.payload);
 
-        if(!titleColumn){
+        if(!built.titleColumn){
             return toast(
-                'Work save failed: no supported work-name column exists in society_work. ' +
-                'Add one such as title or work_name.'
+                'Work save failed: no work-name/title column was found in society_work. ' +
+                'Check the table columns in Supabase.'
             );
         }
 
-        const {error}=await sb.from('society_work').insert(payload);
+        const {error}=await sb.from('society_work').insert(built.payload);
 
         if(error){
-            console.error('Work save failed:',error,payload);
+            console.error('Work save failed:',error,built.payload);
             return toast('Work save failed: '+error.message);
         }
 
@@ -310,40 +365,39 @@ async function adminEditWork(i){
 
     const progressInput=prompt('Progress %:',x.progress??0);
     if(progressInput===null)return;
-
     const progress=Math.max(0,Math.min(100,Number(progressInput)||0));
 
-    const target_date=prompt(
+    const targetDate=prompt(
         'Target date:',
         x.target_date||x.target||x.due_date||''
     );
-    if(target_date===null)return;
+    if(targetDate===null)return;
 
     try{
         const columns=await getSocietyWorkColumns();
-        const {payload,titleColumn}=societyWorkPayload(columns,{
+        const built=societyWorkPayload(columns,{
             name:workName.trim(),
-            description,
-            status,
+            description:description.trim(),
+            status:status.trim(),
             progress,
-            target_date:target_date||null
+            target_date:targetDate.trim()||null
         });
 
         console.log('Society Work detected columns:',columns);
-        console.log('Society Work update payload:',payload);
+        console.log('Society Work update payload:',built.payload);
 
-        if(!titleColumn){
+        if(!built.titleColumn){
             return toast(
-                'Work update failed: no supported work-name column exists in society_work.'
+                'Work update failed: no work-name/title column was found in society_work.'
             );
         }
 
         const {error}=await sb.from('society_work')
-            .update(payload)
+            .update(built.payload)
             .eq('id',x.id);
 
         if(error){
-            console.error('Work update failed:',error,payload);
+            console.error('Work update failed:',error,built.payload);
             return toast('Work update failed: '+error.message);
         }
 
