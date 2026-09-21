@@ -77,7 +77,7 @@ async function renderPublic(){
 }
 renderPublic().catch(e=>console.error('Initial public render:',e));
 const authModal=document.getElementById('authModal');const showLogin=()=>{document.getElementById('authHeading').textContent='Member Login';document.getElementById('authLogin').classList.remove('hidden');document.getElementById('authRegister').classList.add('hidden');authModal.classList.remove('hidden')};const showReg=()=>{document.getElementById('authHeading').textContent='Create Member Account';document.getElementById('authLogin').classList.add('hidden');document.getElementById('authRegister').classList.remove('hidden');authModal.classList.remove('hidden')};document.getElementById('openLogin').onclick=showLogin;document.getElementById('openRegister').onclick=showReg;document.getElementById('authClose').onclick=()=>authModal.classList.add('hidden');
-    setPublicLoginButtonVisible(false);document.getElementById('switchRegister').onclick=showReg;document.getElementById('switchLogin').onclick=showLogin;
+document.getElementById('switchRegister').onclick=showReg;document.getElementById('switchLogin').onclick=showLogin;
 
 /* ===== PUBLIC TOP NAVIGATION FIX ===== */
 function setPublicLoginButtonVisible(visible){
@@ -132,6 +132,7 @@ async function login(){
     if(result.error)console.error('Profile loading error:',result.error);
     const profile=result.data;
     authModal.classList.add('hidden');
+    setPublicLoginButtonVisible(false);
     const user={...data.user,name:profile?.full_name||data.user.user_metadata?.full_name||data.user.email?.split('@')[0]||'Member',email:data.user.email||'',phone:profile?.phone||'',house_no:profile?.house_number||profile?.house_no||'',address:profile?.address||'',role:String(profile?.role||'member').trim().toLowerCase()};
     if(user.role==='admin') openAdminDashboard(user); else openMemberDashboard(user);
     toast('Login successful');
@@ -152,6 +153,7 @@ async function register(){
     const profileResult=await sb.from('profiles').update({full_name:name,email:data.user.email||email,phone:phone||null,house_number:house_no,address:address||null}).eq('id',data.user.id);
     if(profileResult.error){console.error('Profile update error:',profileResult.error);return toast('Account created, but profile details could not be saved');}
     authModal.classList.add('hidden');
+    if(data.session) setPublicLoginButtonVisible(false);
     if(!data.session){showLogin();return toast('Registration successful. Please verify your email before login.');}
     openMemberDashboard({...data.user,name,email,phone,house_no,address,role:'member'});
     toast('Registration complete');
@@ -171,6 +173,7 @@ function openAdminDashboard(user){
  <button class="nav-item" data-a="members">♙ <span>Members</span></button>
  <button class="nav-item" data-a="complaints">⚑ <span>Complaints</span></button>
  <button class="nav-item" data-a="map">⌖ <span>Society Map</span></button>
+ <button class="nav-item" data-a="about">ⓘ <span>About</span></button>
  </nav><div class="sidebar-bottom"><div class="user-mini"><div class="avatar">${initials(user.name)}</div><div><strong>${user.name}</strong><span>Administrator</span></div></div><button class="outline-btn" id="adminLogout">Log out</button></div></aside>
  <main class="main"><header class="topbar"><div><div class="eyebrow">DEFENSE ENCLAVE SOCIETY</div><h1 id="adminTitle">Admin Dashboard</h1></div><div class="top-actions"><span class="status ongoing">ADMIN</span><div class="avatar">${initials(user.name)}</div></div></header><section id="adminContent" class="content"></section></main>`;
  const nav=app.querySelector('nav'); nav.onclick=e=>{const b=e.target.closest('.nav-item');if(!b)return;adminPage(b.dataset.a,user)};
@@ -1227,7 +1230,13 @@ async function adminUploadMap(){
 async function adminPage(p,user){
  const c=document.getElementById('adminContent'),t=document.getElementById('adminTitle');
  document.querySelectorAll('#memberApp .nav-item').forEach(b=>b.classList.toggle('active',b.dataset.a===p));
- const titles={dashboard:'Admin Dashboard',finance:'Society Finance',maintenance:'Active Maintenance',work:'Society Work',events:'Events',gallery:'Photo Gallery',members:'Members',complaints:'Complaints',map:'Society Map'}; t.textContent=titles[p]||'Admin Dashboard';
+ if(p==='about'){
+  c.innerHTML=`<div class="hero"><div><div class="eyebrow">DEFENSE ENCLAVE SOCIETY</div><h2>About</h2><div class="muted">Society information and administration details.</div></div></div>
+  <div class="panel"><h3>Defense Enclave Society</h3><p class="muted">Society management portal for members, society work, events, gallery, complaints, finance and society information.</p></div>`;
+  return;
+ }
+
+ const titles={dashboard:'Admin Dashboard',finance:'Society Finance',maintenance:'Active Maintenance',work:'Society Work',events:'Events',gallery:'Photo Gallery',members:'Members',complaints:'Complaints',map:'Society Map',about:'About'}; t.textContent=titles[p]||'Admin Dashboard';
  if(p==='dashboard'){
   if(!sb)return toast('Supabase is not configured.');
   const {data:f,error}=await sb.from('society_finance').select('*').eq('id',1).maybeSingle();
@@ -1396,6 +1405,7 @@ async function restoreLoginSession(){
 
         document.getElementById('authModal')?.classList.add('hidden');
         document.getElementById('authOverlay')?.classList.add('hidden');
+        setPublicLoginButtonVisible(false);
 
         if(user.role==='admin'){
             await openAdminDashboard(user);
@@ -1429,3 +1439,26 @@ document.addEventListener('DOMContentLoaded',()=>{
     setupPublicTopNavigation();
     setPublicLoginButtonVisible(true);
 });
+
+
+/* ===== PUBLIC TOP BAR =====
+   Remove only: Home, Members, Work, Events, Gallery, Map.
+   Member Login is intentionally preserved and controlled separately. */
+function removeOnlyPublicTopLinks(){
+    const labels=new Set(['home','members','work','events','gallery','map']);
+    document.querySelectorAll('a').forEach(a=>{
+        if(a.closest('#memberApp')) return;
+
+        const text=(a.textContent||'').trim().toLowerCase();
+        const href=(a.getAttribute('href')||'').trim().toLowerCase();
+
+        if(labels.has(text) || /^#(home|members|work|events|gallery|map)$/.test(href)){
+            a.remove();
+        }
+    });
+}
+if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',removeOnlyPublicTopLinks);
+}else{
+    removeOnlyPublicTopLinks();
+}
