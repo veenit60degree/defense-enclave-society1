@@ -21,137 +21,189 @@ if (
 const demo={members:[['RS','Raj Sharma','A-101'],['PK','Priya Kapoor','A-102'],['MG','Manoj Gupta','A-103'],['AJ','Alex Johnson','A-104'],['SK','Sonia Kaur','B-201'],['VS','Vikas Singh','B-202'],['AM','Anita Mehta','B-203'],['NK','Nitin Kumar','C-301'],['PS','Pooja Sethi','C-302']],works:[['Main Gate Repair','Repair and repaint main entrance gate','Ongoing',72,'12 Sep 2026'],['Street Light Upgrade','Replace 18 old lights with LED fixtures','Ongoing',45,'18 Sep 2026'],['Park Renovation','Benches, pathway and plantation work','Pending',0,'25 Sep 2026'],['Water Tank Cleaning','Annual cleaning and inspection','Completed',100,'05 Sep 2026']],events:[['20 Sep 2026','Monthly General Meeting','Community Hall · 6:00 PM','◷'],['02 Oct 2026','Cleanliness Drive','Main Park · 7:00 AM','♧'],['18 Oct 2026','Family Sports Day','Society Ground · 4:00 PM','★']],gallery:['Society Meeting','Park Activity','Festival Evening','Cleanliness Drive','Community Gathering']};
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)}
 async function renderPublic(){
-    // Public/logout page must not expose Society Finance.
-    // Hide the existing finance/stat block if the HTML contains it.
-    const stats=document.getElementById('publicStats');
-    if(stats){
-        stats.innerHTML='';
-        stats.style.display='none';
+    /*
+     * PUBLIC/LOGOUT PAGE
+     * ------------------
+     * Do not use society_finance here. Finance is available only after login.
+     * All public sections below are loaded from Supabase.
+     */
+    const publicRoot=document.getElementById('public');
+    if(!publicRoot || !sb){
+        if(!sb) console.error('Public render: Supabase client is not available.');
+        return;
     }
 
-    if(!sb) return;
+    // Create public sections when the HTML page does not already provide them.
+    // This makes the public page work even when older HTML is being used.
+    function ensureSection(id,title){
+        let el=document.getElementById(id);
+        if(el)return el;
+        el=document.createElement('section');
+        el.id=id;
+        el.className='content-section';
+        el.style.cssText='padding:48px 20px;max-width:1180px;margin:0 auto;scroll-margin-top:80px;';
+        el.innerHTML=`<div class="hero"><div><div class="eyebrow">DEFENSE ENCLAVE SOCIETY</div><h2>${title}</h2></div></div><div id="${id}Content"></div>`;
+        publicRoot.appendChild(el);
+        return el;
+    }
 
-    try{
-        // Public page data is loaded directly from Supabase.
-        // Do not use demo/static data for these sections.
-        const [members,works,events,gallery,maintenance]=await Promise.all([
-            sb.from('profiles')
-              .select('id,full_name,phone,house_number,address,role,is_active')
-              .eq('role','member')
-              .eq('is_active',true)
-              .order('full_name',{ascending:true}),
-            sb.from('society_work').select('*').order('created_at',{ascending:false}),
-            sb.from('events').select('*').order('event_date',{ascending:false}),
-            sb.from('gallery_photos').select('*').order('created_at',{ascending:false}),
-            sb.from('maintenance').select('*').order('created_at',{ascending:false})
-        ]);
+    const membersSection=ensureSection('publicMembers','Society Members');
+    const eventsSection=ensureSection('publicEvents','Events');
+    const maintenanceSection=ensureSection('publicMaintenance','Maintenance');
+    const mapSection=ensureSection('publicMap','Society Map');
+    const aboutSection=ensureSection('publicAbout','About Us');
 
-        if(members.error) console.error('Public members load error:',members.error);
-        if(works.error) console.error('Public work load error:',works.error);
-        if(events.error) console.error('Public events load error:',events.error);
-        if(gallery.error) console.error('Public gallery load error:',gallery.error);
-        if(maintenance.error) console.error('Public maintenance load error:',maintenance.error);
+    // Reuse existing containers if the page already has them.
+    let memberGrid=document.getElementById('memberGrid');
+    if(!memberGrid){
+        memberGrid=document.createElement('div');
+        memberGrid.id='memberGrid';
+        memberGrid.className='card-grid';
+        (membersSection.querySelector('#publicMembersContent')||membersSection).appendChild(memberGrid);
+    }
 
-        // ---------------------------------------------------------
-        // Society Members - public/logout page
-        // ---------------------------------------------------------
-        const memberGrid=document.getElementById('memberGrid');
-        if(memberGrid){
-            memberGrid.innerHTML=(members.data||[]).map(p=>{
-                const initials=(p.full_name||'M')
-                    .split(/\s+/)
-                    .map(x=>x[0])
-                    .slice(0,2)
-                    .join('')
-                    .toUpperCase();
+    let eventGrid=document.getElementById('eventGrid');
+    if(!eventGrid){
+        eventGrid=document.createElement('div');
+        eventGrid.id='eventGrid';
+        eventGrid.className='event-grid';
+        (eventsSection.querySelector('#publicEventsContent')||eventsSection).appendChild(eventGrid);
+    }
 
-                const address=[p.house_number,p.address]
-                    .filter(Boolean)
-                    .join(', ');
+    const maintenanceContent=document.getElementById('publicMaintenanceContent');
+    const mapContent=document.getElementById('publicMapContent');
+    const aboutContent=document.getElementById('publicAboutContent');
 
-                return `<div class="member-card">
-                    <div class="member-photo">${initials}</div>
-                    <div>
-                        <strong>${p.full_name||'Member'}</strong>
-                        <div class="muted">Phone: ${p.phone||'Not available'}</div>
-                        <div class="muted">Address: ${address||'Not available'}</div>
-                        <span class="status ongoing" style="margin-top:6px">Active Member</span>
-                    </div>
-                </div>`;
-            }).join('') || '<div class="muted">No members available.</div>';
-        }
+    // Load all public data independently so one RLS/query error does not
+    // prevent the other sections from rendering.
+    const [membersResult,eventsResult,maintenanceResult,aboutResult]=await Promise.all([
+        sb.from('profiles')
+          .select('id,full_name,phone,house_number,address,role,is_active')
+          .eq('role','member')
+          .eq('is_active',true)
+          .order('full_name',{ascending:true}),
+        sb.from('events')
+          .select('*')
+          .order('event_date',{ascending:true}),
+        sb.from('maintenance')
+          .select('*')
+          .order('created_at',{ascending:false}),
+        sb.from('society_about')
+          .select('id,description,updated_at')
+          .eq('id',1)
+          .maybeSingle()
+    ]);
 
-        // ---------------------------------------------------------
-        // Society Work - public/logout page
-        // ---------------------------------------------------------
-        const workTable=document.getElementById('workTable');
-        if(workTable){
-            const rows=works.data||[];
-            workTable.innerHTML=`<thead><tr><th>Project</th><th>Description</th><th>Status</th><th>Progress</th><th>Target</th></tr></thead><tbody>${rows.map(w=>{
-                const name=w.name||w.title||w.work_name||w.project_name||w.work_title||w.project||w.work||w.activity||w.task||w.subject||'';
-                return `<tr><td><strong>${name}</strong></td><td>${w.description||w.details||''}</td><td><span class="status ${(w.status||'').toLowerCase()}">${w.status||''}</span></td><td><div class="progress"><i style="width:${Number(w.progress||0)}%"></i></div>${Number(w.progress||0)}%</td><td>${w.target_date||w.target||w.due_date||''}</td></tr>`;
-            }).join('')}</tbody>`;
-        }
-
-        // ---------------------------------------------------------
-        // Events - public/logout page
-        // ---------------------------------------------------------
-        const eventGrid=document.getElementById('eventGrid');
-        if(eventGrid){
-            eventGrid.innerHTML=(events.data||[]).map(e=>`<div class="card"><div class="photo">📅</div><div class="card-body"><div class="event-date">${e.event_date||e.date||''}</div><h3>${e.title||e.name||''}</h3><div class="muted">${e.location||e.place||e.description||''}</div></div></div>`).join('') || '<div class="muted">No events available.</div>';
-        }
-
-        // ---------------------------------------------------------
-        // Gallery - public/logout page
-        // ---------------------------------------------------------
-        const galleryGrid=document.getElementById('galleryGrid');
-        if(galleryGrid){
-            galleryGrid.innerHTML=(gallery.data||[]).map((g,i)=>`<div class="card"><div class="photo">${g.public_url?`<img src="${g.public_url}" alt="${g.file_name||'Gallery photo'}" style="width:100%;height:100%;object-fit:cover">`:['◉','★','♧','✦','✓','◎'][i%6]}</div><div class="card-body"><strong>${g.file_name||'Gallery Photo'}</strong></div></div>`).join('') || '<div class="muted">No gallery photos available.</div>';
-        }
-
-        // ---------------------------------------------------------
-        // Maintenance - public/logout page
-        // ---------------------------------------------------------
-        let maintenanceSection=document.getElementById('publicMaintenanceSection');
-        const eventsSection=document.getElementById('events');
-
-        if(!maintenanceSection && eventsSection?.parentElement){
-            maintenanceSection=document.createElement('section');
-            maintenanceSection.id='publicMaintenanceSection';
-            maintenanceSection.className=eventsSection.className||'';
-            eventsSection.parentElement.insertBefore(maintenanceSection,eventsSection);
-        }
-
-        if(maintenanceSection){
-            const rows=maintenance.data||[];
-            maintenanceSection.innerHTML=`
-                <div class="section-head">
-                    <div>
-                        <div class="eyebrow">SOCIETY MAINTENANCE</div>
-                        <h2>Maintenance</h2>
-                        <div class="muted">Current maintenance work and status.</div>
-                    </div>
+    // MEMBERS
+    if(membersResult.error){
+        console.error('Public members load error:',membersResult.error);
+        memberGrid.innerHTML='<div class="muted">Unable to load society members. Please check the public SELECT policy for profiles.</div>';
+    }else{
+        const rows=membersResult.data||[];
+        memberGrid.innerHTML=rows.map(p=>{
+            const initials=(p.full_name||'M').split(/\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase();
+            const address=[p.house_number,p.address].filter(Boolean).join(', ');
+            return `<div class="member-card">
+                <div class="member-photo">${initials}</div>
+                <div>
+                    <strong>${escapePublic(p.full_name||'Member')}</strong>
+                    <div class="muted">${escapePublic(address||'Address not available')}</div>
+                    <div class="muted" style="margin-top:4px">${escapePublic(p.phone||'Phone not available')}</div>
+                    <span class="status ongoing" style="margin-top:6px">Active Member</span>
                 </div>
-                <div class="panel">
-                    ${rows.length ? `
-                    <div class="table-wrap">
-                        <table class="table">
-                            <thead><tr><th>Item</th><th>Description</th><th>Amount</th><th>Status</th></tr></thead>
-                            <tbody>
-                                ${rows.map(x=>`<tr>
-                                    <td><strong>${x.item||x.title||x.name||'Maintenance'}</strong></td>
-                                    <td>${x.description||x.details||''}</td>
-                                    <td>${x.amount!=null ? `₹${Number(x.amount||0).toLocaleString('en-IN')}` : ''}</td>
-                                    <td><span class="status ${(x.status||'').toLowerCase()}">${x.status||''}</span></td>
-                                </tr>`).join('')}
-                            </tbody>
-                        </table>
-                    </div>` : '<div class="muted">No maintenance records available.</div>'}
-                </div>`;
-        }
-    }catch(e){
-        console.error('Public dynamic data load failed:',e);
+            </div>`;
+        }).join('') || '<div class="muted">No active members available.</div>';
     }
+
+    // EVENTS
+    if(eventsResult.error){
+        console.error('Public events load error:',eventsResult.error);
+        eventGrid.innerHTML='<div class="muted">Unable to load events. Please check the public SELECT policy for events.</div>';
+    }else{
+        const rows=eventsResult.data||[];
+        eventGrid.innerHTML=rows.map(e=>`<div class="card">
+            <div class="photo">📅</div>
+            <div class="card-body">
+                <div class="event-date">${escapePublic(e.event_date||e.date||'')}</div>
+                <h3>${escapePublic(e.title||e.name||'Event')}</h3>
+                <div class="muted">${escapePublic(e.location||e.place||e.description||'')}</div>
+            </div>
+        </div>`).join('') || '<div class="muted">No events available.</div>';
+    }
+
+    // MAINTENANCE
+    if(maintenanceContent){
+        if(maintenanceResult.error){
+            console.error('Public maintenance load error:',maintenanceResult.error);
+            maintenanceContent.innerHTML='<div class="panel"><div class="muted">Unable to load maintenance records. Please check the public SELECT policy for maintenance.</div></div>';
+        }else{
+            const rows=maintenanceResult.data||[];
+            maintenanceContent.innerHTML=`<div class="panel"><div class="table-wrap"><table class="table">
+                <thead><tr><th>Maintenance</th><th>Amount</th><th>Status</th></tr></thead>
+                <tbody>${rows.map(x=>`<tr>
+                    <td><strong>${escapePublic(x.item||x.title||x.name||x.description||'Maintenance')}</strong></td>
+                    <td>₹${Number(x.amount||0).toLocaleString('en-IN')}</td>
+                    <td><span class="status ${(String(x.status||'').toLowerCase())}">${escapePublic(x.status||'')}</span></td>
+                </tr>`).join('') || '<tr><td colspan="3" class="muted">No maintenance records available.</td></tr>'}</tbody>
+            </table></div></div>`;
+        }
+    }
+
+    // GOOGLE MAP - always render on public/logout page.
+    if(mapContent){
+        mapContent.innerHTML=`<div class="panel">
+            <div style="border-radius:14px;overflow:hidden;border:1px solid rgba(0,0,0,.12)">
+                <iframe title="Defense Enclave Society Map"
+                    src="https://www.google.com/maps?q=30.777604,76.616637&z=17&output=embed"
+                    width="100%" height="520" style="border:0;display:block"
+                    loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+            </div>
+            <div style="margin-top:12px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+                <div class="muted">Defense Enclave Society · 30.777604, 76.616637</div>
+                <a class="outline-btn" href="https://maps.app.goo.gl/A9TuNFyh9xzpTynU8" target="_blank" rel="noopener noreferrer">Open in Google Maps</a>
+            </div>
+        </div>`;
+    }
+
+    // ABOUT US
+    if(aboutContent){
+        if(aboutResult.error){
+            console.error('Public About load error:',aboutResult.error);
+            aboutContent.innerHTML='<div class="panel"><div class="muted">Unable to load About Us information. Please check the public SELECT policy for society_about.</div></div>';
+        }else{
+            const description=aboutResult.data?.description||'';
+            aboutContent.innerHTML=`<div class="panel"><h3>About Defense Enclave Society</h3>
+                <div style="white-space:pre-wrap;line-height:1.7">${escapePublic(description)||'<span class="muted">About Us information is not available yet.</span>'}</div>
+            </div>`;
+        }
+    }
+
+    // Keep existing dynamic Society Work and Gallery containers working.
+    const [works,gallery]=await Promise.all([
+        sb.from('society_work').select('*').order('created_at',{ascending:false}),
+        sb.from('gallery_photos').select('*').order('created_at',{ascending:false})
+    ]);
+
+    if(works.error)console.error('Public work load error:',works.error);
+    if(gallery.error)console.error('Public gallery load error:',gallery.error);
+
+    const workTable=document.getElementById('workTable');
+    if(workTable){
+        const rows=works.data||[];
+        workTable.innerHTML=`<thead><tr><th>Project</th><th>Description</th><th>Status</th><th>Progress</th><th>Target</th></tr></thead><tbody>${rows.map(w=>{
+            const name=w.name||w.title||w.work_name||w.project_name||w.work_title||w.project||w.work||w.activity||w.task||w.subject||'';
+            return `<tr><td><strong>${escapePublic(name)}</strong></td><td>${escapePublic(w.description||w.details||'')}</td><td><span class="status ${(w.status||'').toLowerCase()}">${escapePublic(w.status||'')}</span></td><td><div class="progress"><i style="width:${Number(w.progress||0)}%"></i></div>${Number(w.progress||0)}%</td><td>${escapePublic(w.target_date||w.target||w.due_date||'')}</td></tr>`;
+        }).join('')}</tbody>`;
+    }
+
+    const galleryGrid=document.getElementById('galleryGrid');
+    if(galleryGrid){
+        galleryGrid.innerHTML=(gallery.data||[]).map((g,i)=>`<div class="card"><div class="photo">${g.public_url?`<img src="${escapePublic(g.public_url)}" alt="${escapePublic(g.file_name||'Gallery photo')}" style="width:100%;height:100%;object-fit:cover">`:['◉','★','♧','✦','✓','◎'][i%6]}</div><div class="card-body"><strong>${escapePublic(g.file_name||'Gallery Photo')}</strong></div></div>`).join('') || '<div class="muted">No gallery photos available.</div>';
+    }
+}
+
+function escapePublic(value){
+    return String(value??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 renderPublic().catch(e=>console.error('Initial public render:',e));
