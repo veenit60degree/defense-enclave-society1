@@ -457,7 +457,7 @@ function escapeHtml(v){
     const parent=societyWork?.closest('section')||document.getElementById('public');
     parent?.insertAdjacentElement('afterend',publicComplaintSection);
   }
-  publicComplaintSection.innerHTML=`<div class="section-head"><div><div class="eyebrow">COMPLAINTS</div><h2>Complaints</h2><div class="muted">Complaint status visible to all visitors.</div></div></div><div id="publicComplaintsTableWrap" class="table-wrap"><div class="muted" style="padding:18px">Loading complaints...</div></div>`;
+  publicComplaintSection.innerHTML=`<div class="section-head"><div><h2>Complaints</h2><div class="muted">Complaint status visible to all visitors.</div></div></div><div id="publicComplaintsTableWrap" class="table-wrap"><div class="muted" style="padding:18px">Loading complaints...</div></div>`;
 
   const publicWrap=document.getElementById('publicComplaintsTableWrap');
   if(publicWrap){
