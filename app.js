@@ -218,14 +218,7 @@ function fixPublicMemberForm(){
 
     // Supabase is configured in this file, so hide the old demo/configuration
     // notice if it exists in the attached page.
-    if(sb){
-        register.querySelectorAll('*').forEach(el=>{
-            const t=(el.textContent||'').trim();
-            if(t.includes('This preview runs in demo mode until you connect Supabase using the included configuration file.')){
-                el.style.display='none';
-            }
-        });
-    }
+  
 }
 
 function addPublicMembersViewAll(section,members){
