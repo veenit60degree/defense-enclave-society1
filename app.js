@@ -473,7 +473,28 @@ function escapeHtml(v){
   }
 }
 
-renderPublic().catch(e=>console.error('Initial public render:',e));
+
+function applyPublicWhitePanels(){
+  // Public/logout page: presentation-only white panels.
+  const publicPanelStyle=[
+    'background:#fff',
+    'border-radius:16px',
+    'padding:24px',
+    'box-sizing:border-box',
+    'box-shadow:0 4px 18px rgba(15,23,42,.06)',
+    'border:1px solid #eaecf0'
+  ].join(';');
+  [
+    publicSectionByHeading(['Complaints']),
+    publicSectionByHeading(['Events']),
+    publicSectionByHeading(['Photo Gallery','Gallery']),
+    publicSectionByHeading(['Society Map'])
+  ].filter(Boolean).forEach(section=>{
+    section.style.cssText=(section.style.cssText||'')+';'+publicPanelStyle;
+  });
+}
+
+renderPublic().then(()=>applyPublicWhitePanels()).catch(e=>console.error('Initial public render:',e));
 const authModal=document.getElementById('authModal');const showLogin=()=>{document.getElementById('authHeading').textContent='Member Login';document.getElementById('authLogin').classList.remove('hidden');document.getElementById('authRegister').classList.add('hidden');authModal.classList.remove('hidden')};const showReg=()=>{document.getElementById('authHeading').textContent='Create Member Account';document.getElementById('authLogin').classList.add('hidden');document.getElementById('authRegister').classList.remove('hidden');authModal.classList.remove('hidden');setTimeout(fixPublicMemberForm,0)};document.getElementById('openLogin').onclick=showLogin;document.getElementById('openRegister').onclick=showReg;document.getElementById('authClose').onclick=()=>authModal.classList.add('hidden');
     setPublicLoginButtonVisible(false);document.getElementById('switchRegister').onclick=showReg;document.getElementById('switchLogin').onclick=showLogin;setTimeout(fixPublicMemberForm,0);
 
