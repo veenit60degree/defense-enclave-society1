@@ -72,84 +72,91 @@ async function renderPublic(){
 }
 
 renderPublic().catch(e=>console.error('Initial public render:',e));
-const authModal=document.getElementById('authModal');
 
-function buildPublicRegisterForm(){
-    const register=document.getElementById('authRegister');
-    if(!register || register.dataset.fullMemberForm==='true')return;
+/* ===== PUBLIC CREATE MEMBER ACCOUNT FORM =====
+ * Reuse the existing auth dialog. Add any missing member fields and make
+ * the registration area vertically scrollable instead of creating a new
+ * popup/layout.
+ */
+function ensurePublicRegisterForm(){
+    const box=document.getElementById('authRegister');
+    if(!box)return;
 
-    register.dataset.fullMemberForm='true';
-    register.innerHTML=`
-      <div id="publicRegisterGeneralError" style="display:none;margin-bottom:14px;padding:11px 12px;border-radius:9px;background:#fff1f1;color:#b42318;font-size:13px;"></div>
+    box.style.maxHeight='min(72vh, 620px)';
+    box.style.overflowY='auto';
+    box.style.overflowX='hidden';
+    box.style.paddingRight='6px';
+    box.style.boxSizing='border-box';
+    box.style.webkitOverflowScrolling='touch';
 
-      <div style="display:grid;gap:14px;">
-        <label style="display:block;font-weight:600;">
-          Member name <span style="color:#d92d20;">*</span>
-          <input id="regName" type="text" maxlength="150" placeholder="Enter member full name" autocomplete="name"
-            style="display:block;width:100%;box-sizing:border-box;margin-top:6px;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
-        </label>
+    const fieldStyle='width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;background:#fff;';
+    const labelStyle='display:block;font-weight:600;margin:0 0 6px;';
+    const wrapStyle='margin-bottom:14px;';
 
-        <label style="display:block;font-weight:600;">
-          House / Flat number <span style="color:#d92d20;">*</span>
-          <input id="regHouse" type="text" maxlength="50" placeholder="Enter house / flat number"
-            style="display:block;width:100%;box-sizing:border-box;margin-top:6px;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
-        </label>
+    const addField=(id,label,type,placeholder,required=true)=>{
+        if(document.getElementById(id))return;
+        const wrap=document.createElement('div');
+        wrap.dataset.publicMemberField='1';
+        wrap.style.cssText=wrapStyle;
+        wrap.innerHTML=`<label for="${id}" style="${labelStyle}">${label}${required?' <span style="color:#d92d20;">*</span>':''}</label>
+          <input id="${id}" type="${type}" ${type==='password'?'autocomplete="new-password"':''} placeholder="${placeholder}" ${required?'required':''} style="${fieldStyle}">`;
+        const button=box.querySelector('#registerBtn');
+        if(button && button.parentElement)button.parentElement.insertBefore(wrap,button);
+        else box.appendChild(wrap);
+    };
 
-        <label style="display:block;font-weight:600;">
-          Phone <span style="color:#d92d20;">*</span>
-          <input id="regPhone" type="tel" maxlength="20" placeholder="Enter phone number" autocomplete="tel"
-            style="display:block;width:100%;box-sizing:border-box;margin-top:6px;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
-        </label>
+    addField('regName','Member Name','text','Enter member name');
+    addField('regHouse','House / Flat Number','text','Enter house / flat number');
+    addField('regPhone','Phone Number','tel','Enter phone number');
+    addField('regEmail','Email','email','Enter email address');
+    addField('regPassword','Password','password','Enter password');
+    addField('regConfirmPassword','Confirm Password','password','Confirm password');
+    addField('regAddress','Address','text','Enter address',false);
 
-        <label style="display:block;font-weight:600;">
-          Email <span style="color:#d92d20;">*</span>
-          <input id="regEmail" type="email" maxlength="254" placeholder="Enter email address" autocomplete="email"
-            style="display:block;width:100%;box-sizing:border-box;margin-top:6px;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
-          <span style="display:block;margin-top:5px;font-size:12px;color:#667085;">Email is required because phone authentication is disabled.</span>
-        </label>
-
-        <label style="display:block;font-weight:600;">
-          Password <span style="color:#d92d20;">*</span>
-          <input id="regPassword" type="password" minlength="6" maxlength="72" placeholder="Enter password" autocomplete="new-password"
-            style="display:block;width:100%;box-sizing:border-box;margin-top:6px;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
-          <span style="display:block;margin-top:5px;font-size:12px;color:#667085;">Minimum 6 characters.</span>
-        </label>
-
-        <label style="display:block;font-weight:600;">
-          Confirm Password <span style="color:#d92d20;">*</span>
-          <input id="regConfirmPassword" type="password" minlength="6" maxlength="72" placeholder="Re-enter password" autocomplete="new-password"
-            style="display:block;width:100%;box-sizing:border-box;margin-top:6px;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
-        </label>
-
-        <label style="display:block;font-weight:600;">
-          Address <span style="color:#667085;font-weight:400;">(optional)</span>
-          <textarea id="regAddress" rows="3" maxlength="500" placeholder="Enter address"
-            style="display:block;width:100%;box-sizing:border-box;margin-top:6px;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;resize:vertical;"></textarea>
-        </label>
-
-        <button id="registerBtn" type="button" class="primary-btn" style="width:100%;">Create Member Account</button>
-      </div>`;
+    ['regPassword','regConfirmPassword'].forEach(id=>{
+        const input=document.getElementById(id);
+        if(!input || input.dataset.eyeReady==='1')return;
+        input.dataset.eyeReady='1';
+        const parent=input.parentElement;
+        if(!parent)return;
+        parent.style.position='relative';
+        input.style.paddingRight='46px';
+        const eye=document.createElement('button');
+        eye.type='button';
+        eye.setAttribute('aria-label','Show password');
+        eye.textContent='👁';
+        eye.style.cssText='position:absolute;right:8px;bottom:7px;width:34px;height:34px;border:0;background:transparent;cursor:pointer;font-size:17px;';
+        eye.onclick=()=>{
+            const visible=input.type==='text';
+            input.type=visible?'password':'text';
+            eye.setAttribute('aria-label',visible?'Show password':'Hide password');
+            eye.textContent=visible?'👁':'🙈';
+        };
+        parent.appendChild(eye);
+    });
 }
 
+const authModal=document.getElementById('authModal');
 const showLogin=()=>{
+    ensurePublicRegisterForm();
     document.getElementById('authHeading').textContent='Member Login';
     document.getElementById('authLogin').classList.remove('hidden');
     document.getElementById('authRegister').classList.add('hidden');
     authModal.classList.remove('hidden');
 };
-
 const showReg=()=>{
+    ensurePublicRegisterForm();
     document.getElementById('authHeading').textContent='Create Member Account';
     document.getElementById('authLogin').classList.add('hidden');
-    buildPublicRegisterForm();
     document.getElementById('authRegister').classList.remove('hidden');
     authModal.classList.remove('hidden');
+    setTimeout(()=>document.getElementById('regName')?.focus(),50);
 };
-
+ensurePublicRegisterForm();
 document.getElementById('openLogin').onclick=showLogin;
 document.getElementById('openRegister').onclick=showReg;
 document.getElementById('authClose').onclick=()=>authModal.classList.add('hidden');
-    setPublicLoginButtonVisible(false);document.getElementById('switchRegister').onclick=showReg;document.getElementById('switchLogin').onclick=showLogin;document.addEventListener('click',e=>{if(e.target?.id==='registerBtn')register();});
+    setPublicLoginButtonVisible(false);document.getElementById('switchRegister').onclick=showReg;document.getElementById('switchLogin').onclick=showLogin;
 
 /* ===== PUBLIC TOP NAVIGATION FIX ===== */
 function setPublicLoginButtonVisible(visible){
@@ -225,7 +232,17 @@ async function login(){
     else openMemberDashboard(user);
     toast('Login successful');
 }
+let publicRegisterBusy=false;
+let publicRegisterLastAttempt=0;
 async function register(){
+    ensurePublicRegisterForm();
+    if(publicRegisterBusy)return;
+
+    const now=Date.now();
+    if(now-publicRegisterLastAttempt<5000){
+        return toast('Please wait a few seconds before trying again.');
+    }
+
     const name=document.getElementById('regName')?.value.trim()||'';
     const email=document.getElementById('regEmail')?.value.trim().toLowerCase()||'';
     const password=document.getElementById('regPassword')?.value||'';
@@ -234,76 +251,86 @@ async function register(){
     const house_no=document.getElementById('regHouse')?.value.trim()||'';
     const address=document.getElementById('regAddress')?.value.trim()||'';
 
-    if(!name||!house_no||!phone||!email||!password||!confirmPassword){
-        return toast('Please fill all required member details.');
-    }
-    if(!/^[+0-9][0-9 ()-]{6,19}$/.test(phone)){
-        return toast('Please enter a valid phone number.');
+    if(!name||!email||!password||!confirmPassword||!house_no||!phone){
+        return toast('Please fill all required member fields.');
     }
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
         return toast('Please enter a valid email address.');
     }
-    if(password.length<6)return toast('Password must be at least 6 characters');
+    if(!/^\+?[0-9 ()-]{7,20}$/.test(phone)){
+        return toast('Please enter a valid phone number.');
+    }
+    if(password.length<6)return toast('Password must be at least 6 characters.');
     if(password!==confirmPassword)return toast('Passwords do not match.');
-    if(!sb)return toast('Supabase is not configured yet');
+    if(!sb)return toast('Supabase is not configured yet.');
+
+    publicRegisterBusy=true;
+    publicRegisterLastAttempt=now;
+    const registerBtn=document.getElementById('registerBtn');
+    const originalText=registerBtn?.textContent||'Create Member Account';
+    if(registerBtn){registerBtn.disabled=true;registerBtn.textContent='Creating...';registerBtn.style.opacity='.7';}
 
     try{
+        /*
+         * One signup request is made per click. Supabase may send a
+         * confirmation email when "Confirm email" is enabled, and that
+         * email is subject to Supabase's email rate limit.
+         *
+         * The service-role admin API must NOT be called from browser JS.
+         * For a no-email-confirmation flow, disable "Confirm email" in
+         * Supabase Authentication settings, or use a dedicated server-side
+         * registration Edge Function with auth.admin.createUser().
+         */
         const {data,error}=await sb.auth.signUp({
             email,
             password,
-            options:{
-                data:{
-                    full_name:name,
-                    phone
-                }
-            }
+            options:{data:{full_name:name,phone}}
         });
 
-        if(error)return toast(error.message);
-        if(!data.user)return toast('Registration could not be completed');
+        if(error){
+            console.error('Public member registration error:',error);
+            const msg=String(error.message||'');
+            if(/rate limit|rate_limit|email.*limit/i.test(msg)){
+                throw new Error('Email rate limit exceeded. Please wait before creating another account. If you do not want confirmation emails, disable "Confirm email" in Supabase Authentication settings.');
+            }
+            throw new Error(msg||'Registration failed.');
+        }
+        if(!data.user)throw new Error('Registration could not be completed.');
 
         const profileResult=await sb.from('profiles').update({
             full_name:name,
             email:data.user.email||email,
-            phone,
+            phone:phone||null,
             house_number:house_no,
             address:address||null,
             role:'member',
-            is_active:true
+            is_active:true,
+            updated_at:new Date().toISOString()
         }).eq('id',data.user.id);
 
         if(profileResult.error){
             console.error('Profile update error:',profileResult.error);
-            return toast('Account created, but profile details could not be saved: '+profileResult.error.message);
+            throw new Error('Account was created, but member profile details could not be saved: '+profileResult.error.message);
         }
 
         authModal.classList.add('hidden');
-
         if(!data.session){
             showLogin();
             return toast('Registration successful. Please verify your email before login.');
         }
 
-        openMemberDashboard({
-            ...data.user,
-            name,
-            email,
-            phone,
-            house_no,
-            address,
-            role:'member'
-        });
+        openMemberDashboard({...data.user,name,email,phone,house_no,address,role:'member'});
         toast('Registration complete');
     }catch(error){
-        console.error('Registration failed:',error);
-        toast('Registration failed: '+(error?.message||error));
+        console.error('Create Member Account failed:',error);
+        toast(error?.message||'Unable to create member account.');
+    }finally{
+        publicRegisterBusy=false;
+        if(registerBtn){registerBtn.disabled=false;registerBtn.textContent=originalText;registerBtn.style.opacity='1';}
     }
 }
-
 document.getElementById('loginBtn').onclick=login;
-// registerBtn is created by buildPublicRegisterForm() when the public
-// registration dialog is opened.
-
+document.getElementById('registerBtn').onclick=register;
 function openAdminDashboard(user){
  document.getElementById('public').classList.add('hidden');
  const app=document.getElementById('memberApp'); app.className='app-shell';
