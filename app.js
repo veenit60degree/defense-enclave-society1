@@ -2736,9 +2736,119 @@ async function memberPage(p,user){
   if(!sb)return;
   try{
     if(p==='profile'){
-      const {data:profile}=await sb.from('profiles').select('*').eq('id',user.id).maybeSingle();
+      const {data:profile,error:profileError}=await sb.from('profiles').select('*').eq('id',user.id).maybeSingle();
+      if(profileError) throw profileError;
       const u=profile||user;
-      c.innerHTML=`<div class="hero"><div><h2>My Profile</h2><div class="muted">Your registered society information.</div></div></div><div class="panel"><div class="form-grid"><label>Name<input value="${u.full_name||u.name||''}" readonly></label><label>Email<input value="${u.email||''}" readonly></label><label>House / Flat<input value="${u.house_number||u.house_no||''}" readonly></label><label>Phone<input value="${u.phone||''}" readonly></label></div><label>Address<textarea readonly>${u.address||''}</textarea></label></div>`;
+      const esc=(v)=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+      c.innerHTML=`
+        <div class="hero">
+          <div>
+            <h2>My Profile</h2>
+            <div class="muted">Your registered society information.</div>
+          </div>
+          <button class="primary-btn" id="editMemberProfile">Edit</button>
+        </div>
+        <div class="panel">
+          <div class="form-grid">
+            <label>Name<input value="${esc(u.full_name||u.name||'')}" readonly></label>
+            <label>Email<input value="${esc(u.email||user.email||'')}" readonly></label>
+            <label>House / Flat<input value="${esc(u.house_number||u.house_no||'')}" readonly></label>
+            <label>Phone<input value="${esc(u.phone||user.phone||'')}" readonly></label>
+          </div>
+          <label>Address<textarea readonly>${esc(u.address||'')}</textarea></label>
+        </div>`;
+
+      document.getElementById('editMemberProfile').onclick=()=>{
+        const old=document.getElementById('memberProfileEditModal');
+        if(old) old.remove();
+        const overlay=document.createElement('div');
+        overlay.id='memberProfileEditModal';
+        overlay.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.58);display:flex;align-items:center;justify-content:center;padding:20px;z-index:10000;overflow:auto;';
+        overlay.innerHTML=`
+          <div role="dialog" aria-modal="true" style="width:min(720px,100%);max-height:calc(100vh - 40px);overflow-y:auto;background:#fff;border-radius:18px;padding:24px;box-shadow:0 24px 70px rgba(0,0,0,.25);">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px;">
+              <div><h2 style="margin:0 0 4px;font-size:24px;">Edit Profile</h2><div style="color:#64748b;font-size:13px;">Update your registered society information.</div></div>
+              <button type="button" id="memberProfileEditClose" style="border:0;background:transparent;font-size:26px;cursor:pointer;line-height:1;">&times;</button>
+            </div>
+            <form id="memberProfileEditForm" novalidate>
+              <div id="memberProfileEditError" style="display:none;margin-bottom:14px;padding:11px 12px;border-radius:9px;background:#fff1f1;color:#b42318;font-size:13px;"></div>
+              <div class="form-grid">
+                <label>Name<input id="profileEditName" value="${esc(u.full_name||u.name||'')}" required></label>
+                <label>Phone<input id="profileEditPhone" value="${esc(u.phone||user.phone||'')}" required></label>
+                <label>Email<input id="profileEditEmail" value="${esc(u.email||user.email||'')}" readonly disabled></label>
+                <label>House / Flat<input id="profileEditHouse" value="${esc(u.house_number||u.house_no||'')}" required></label>
+              </div>
+              <div style="margin-top:14px;">
+                <label>Password <span style="color:#64748b;font-size:12px;">(leave blank to keep current password)</span></label>
+                <div style="position:relative;">
+                  <input id="profileEditPassword" type="password" autocomplete="new-password" minlength="6" style="width:100%;padding-right:70px;">
+                  <button type="button" id="profileEditPasswordToggle" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);border:0;background:transparent;color:#475569;font-weight:600;cursor:pointer;">Show</button>
+                </div>
+              </div>
+              <div style="margin-top:14px;">
+                <label>Confirm Password</label>
+                <div style="position:relative;">
+                  <input id="profileEditConfirmPassword" type="password" autocomplete="new-password" minlength="6" style="width:100%;padding-right:70px;">
+                  <button type="button" id="profileEditConfirmToggle" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);border:0;background:transparent;color:#475569;font-weight:600;cursor:pointer;">Show</button>
+                </div>
+              </div>
+              <div style="margin-top:14px;">
+                <label>Address<textarea id="profileEditAddress" rows="4">${esc(u.address||'')}</textarea></label>
+              </div>
+              <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;">
+                <button type="button" id="memberProfileEditCancel" class="outline-btn">Cancel</button>
+                <button type="submit" id="memberProfileEditSave" class="primary-btn">Save Changes</button>
+              </div>
+            </form>
+          </div>`;
+        document.body.appendChild(overlay);
+        const close=()=>overlay.remove();
+        document.getElementById('memberProfileEditClose').onclick=close;
+        document.getElementById('memberProfileEditCancel').onclick=close;
+        overlay.addEventListener('click',e=>{if(e.target===overlay)close();});
+        const toggle=(inputId,buttonId)=>{
+          const input=document.getElementById(inputId),button=document.getElementById(buttonId);
+          button.onclick=()=>{const show=input.type==='password';input.type=show?'text':'password';button.textContent=show?'Hide':'Show';};
+        };
+        toggle('profileEditPassword','profileEditPasswordToggle');
+        toggle('profileEditConfirmPassword','profileEditConfirmToggle');
+        document.getElementById('memberProfileEditForm').onsubmit=async e=>{
+          e.preventDefault();
+          const ge=document.getElementById('memberProfileEditError');
+          ge.style.display='none';
+          const name=document.getElementById('profileEditName').value.trim();
+          const phone=document.getElementById('profileEditPhone').value.trim();
+          const house=document.getElementById('profileEditHouse').value.trim();
+          const address=document.getElementById('profileEditAddress').value.trim();
+          const password=document.getElementById('profileEditPassword').value;
+          const confirmPassword=document.getElementById('profileEditConfirmPassword').value;
+          if(!name||!house||!phone){ge.textContent='Name, House / Flat and Phone are required.';ge.style.display='block';return;}
+          if(phone && !/^[+0-9][0-9 ()-]{6,19}$/.test(phone)){ge.textContent='Please enter a valid phone number.';ge.style.display='block';return;}
+          if(password && password.length<6){ge.textContent='Password must be at least 6 characters.';ge.style.display='block';return;}
+          if(password!==confirmPassword){ge.textContent='Passwords do not match.';ge.style.display='block';return;}
+          const saveBtn=document.getElementById('memberProfileEditSave');
+          saveBtn.disabled=true; saveBtn.textContent='Saving...';
+          try{
+            const profileUpdate={full_name:name,phone,house_number:house,address:address||null,updated_at:new Date().toISOString()};
+            const {error:profileUpdateError}=await sb.from('profiles').update(profileUpdate).eq('id',user.id);
+            if(profileUpdateError) throw profileUpdateError;
+            if(password){
+              const {error:passwordError}=await sb.auth.updateUser({password});
+              if(passwordError) throw passwordError;
+            }
+            Object.assign(user,{name,phone,house_no:house,address});
+            close();
+            await memberPage('profile',user);
+            toast('Profile updated successfully');
+          }catch(err){
+            console.error('Member profile update failed:',err);
+            ge.textContent=err?.message||'Unable to update profile.';
+            ge.style.display='block';
+          }finally{
+            saveBtn.disabled=false; saveBtn.textContent='Save Changes';
+          }
+        };
+      };
     }else if(p==='dash'){
       const [{data:finance},{data:work},{data:complaints}]=await Promise.all([
         sb.from('society_finance').select('*').eq('id',1).maybeSingle(),
