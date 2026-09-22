@@ -22,61 +22,65 @@ const demo={members:[['RS','Raj Sharma','A-101'],['PK','Priya Kapoor','A-102'],[
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)}
 async function renderPublic(){
     /*
-     * PUBLIC/LOGOUT PAGE
-     * ------------------
-     * Do not use society_finance here. Finance is available only after login.
-     * All public sections below are loaded from Supabase.
+     * PUBLIC / LOGGED-OUT PAGE
+     * IMPORTANT: Reuse the sections that already exist in the HTML.
+     * Do NOT create new Society Members / Events / Maintenance / Map / About
+     * sections here. We only replace the dynamic data inside those sections.
+     * Society Finance is intentionally NOT loaded on the public page.
      */
-    const publicRoot=document.getElementById('public');
-    if(!publicRoot || !sb){
-        if(!sb) console.error('Public render: Supabase client is not available.');
+    if(!sb){
+        console.error('Public render: Supabase client is not available.');
         return;
     }
 
-    // Create public sections when the HTML page does not already provide them.
-    // This makes the public page work even when older HTML is being used.
-    function ensureSection(id,title){
-        let el=document.getElementById(id);
-        if(el)return el;
-        el=document.createElement('section');
-        el.id=id;
-        el.className='content-section';
-        el.style.cssText='padding:48px 20px;max-width:1180px;margin:0 auto;scroll-margin-top:80px;';
-        el.innerHTML=`<div class="hero"><div><div class="eyebrow">DEFENSE ENCLAVE SOCIETY</div><h2>${title}</h2></div></div><div id="${id}Content"></div>`;
-        publicRoot.appendChild(el);
-        return el;
-    }
+    // Find an existing section by its normal page id. We never append a new
+    // section, which prevents duplicate layouts.
+    const findSection=(...ids)=>{
+        for(const id of ids){
+            const el=document.getElementById(id);
+            if(el)return el;
+        }
+        return null;
+    };
 
-    const membersSection=ensureSection('publicMembers','Society Members');
-    const eventsSection=ensureSection('publicEvents','Events');
-    const maintenanceSection=ensureSection('publicMaintenance','Maintenance');
-    const mapSection=ensureSection('publicMap','Society Map');
-    const aboutSection=ensureSection('publicAbout','About Us');
+    const membersSection=findSection('members','societyMembers','publicMembers');
+    const eventsSection=findSection('events','societyEvents','publicEvents');
+    const maintenanceSection=findSection('maintenance','societyMaintenance','publicMaintenance');
+    const mapSection=findSection('map','societyMap','publicMap');
+    const aboutSection=findSection('about','aboutUs','societyAbout','publicAbout');
 
-    // Reuse existing containers if the page already has them.
-    let memberGrid=document.getElementById('memberGrid');
-    if(!memberGrid){
-        memberGrid=document.createElement('div');
-        memberGrid.id='memberGrid';
-        memberGrid.className='card-grid';
-        (membersSection.querySelector('#publicMembersContent')||membersSection).appendChild(memberGrid);
-    }
+    // Use the existing data containers. If the existing section has no named
+    // container, use its existing grid/table/content element. We do not create
+    // another section or another heading.
+    const existingContent=(section, selectors)=>{
+        if(!section)return null;
+        for(const selector of selectors){
+            const el=section.querySelector(selector);
+            if(el)return el;
+        }
+        return null;
+    };
 
-    let eventGrid=document.getElementById('eventGrid');
-    if(!eventGrid){
-        eventGrid=document.createElement('div');
-        eventGrid.id='eventGrid';
-        eventGrid.className='event-grid';
-        (eventsSection.querySelector('#publicEventsContent')||eventsSection).appendChild(eventGrid);
-    }
+    const memberGrid=document.getElementById('memberGrid') || existingContent(membersSection,[
+        '.member-grid','.card-grid','[data-members]'
+    ]);
 
-    const maintenanceContent=document.getElementById('publicMaintenanceContent');
-    const mapContent=document.getElementById('publicMapContent');
-    const aboutContent=document.getElementById('publicAboutContent');
+    const eventGrid=document.getElementById('eventGrid') || existingContent(eventsSection,[
+        '.event-grid','.card-grid','[data-events]'
+    ]);
 
-    // Load all public data independently so one RLS/query error does not
-    // prevent the other sections from rendering.
-    const [membersResult,eventsResult,maintenanceResult,aboutResult]=await Promise.all([
+    const maintenanceTable=document.getElementById('maintenanceTable') || existingContent(maintenanceSection,[
+        'tbody','.table-wrap','table','[data-maintenance]','.card-grid'
+    ]);
+
+    const mapFrame=mapSection?.querySelector('iframe');
+    const aboutContent=document.getElementById('aboutContent') || existingContent(aboutSection,[
+        '[data-about]','.about-content','.about-text','.panel p','.card-body p','p'
+    ]);
+
+    // Public data is intentionally loaded separately. One RLS/query failure
+    // must not stop the remaining sections from updating.
+    const [membersResult,eventsResult,maintenanceResult,aboutResult,worksResult,galleryResult]=await Promise.all([
         sb.from('profiles')
           .select('id,full_name,phone,house_number,address,role,is_active')
           .eq('role','member')
@@ -89,116 +93,151 @@ async function renderPublic(){
           .select('*')
           .order('created_at',{ascending:false}),
         sb.from('society_about')
-          .select('id,description,updated_at')
+          .select('*')
           .eq('id',1)
-          .maybeSingle()
+          .maybeSingle(),
+        sb.from('society_work')
+          .select('*')
+          .order('created_at',{ascending:false}),
+        sb.from('gallery_photos')
+          .select('*')
+          .order('created_at',{ascending:false})
     ]);
 
-    // MEMBERS
-    if(membersResult.error){
-        console.error('Public members load error:',membersResult.error);
-        memberGrid.innerHTML='<div class="muted">Unable to load society members. Please check the public SELECT policy for profiles.</div>';
+    console.log('PUBLIC MEMBERS:',membersResult.data,'ERROR:',membersResult.error);
+    console.log('PUBLIC EVENTS:',eventsResult.data,'ERROR:',eventsResult.error);
+    console.log('PUBLIC MAINTENANCE:',maintenanceResult.data,'ERROR:',maintenanceResult.error);
+    console.log('PUBLIC ABOUT:',aboutResult.data,'ERROR:',aboutResult.error);
+
+    // -------------------- Society Members --------------------
+    if(memberGrid){
+        if(membersResult.error){
+            console.error('Public members load error:',membersResult.error);
+            memberGrid.innerHTML='<div class="muted">Unable to load members. Please check the public SELECT policy for profiles.</div>';
+        }else{
+            const rows=membersResult.data||[];
+            memberGrid.innerHTML=rows.map(p=>{
+                const initials=(p.full_name||'M').split(/\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase();
+                const address=[p.house_number,p.address].filter(Boolean).join(', ');
+                return `<div class="member-card">
+                    <div class="member-photo">${escapePublic(initials)}</div>
+                    <div>
+                        <strong>${escapePublic(p.full_name||'Member')}</strong>
+                        <div class="muted">${escapePublic(address||'Address not available')}</div>
+                        <div class="muted" style="margin-top:4px">${escapePublic(p.phone||'Phone not available')}</div>
+                        <span class="status ongoing" style="margin-top:6px">Active Member</span>
+                    </div>
+                </div>`;
+            }).join('') || '<div class="muted">No active members available.</div>';
+        }
     }else{
-        const rows=membersResult.data||[];
-        memberGrid.innerHTML=rows.map(p=>{
-            const initials=(p.full_name||'M').split(/\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase();
-            const address=[p.house_number,p.address].filter(Boolean).join(', ');
-            return `<div class="member-card">
-                <div class="member-photo">${initials}</div>
-                <div>
-                    <strong>${escapePublic(p.full_name||'Member')}</strong>
-                    <div class="muted">${escapePublic(address||'Address not available')}</div>
-                    <div class="muted" style="margin-top:4px">${escapePublic(p.phone||'Phone not available')}</div>
-                    <span class="status ongoing" style="margin-top:6px">Active Member</span>
+        console.warn('Existing Society Members data container was not found. No new layout was created.');
+    }
+
+    // -------------------- Events --------------------
+    if(eventGrid){
+        if(eventsResult.error){
+            console.error('Public events load error:',eventsResult.error);
+            eventGrid.innerHTML='<div class="muted">Unable to load events. Please check the public SELECT policy for events.</div>';
+        }else{
+            const rows=eventsResult.data||[];
+            eventGrid.innerHTML=rows.map(e=>`<div class="card">
+                <div class="photo">📅</div>
+                <div class="card-body">
+                    <div class="event-date">${escapePublic(e.event_date||e.date||'')}</div>
+                    <h3>${escapePublic(e.title||e.name||'Event')}</h3>
+                    <div class="muted">${escapePublic(e.location||e.place||e.description||'')}</div>
                 </div>
-            </div>`;
-        }).join('') || '<div class="muted">No active members available.</div>';
-    }
-
-    // EVENTS
-    if(eventsResult.error){
-        console.error('Public events load error:',eventsResult.error);
-        eventGrid.innerHTML='<div class="muted">Unable to load events. Please check the public SELECT policy for events.</div>';
+            </div>`).join('') || '<div class="muted">No events available.</div>';
+        }
     }else{
-        const rows=eventsResult.data||[];
-        eventGrid.innerHTML=rows.map(e=>`<div class="card">
-            <div class="photo">📅</div>
-            <div class="card-body">
-                <div class="event-date">${escapePublic(e.event_date||e.date||'')}</div>
-                <h3>${escapePublic(e.title||e.name||'Event')}</h3>
-                <div class="muted">${escapePublic(e.location||e.place||e.description||'')}</div>
-            </div>
-        </div>`).join('') || '<div class="muted">No events available.</div>';
+        console.warn('Existing Events data container was not found. No new layout was created.');
     }
 
-    // MAINTENANCE
-    if(maintenanceContent){
+    // -------------------- Maintenance --------------------
+    if(maintenanceSection){
         if(maintenanceResult.error){
             console.error('Public maintenance load error:',maintenanceResult.error);
-            maintenanceContent.innerHTML='<div class="panel"><div class="muted">Unable to load maintenance records. Please check the public SELECT policy for maintenance.</div></div>';
-        }else{
+        }else if(maintenanceTable){
             const rows=maintenanceResult.data||[];
-            maintenanceContent.innerHTML=`<div class="panel"><div class="table-wrap"><table class="table">
-                <thead><tr><th>Maintenance</th><th>Amount</th><th>Status</th></tr></thead>
-                <tbody>${rows.map(x=>`<tr>
-                    <td><strong>${escapePublic(x.item||x.title||x.name||x.description||'Maintenance')}</strong></td>
-                    <td>₹${Number(x.amount||0).toLocaleString('en-IN')}</td>
-                    <td><span class="status ${(String(x.status||'').toLowerCase())}">${escapePublic(x.status||'')}</span></td>
-                </tr>`).join('') || '<tr><td colspan="3" class="muted">No maintenance records available.</td></tr>'}</tbody>
-            </table></div></div>`;
+            const html=rows.map(x=>`<tr>
+                <td><strong>${escapePublic(x.item||x.title||x.name||x.description||'Maintenance')}</strong></td>
+                <td>₹${Number(x.amount||0).toLocaleString('en-IN')}</td>
+                <td><span class="status ${(String(x.status||'').toLowerCase())}">${escapePublic(x.status||'')}</span></td>
+            </tr>`).join('') || '<tr><td colspan="3" class="muted">No maintenance records available.</td></tr>';
+
+            if(maintenanceTable.tagName==='TBODY'){
+                maintenanceTable.innerHTML=html;
+            }else if(maintenanceTable.tagName==='TABLE'){
+                const tbody=maintenanceTable.querySelector('tbody');
+                if(tbody)tbody.innerHTML=html;
+            }else if(maintenanceTable.classList.contains('table-wrap')){
+                const tbody=maintenanceTable.querySelector('tbody');
+                if(tbody)tbody.innerHTML=html;
+            }else{
+                // Existing maintenance content area: update only its data,
+                // without adding another section or duplicate heading.
+                maintenanceTable.innerHTML=`<table class="table"><thead><tr><th>Maintenance</th><th>Amount</th><th>Status</th></tr></thead><tbody>${html}</tbody></table>`;
+            }
+        }else{
+            console.warn('Existing Maintenance data container was not found. No new layout was created.');
         }
     }
 
-    // GOOGLE MAP - always render on public/logout page.
-    if(mapContent){
-        mapContent.innerHTML=`<div class="panel">
-            <div style="border-radius:14px;overflow:hidden;border:1px solid rgba(0,0,0,.12)">
-                <iframe title="Defense Enclave Society Map"
-                    src="https://www.google.com/maps?q=30.777604,76.616637&z=17&output=embed"
-                    width="100%" height="520" style="border:0;display:block"
-                    loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
-            </div>
-            <div style="margin-top:12px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
-                <div class="muted">Defense Enclave Society · 30.777604, 76.616637</div>
-                <a class="outline-btn" href="https://maps.app.goo.gl/A9TuNFyh9xzpTynU8" target="_blank" rel="noopener noreferrer">Open in Google Maps</a>
-            </div>
-        </div>`;
+    // -------------------- Society Map --------------------
+    // Reuse the existing map iframe/container. Never create another map block.
+    if(mapSection){
+        if(mapFrame){
+            mapFrame.src='https://www.google.com/maps?q=30.777604,76.616637&z=17&output=embed';
+            mapFrame.title='Defense Enclave Society Map';
+        }else{
+            const existingMapLink=mapSection.querySelector('a[href*="maps.app.goo.gl"],a[href*="google.com/maps"]');
+            if(existingMapLink)existingMapLink.href='https://maps.app.goo.gl/A9TuNFyh9xzpTynU8';
+            console.warn('Existing Society Map iframe was not found; no new map layout was created.');
+        }
     }
 
-    // ABOUT US
+    // -------------------- About Us --------------------
+    // Update the existing About Us text only. Do not add another heading,
+    // address block, or a second About Us section.
     if(aboutContent){
         if(aboutResult.error){
             console.error('Public About load error:',aboutResult.error);
-            aboutContent.innerHTML='<div class="panel"><div class="muted">Unable to load About Us information. Please check the public SELECT policy for society_about.</div></div>';
         }else{
-            const description=aboutResult.data?.description||'';
-            aboutContent.innerHTML=`<div class="panel"><h3>About Defense Enclave Society</h3>
-                <div style="white-space:pre-wrap;line-height:1.7">${escapePublic(description)||'<span class="muted">About Us information is not available yet.</span>'}</div>
-            </div>`;
+            const row=aboutResult.data||{};
+            const description=row.description||row.about||row.content||row.text||'';
+            if(aboutContent.tagName==='P' || aboutContent.tagName==='DIV' || aboutContent.tagName==='SPAN'){
+                aboutContent.textContent=description || aboutContent.textContent || '';
+            }else{
+                aboutContent.textContent=description || '';
+            }
+        }
+    }else if(aboutSection){
+        console.warn('Existing About Us data container was not found. No new About Us layout was created.');
+    }
+
+    // -------------------- Existing Society Work --------------------
+    const workTable=document.getElementById('workTable');
+    if(workTable){
+        if(worksResult.error){
+            console.error('Public work load error:',worksResult.error);
+        }else{
+            const rows=worksResult.data||[];
+            workTable.innerHTML=`<thead><tr><th>Project</th><th>Description</th><th>Status</th><th>Progress</th><th>Target</th></tr></thead><tbody>${rows.map(w=>{
+                const name=w.name||w.title||w.work_name||w.project_name||w.work_title||w.project||w.work||w.activity||w.task||w.subject||'';
+                return `<tr><td><strong>${escapePublic(name)}</strong></td><td>${escapePublic(w.description||w.details||'')}</td><td><span class="status ${(w.status||'').toLowerCase()}">${escapePublic(w.status||'')}</span></td><td><div class="progress"><i style="width:${Number(w.progress||0)}%"></i></div>${Number(w.progress||0)}%</td><td>${escapePublic(w.target_date||w.target||w.due_date||'')}</td></tr>`;
+            }).join('')}</tbody>`;
         }
     }
 
-    // Keep existing dynamic Society Work and Gallery containers working.
-    const [works,gallery]=await Promise.all([
-        sb.from('society_work').select('*').order('created_at',{ascending:false}),
-        sb.from('gallery_photos').select('*').order('created_at',{ascending:false})
-    ]);
-
-    if(works.error)console.error('Public work load error:',works.error);
-    if(gallery.error)console.error('Public gallery load error:',gallery.error);
-
-    const workTable=document.getElementById('workTable');
-    if(workTable){
-        const rows=works.data||[];
-        workTable.innerHTML=`<thead><tr><th>Project</th><th>Description</th><th>Status</th><th>Progress</th><th>Target</th></tr></thead><tbody>${rows.map(w=>{
-            const name=w.name||w.title||w.work_name||w.project_name||w.work_title||w.project||w.work||w.activity||w.task||w.subject||'';
-            return `<tr><td><strong>${escapePublic(name)}</strong></td><td>${escapePublic(w.description||w.details||'')}</td><td><span class="status ${(w.status||'').toLowerCase()}">${escapePublic(w.status||'')}</span></td><td><div class="progress"><i style="width:${Number(w.progress||0)}%"></i></div>${Number(w.progress||0)}%</td><td>${escapePublic(w.target_date||w.target||w.due_date||'')}</td></tr>`;
-        }).join('')}</tbody>`;
-    }
-
+    // -------------------- Existing Gallery --------------------
     const galleryGrid=document.getElementById('galleryGrid');
     if(galleryGrid){
-        galleryGrid.innerHTML=(gallery.data||[]).map((g,i)=>`<div class="card"><div class="photo">${g.public_url?`<img src="${escapePublic(g.public_url)}" alt="${escapePublic(g.file_name||'Gallery photo')}" style="width:100%;height:100%;object-fit:cover">`:['◉','★','♧','✦','✓','◎'][i%6]}</div><div class="card-body"><strong>${escapePublic(g.file_name||'Gallery Photo')}</strong></div></div>`).join('') || '<div class="muted">No gallery photos available.</div>';
+        if(galleryResult.error){
+            console.error('Public gallery load error:',galleryResult.error);
+        }else{
+            galleryGrid.innerHTML=(galleryResult.data||[]).map((g,i)=>`<div class="card"><div class="photo">${g.public_url?`<img src="${escapePublic(g.public_url)}" alt="${escapePublic(g.file_name||'Gallery photo')}" style="width:100%;height:100%;object-fit:cover">`:['◉','★','♧','✦','✓','◎'][i%6]}</div><div class="card-body"><strong>${escapePublic(g.file_name||'Gallery Photo')}</strong></div></div>`).join('') || '<div class="muted">No gallery photos available.</div>';
+        }
     }
 }
 
