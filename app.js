@@ -20,152 +20,208 @@ if (
 
 const demo={members:[['RS','Raj Sharma','A-101'],['PK','Priya Kapoor','A-102'],['MG','Manoj Gupta','A-103'],['AJ','Alex Johnson','A-104'],['SK','Sonia Kaur','B-201'],['VS','Vikas Singh','B-202'],['AM','Anita Mehta','B-203'],['NK','Nitin Kumar','C-301'],['PS','Pooja Sethi','C-302']],works:[['Main Gate Repair','Repair and repaint main entrance gate','Ongoing',72,'12 Sep 2026'],['Street Light Upgrade','Replace 18 old lights with LED fixtures','Ongoing',45,'18 Sep 2026'],['Park Renovation','Benches, pathway and plantation work','Pending',0,'25 Sep 2026'],['Water Tank Cleaning','Annual cleaning and inspection','Completed',100,'05 Sep 2026']],events:[['20 Sep 2026','Monthly General Meeting','Community Hall · 6:00 PM','◷'],['02 Oct 2026','Cleanliness Drive','Main Park · 7:00 AM','♧'],['18 Oct 2026','Family Sports Day','Society Ground · 4:00 PM','★']],gallery:['Society Meeting','Park Activity','Festival Evening','Cleanliness Drive','Community Gathering']};
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)}
+function publicSectionByHeading(labels){
+    const wanted=(labels||[]).map(x=>String(x).trim().toLowerCase());
+    const nodes=[...document.querySelectorAll('section,article,.section,.panel,main > div,body > div')];
+    return nodes.find(node=>{
+        const h=node.querySelector('h1,h2,h3,h4,.section-title,.eyebrow');
+        const text=(h?.textContent||'').trim().toLowerCase();
+        return wanted.some(x=>text===x || text.includes(x));
+    })||null;
+}
+
+function publicContentContainer(labels, preferredSelectors=[]){
+    const section=publicSectionByHeading(labels);
+    if(!section)return null;
+    for(const selector of preferredSelectors){
+        const el=section.querySelector(selector);
+        if(el)return el;
+    }
+    // Reuse the existing section and only create a content holder inside it.
+    // This does NOT create another section/layout.
+    let holder=section.querySelector('[data-public-dynamic-content]');
+    if(!holder){
+        holder=document.createElement('div');
+        holder.setAttribute('data-public-dynamic-content','1');
+        section.appendChild(holder);
+    }
+    return holder;
+}
+
+function escapePublic(v){
+    return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 async function renderPublic(){
-    const empty={society_fund:0,total_expenses:0,active_maintenance:0,pending_tasks:0};
-    let finance={...empty};
-    if(sb){
-      try{
-        const {data,error}=await sb.from('society_finance').select('society_fund,total_expenses,active_maintenance,pending_tasks').eq('id',1).maybeSingle();
-        if(error) console.error('Public finance load error:',error); else if(data) finance=data;
-      }catch(e){console.error('Public finance load exception:',e);}
+    if(!sb){
+        console.warn('Public render: Supabase client is not available.');
+        return;
     }
-    const stats=document.getElementById('publicStats');
-    if(stats) stats.innerHTML=[
-      ['Society Fund',`₹${Number(finance.society_fund||0).toLocaleString('en-IN')}`,'Current balance'],
-      ['Total Expenses',`₹${Number(finance.total_expenses||0).toLocaleString('en-IN')}`,'This year'],
-      ['Active Maintenance',`₹${Number(finance.active_maintenance||0).toLocaleString('en-IN')}`,'Active maintenance'],
-      ['Pending Tasks',String(Number(finance.pending_tasks||0)),'Needs attention']
-    ].map(x=>`<div class="stat"><div class="stat-head">${x[0]}<span>●</span></div><div class="value">${x[1]}</div><div class="trend">${x[2]}</div></div>`).join('');
 
-    if(!sb) return;
-    const [members,works,events,gallery]=await Promise.all([
-      sb.from('profiles').select('id,full_name,phone,house_number,role,is_active').eq('role','member').eq('is_active',true),
-      sb.from('society_work').select('*').order('created_at',{ascending:false}),
-      sb.from('events').select('*').order('event_date',{ascending:false}),
-      sb.from('gallery_photos').select('*').order('created_at',{ascending:false})
+    const [members,works,events,gallery,maintenance,about]=await Promise.all([
+        sb.from('profiles').select('id,full_name,phone,house_number,address,role,is_active').eq('role','member').eq('is_active',true),
+        sb.from('society_work').select('*').order('created_at',{ascending:false}),
+        sb.from('events').select('*').order('event_date',{ascending:false}),
+        sb.from('gallery_photos').select('*').order('created_at',{ascending:false}),
+        sb.from('maintenance').select('*').order('created_at',{ascending:false}),
+        sb.from('society_about').select('*').eq('id',1).maybeSingle()
     ]);
-    if(members.error) console.error('Public members load error:',members.error);
-    if(works.error) console.error('Public work load error:',works.error);
-    if(events.error) console.error('Public events load error:',events.error);
-    if(gallery.error) console.error('Public gallery load error:',gallery.error);
 
-    const memberGrid=document.getElementById('memberGrid');
-    if(memberGrid) memberGrid.innerHTML=(members.data||[]).map(p=>{
-      const initials=(p.full_name||'M').split(/\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase();
-      return `<div class="member-card"><div class="member-photo">${initials}</div><div><strong>${p.full_name||'Member'}</strong><div class="muted">House ${p.house_number||''}</div><span class="status ongoing" style="margin-top:6px">Active Member</span></div></div>`;
-    }).join('') || '<div class="muted">No members available.</div>';
+    console.log('[PUBLIC] members:',members.data,'error:',members.error);
+    console.log('[PUBLIC] events:',events.data,'error:',events.error);
+    console.log('[PUBLIC] gallery:',gallery.data,'error:',gallery.error);
+    console.log('[PUBLIC] maintenance:',maintenance.data,'error:',maintenance.error);
+    console.log('[PUBLIC] about:',about.data,'error:',about.error);
 
-    const workTable=document.getElementById('workTable');
-    if(workTable){
-      const rows=works.data||[];
-      workTable.innerHTML=`<thead><tr><th>Project</th><th>Description</th><th>Status</th><th>Progress</th><th>Target</th></tr></thead><tbody>${rows.map(w=>{
-        const name=w.name||w.title||w.work_name||w.project_name||w.work_title||w.project||w.work||w.activity||w.task||w.subject||'';
-        return `<tr><td><strong>${name}</strong></td><td>${w.description||w.details||''}</td><td><span class="status ${(w.status||'').toLowerCase()}">${w.status||''}</span></td><td><div class="progress"><i style="width:${Number(w.progress||0)}%"></i></div>${Number(w.progress||0)}%</td><td>${w.target_date||w.target||w.due_date||''}</td></tr>`;
-      }).join('')}</tbody>`;
+    // Always reuse the already-rendered public sections. No new sections are created.
+    const memberGrid=document.getElementById('memberGrid') ||
+        publicContentContainer(['Society Members'],['.member-grid','.members-grid','.cards-grid','.grid-3']);
+    if(memberGrid){
+        if(members.error){
+            memberGrid.innerHTML='<div class="muted">Unable to load members.</div>';
+        }else{
+            memberGrid.innerHTML=(members.data||[]).map(p=>{
+                const initials=(p.full_name||'M').split(/\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase();
+                const address=[p.house_number,p.address].filter(Boolean).join(', ');
+                return `<div class="member-card"><div class="member-photo">${escapePublic(initials)}</div><div><strong>${escapePublic(p.full_name||'Member')}</strong><div class="muted">${escapePublic(p.phone||'Phone not available')}</div><div class="muted">${escapePublic(address||'Address not available')}</div></div></div>`;
+            }).join('') || '<div class="muted">No registered members found.</div>';
+        }
     }
 
-    const eventGrid=document.getElementById('eventGrid');
-    if(eventGrid) eventGrid.innerHTML=(events.data||[]).map(e=>`<div class="card"><div class="photo">📅</div><div class="card-body"><div class="event-date">${e.event_date||e.date||''}</div><h3>${e.title||e.name||''}</h3><div class="muted">${e.location||e.place||e.description||''}</div></div></div>`).join('') || '<div class="muted">No events available.</div>';
+    const workTable=document.getElementById('workTable') ||
+        publicContentContainer(['Society Work'],['.work-table','.table-wrap table']);
+    if(workTable && !works.error && works.data){
+        const rows=works.data;
+        if(workTable.tagName==='TABLE'){
+            workTable.innerHTML=`<thead><tr><th>Project</th><th>Description</th><th>Status</th><th>Progress</th><th>Target</th></tr></thead><tbody>${rows.map(w=>{
+                const name=w.name||w.title||w.work_name||w.project_name||w.work_title||w.project||w.work||w.activity||w.task||w.subject||'';
+                return `<tr><td><strong>${escapePublic(name)}</strong></td><td>${escapePublic(w.description||w.details||'')}</td><td>${escapePublic(w.status||'')}</td><td>${Number(w.progress||0)}%</td><td>${escapePublic(w.target_date||w.target||w.due_date||'')}</td></tr>`;
+            }).join('')}</tbody>`;
+        }
+    }
 
-    const galleryGrid=document.getElementById('galleryGrid');
-    if(galleryGrid) galleryGrid.innerHTML=(gallery.data||[]).map((g,i)=>`<div class="card"><div class="photo">${g.public_url?`<img src="${g.public_url}" alt="${g.file_name||'Gallery photo'}" style="width:100%;height:100%;object-fit:cover">`:['◉','★','♧','✦','✓','◎'][i%6]}</div><div class="card-body"><strong>${g.file_name||'Gallery Photo'}</strong></div></div>`).join('') || '<div class="muted">No gallery photos available.</div>';
+    const eventGrid=document.getElementById('eventGrid') ||
+        publicContentContainer(['Events'],['.event-grid','.events-grid','.cards-grid']);
+    if(eventGrid){
+        if(events.error){
+            eventGrid.innerHTML='<div class="muted">Unable to load events.</div>';
+        }else{
+            eventGrid.innerHTML=(events.data||[]).map(e=>`<div class="card"><div class="photo">📅</div><div class="card-body"><div class="event-date">${escapePublic(e.event_date||e.date||'')}</div><h3>${escapePublic(e.title||e.name||'')}</h3><div class="muted">${escapePublic(e.location||e.place||e.description||'')}</div></div></div>`).join('') || '<div class="muted">No events available.</div>';
+        }
+    }
+
+    const maintenanceGrid=document.getElementById('maintenanceGrid') ||
+        publicContentContainer(['Maintenance'],['.maintenance-grid','.maintenance-list','.cards-grid','.table-wrap']);
+    if(maintenanceGrid){
+        maintenanceGrid.innerHTML=maintenance.error
+            ? '<div class="muted">Unable to load maintenance information.</div>'
+            : (maintenance.data||[]).map(x=>`<div class="card"><div class="card-body"><h3>${escapePublic(x.item||x.title||x.name||'Maintenance')}</h3><div class="muted">${escapePublic(x.description||'')}</div><div><strong>₹${Number(x.amount||0).toLocaleString('en-IN')}</strong></div><span class="status">${escapePublic(x.status||'')}</span></div></div>`).join('') || '<div class="muted">No maintenance records available.</div>';
+    }
+
+    // About Us: reuse the EXISTING About Us content/card.
+    // Do not append another dynamic block below the existing layout.
+    const aboutSection=publicSectionByHeading(['About Us']);
+    if(aboutSection){
+        // Remove any dynamic holder that an older version may have appended.
+        aboutSection.querySelectorAll('[data-public-dynamic-content]').forEach(el=>el.remove());
+
+        // Prefer the existing About content/card instead of creating a new one.
+        let aboutContainer=document.getElementById('aboutContent') ||
+            aboutSection.querySelector('.about-content,.about-card,.about-box,.panel,.card');
+
+        // If the page does not use a known class, use the first direct DIV after
+        // the heading as the existing content container.
+        if(!aboutContainer){
+            const heading=aboutSection.querySelector('h1,h2,h3,h4,.section-title,.eyebrow');
+            aboutContainer=[...aboutSection.children].find(el=>
+                el!==heading && el.tagName==='DIV'
+            ) || null;
+        }
+
+        if(aboutContainer){
+            const description=about.data?.description||about.data?.about||about.data?.content||'';
+            aboutContainer.innerHTML=about.error
+                ? '<div class="muted">Unable to load About Us information.</div>'
+                : description
+                    ? `<div class="about-description">${escapePublic(description).replace(/\n/g,'<br>')}</div>`
+                    : '<div class="muted">About information is not available.</div>';
+        }
+    }
+
+    // Reuse the existing .map div and put the map inside it.
+    const mapDiv=document.getElementById('map') || document.querySelector('.map[data-map], .map');
+    if(mapDiv){
+        mapDiv.innerHTML=`<h3 style="margin:0 0 12px 0">Society Map</h3><iframe title="Defense Enclave Society location" src="https://www.google.com/maps?q=30.777604,76.616637&z=17&output=embed" width="100%" height="420" style="border:0;border-radius:14px;display:block" loading="lazy" allowfullscreen referrerpolicy="no-referrer-when-downgrade"></iframe>`;
+    }
+
+    // Existing Photo Gallery: albums -> thumbnails -> full-screen photo viewer.
+    const gallerySection=publicSectionByHeading(['Photo Gallery','Gallery']);
+    if(gallerySection){
+        const galleryHeading=gallerySection.querySelector('h1,h2,h3,h4,.section-title,.eyebrow');
+        if(galleryHeading && !galleryHeading.querySelector('[data-public-gallery-link]')){
+            const link=document.createElement('a');
+            link.href='#';
+            link.textContent=' (View all photos)';
+            link.setAttribute('data-public-gallery-link','1');
+            link.style.cssText='font-size:.82em;font-weight:500;text-decoration:none;cursor:pointer;margin-left:4px;';
+            link.addEventListener('click',e=>{
+                e.preventDefault();
+                const albums=window.__publicGalleryAlbums||{};
+                const first=Object.keys(albums)[0];
+                if(first) window.__publicGalleryOpenAlbum(first);
+                else toast('No photos available.');
+            });
+            galleryHeading.appendChild(link);
+        }
+    }
+    const galleryGrid=document.getElementById('galleryGrid') ||
+        publicContentContainer(['Photo Gallery','Gallery'],['.gallery-grid','.photos-grid','.cards-grid']);
+    if(galleryGrid){
+        if(gallery.error){
+            galleryGrid.innerHTML='<div class="muted">Unable to load photo gallery.</div>';
+        }else{
+            const rows=(gallery.data||[]).filter(x=>x.file_name!=='.folder');
+            const grouped={};
+            rows.forEach(x=>{
+                const path=String(x.storage_path||'').replace(/^\/+/, '');
+                const parts=path.split('/');
+                const album=parts.length>1 ? parts[0] : 'General';
+                (grouped[album] ||= []).push(x);
+            });
+            const albums=Object.keys(grouped).sort((a,b)=>a.localeCompare(b));
+            window.__publicGalleryAlbums=grouped;
+            window.__publicGalleryOpenAlbum=function(album){
+                const photos=window.__publicGalleryAlbums?.[album]||[];
+                const overlay=document.createElement('div');
+                overlay.id='publicGalleryAlbumOverlay';
+                overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:99999;overflow:auto;padding:30px;';
+                overlay.innerHTML=`<div style="max-width:1100px;margin:auto;background:#fff;border-radius:16px;padding:20px"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><h2 style="margin:0">${escapePublic(album)}</h2><button id="publicGalleryAlbumClose" class="outline-btn">Close</button></div><div class="gallery-grid" style="margin-top:18px;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px">${photos.map((x,i)=>`<button type="button" class="public-gallery-thumb" data-photo-index="${i}" style="border:0;background:none;padding:0;cursor:pointer"><img src="${escapePublic(x.public_url||'')}" alt="${escapePublic(x.file_name||'Photo')}" style="width:110px;height:80px;object-fit:cover;border-radius:8px;display:block"></button>`).join('')}</div></div>`;
+                document.body.appendChild(overlay);
+                overlay.querySelector('#publicGalleryAlbumClose').onclick=()=>overlay.remove();
+                overlay.addEventListener('click',e=>{
+                    const b=e.target.closest('.public-gallery-thumb');
+                    if(!b)return;
+                    const photo=photos[Number(b.dataset.photoIndex)];
+                    if(!photo?.public_url)return;
+                    const viewer=document.createElement('div');
+                    viewer.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.94);z-index:100000;display:flex;align-items:center;justify-content:center;padding:20px;';
+                    viewer.innerHTML=`<button id="publicGalleryPhotoClose" style="position:absolute;top:18px;right:22px;font-size:28px;color:#fff;background:none;border:0;cursor:pointer">×</button><img src="${escapePublic(photo.public_url)}" alt="${escapePublic(photo.file_name||'Photo')}" style="max-width:95vw;max-height:90vh;object-fit:contain;border-radius:8px">`;
+                    document.body.appendChild(viewer);
+                    viewer.querySelector('#publicGalleryPhotoClose').onclick=()=>viewer.remove();
+                    viewer.onclick=e=>{if(e.target===viewer)viewer.remove();};
+                });
+            };
+            galleryGrid.innerHTML=`${albums.map(album=>{
+                const photos=grouped[album];
+                const cover=photos.find(x=>x.public_url)?.public_url||'';
+                return `<div class="card" style="cursor:pointer" data-public-album="${escapePublic(album)}"><div class="photo">${cover?`<img src="${escapePublic(cover)}" alt="${escapePublic(album)}" style="width:100%;height:210px;object-fit:cover">`:'<div style="height:210px;display:flex;align-items:center;justify-content:center">📷</div>'}</div><div class="card-body"><h3>${escapePublic(album)}</h3><div class="muted">${photos.length} photo${photos.length===1?'':'s'}</div></div></div>`;
+            }).join('') || '<div class="muted">No photo albums available.</div>'}`;
+            galleryGrid.querySelectorAll('[data-public-album]').forEach(card=>card.addEventListener('click',()=>window.__publicGalleryOpenAlbum(card.getAttribute('data-public-album'))));
+        }
+    }
 }
 
 renderPublic().catch(e=>console.error('Initial public render:',e));
-
-/* ===== PUBLIC HERO IMAGE =====
-   The image in the right side of the public home hero can be changed by
-   replacing PUBLIC_HERO_IMAGE_URL below with your own image URL/path.
-   Example: 'society-highlight.jpg'
-*/
-const PUBLIC_HERO_IMAGE_URL = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 560">
-  <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#0f9f7b"/>
-      <stop offset="1" stop-color="#8bd9c5"/>
-    </linearGradient>
-  </defs>
-  <rect width="900" height="560" rx="34" fill="url(#g)"/>
-  <circle cx="735" cy="105" r="58" fill="#ffffff" opacity=".22"/>
-  <circle cx="145" cy="105" r="82" fill="#ffffff" opacity=".12"/>
-  <path d="M0 430 Q180 350 350 430 T700 430 T900 410 V560 H0Z" fill="#ffffff" opacity=".18"/>
-  <g fill="#ffffff" opacity=".96">
-    <rect x="150" y="275" width="165" height="150" rx="8"/>
-    <rect x="368" y="215" width="190" height="210" rx="8"/>
-    <rect x="610" y="260" width="145" height="165" rx="8"/>
-  </g>
-  <g fill="#0f9f7b" opacity=".9">
-    <rect x="180" y="305" width="34" height="42" rx="4"/>
-    <rect x="250" y="305" width="34" height="42" rx="4"/>
-    <rect x="402" y="255" width="38" height="46" rx="4"/>
-    <rect x="486" y="255" width="38" height="46" rx="4"/>
-    <rect x="402" y="330" width="38" height="46" rx="4"/>
-    <rect x="486" y="330" width="38" height="46" rx="4"/>
-    <rect x="640" y="292" width="32" height="42" rx="4"/>
-    <rect x="700" y="292" width="32" height="42" rx="4"/>
-  </g>
-  <g fill="#0f8068">
-    <rect x="210" y="370" width="45" height="55" rx="5"/>
-    <rect x="438" y="350" width="50" height="75" rx="5"/>
-    <rect x="660" y="365" width="45" height="60" rx="5"/>
-  </g>
-  <g fill="#ffffff" opacity=".9">
-    <circle cx="110" cy="430" r="28"/><circle cx="795" cy="430" r="28"/>
-    <rect x="103" y="430" width="14" height="70"/><rect x="788" y="430" width="14" height="70"/>
-  </g>
-  <text x="450" y="95" text-anchor="middle" font-family="Arial, sans-serif" font-size="32" font-weight="700" fill="#ffffff">Defense Enclave Society</text>
-</svg>`);
-
-function setupPublicHeroImage(){
-    const home=document.getElementById('home');
-    if(!home)return;
-
-    const hero=home.querySelector('.hero');
-    if(!hero)return;
-
-    const target=hero.querySelector('.hero-visual,.hero-art,.hero-media,.hero-image,.hero-side') || hero.lastElementChild;
-    if(!target || target===hero.firstElementChild)return;
-
-    target.classList.add('public-hero-image');
-    target.innerHTML=`<img src="${PUBLIC_HERO_IMAGE_URL}" alt="Defense Enclave Society" loading="eager" decoding="async">`;
-
-    const styleId='publicHeroImageStyle';
-    if(!document.getElementById(styleId)){
-        const style=document.createElement('style');
-        style.id=styleId;
-        style.textContent=`
-          .public-hero-image{
-            overflow:hidden !important;
-            display:flex !important;
-            align-items:center !important;
-            justify-content:center !important;
-            padding:0 !important;
-          }
-          .public-hero-image img{
-            display:block !important;
-            width:100% !important;
-            height:100% !important;
-            min-height:100% !important;
-            object-fit:cover !important;
-            object-position:center !important;
-            border-radius:inherit !important;
-          }
-        `;
-        document.head.appendChild(style);
-    }
-}
-
-function initPublicHeroImage(){
-    if(document.readyState==='loading'){
-        document.addEventListener('DOMContentLoaded',setupPublicHeroImage,{once:true});
-    }else{
-        setupPublicHeroImage();
-    }
-}
-
-initPublicHeroImage();
-
 const authModal=document.getElementById('authModal');const showLogin=()=>{document.getElementById('authHeading').textContent='Member Login';document.getElementById('authLogin').classList.remove('hidden');document.getElementById('authRegister').classList.add('hidden');authModal.classList.remove('hidden')};const showReg=()=>{document.getElementById('authHeading').textContent='Create Member Account';document.getElementById('authLogin').classList.add('hidden');document.getElementById('authRegister').classList.remove('hidden');authModal.classList.remove('hidden')};document.getElementById('openLogin').onclick=showLogin;document.getElementById('openRegister').onclick=showReg;document.getElementById('authClose').onclick=()=>authModal.classList.add('hidden');
     setPublicLoginButtonVisible(false);document.getElementById('switchRegister').onclick=showReg;document.getElementById('switchLogin').onclick=showLogin;
 
