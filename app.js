@@ -452,7 +452,7 @@ function escapeHtml(v){
   if(!publicComplaintSection){
     publicComplaintSection=document.createElement('section');
     publicComplaintSection.id='publicComplaintsSection';
-    publicComplaintSection.className='section';
+    publicComplaintSection.className='public-section';
     const societyWork=[...document.querySelectorAll('#public h1,#public h2,#public h3')].find(el=>el.textContent.trim()==='Society Work');
     const parent=societyWork?.closest('section')||document.getElementById('public');
     parent?.insertAdjacentElement('afterend',publicComplaintSection);
