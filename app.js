@@ -2865,8 +2865,156 @@ async function memberPage(p,user){
       const {data:rows,error}=await sb.from('gallery_photos').select('*').order('created_at',{ascending:false}); if(error)throw error;
       c.innerHTML=`<div class="hero"><div><h2>Photo Gallery</h2><div class="muted">Community photos from the database.</div></div></div><div class="gallery-grid">${(rows||[]).map((g,i)=>`<div class="card"><div class="photo">${g.public_url?`<img src="${g.public_url}" alt="${g.file_name||'Gallery photo'}" style="width:100%;height:100%;object-fit:cover">`:['◉','★','♧','✦','✓','◎'][i%6]}</div><div class="card-body"><strong>${g.file_name||'Gallery Photo'}</strong></div></div>`).join('')}</div>`;
     }
-    document.getElementById('newComplaint')?.addEventListener('click',()=>toast('Complaint form is ready.'));
+    document.getElementById('newComplaint')?.addEventListener('click',()=>openMemberComplaintForm(user));
   }catch(e){console.error('Member page load failed:',e);c.innerHTML=`<div class="panel"><div class="muted">Unable to load this page: ${e?.message||e}</div></div>`;}
+}
+
+
+/* ============================================================
+   MEMBER COMPLAINT FORM
+   ============================================================ */
+function openMemberComplaintForm(user){
+    if(!sb) return toast('Supabase is not configured.');
+
+    const old=document.getElementById('memberComplaintModal');
+    if(old) old.remove();
+
+    const esc=(v)=>String(v??'')
+        .replace(/&/g,'&amp;')
+        .replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;')
+        .replace(/'/g,'&#39;');
+
+    const overlay=document.createElement('div');
+    overlay.id='memberComplaintModal';
+    overlay.style.cssText='position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;background:rgba(15,23,42,.58);backdrop-filter:blur(3px);overflow:auto;';
+
+    overlay.innerHTML=`
+      <div role="dialog" aria-modal="true"
+           style="width:min(650px,100%);max-height:calc(100vh - 40px);overflow:auto;background:#fff;border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.30);padding:24px;box-sizing:border-box;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+          <div>
+            <h2 style="margin:0 0 4px;font-size:22px;">New Complaint</h2>
+            <div style="font-size:13px;color:#667085;">Submit a complaint to the society committee.</div>
+          </div>
+          <button type="button" id="memberComplaintClose"
+                  style="width:36px;height:36px;border:0;border-radius:50%;background:#f2f4f7;font-size:24px;line-height:1;cursor:pointer;">&times;</button>
+        </div>
+
+        <form id="memberComplaintForm" novalidate>
+          <div id="memberComplaintError"
+               style="display:none;margin-bottom:14px;padding:11px 12px;border-radius:9px;background:#fff1f1;color:#b42318;font-size:13px;"></div>
+
+          <div class="form-grid">
+            <label>
+              Category <span style="color:#d92d20;">*</span>
+              <select id="complaintCategory" required>
+                <option value="">Select category</option>
+                <option value="Maintenance">Maintenance</option>
+                <option value="Security">Security</option>
+                <option value="Cleanliness">Cleanliness</option>
+                <option value="Water">Water</option>
+                <option value="Electricity">Electricity</option>
+                <option value="Parking">Parking</option>
+                <option value="Noise">Noise</option>
+                <option value="Other">Other</option>
+              </select>
+            </label>
+
+            <label>
+              Contact Phone
+              <input id="complaintPhone" value="${esc(user.phone||'')}" placeholder="Phone number">
+            </label>
+          </div>
+
+          <label>
+            Subject <span style="color:#d92d20;">*</span>
+            <input id="complaintSubject" maxlength="150" required
+                   placeholder="Briefly describe the complaint">
+          </label>
+
+          <label>
+            Description <span style="color:#d92d20;">*</span>
+            <textarea id="complaintDescription" rows="6" maxlength="3000" required
+                      placeholder="Provide complete details of the issue..."></textarea>
+          </label>
+
+          <label>
+            Contact Email
+            <input id="complaintEmail" type="email" value="${esc(user.email||'')}" placeholder="Email address">
+          </label>
+
+          <div style="font-size:12px;color:#667085;margin:4px 0 18px;">
+            Your complaint will be saved with your member account and can be tracked from <strong>Complaints</strong>.
+          </div>
+
+          <div style="display:flex;justify-content:flex-end;gap:10px;padding-top:15px;border-top:1px solid #eaecf0;">
+            <button type="button" id="memberComplaintCancel" class="outline-btn">Cancel</button>
+            <button type="submit" id="memberComplaintSubmit" class="primary-btn">Submit Complaint</button>
+          </div>
+        </form>
+      </div>`;
+
+    document.body.appendChild(overlay);
+
+    const close=()=>overlay.remove();
+    overlay.querySelector('#memberComplaintClose').onclick=close;
+    overlay.querySelector('#memberComplaintCancel').onclick=close;
+    overlay.addEventListener('click',e=>{if(e.target===overlay)close();});
+
+    overlay.querySelector('#memberComplaintForm').onsubmit=async(e)=>{
+        e.preventDefault();
+
+        const errorBox=overlay.querySelector('#memberComplaintError');
+        errorBox.style.display='none';
+
+        const category=overlay.querySelector('#complaintCategory').value.trim();
+        const subject=overlay.querySelector('#complaintSubject').value.trim();
+        const description=overlay.querySelector('#complaintDescription').value.trim();
+        const contactPhone=overlay.querySelector('#complaintPhone').value.trim();
+        const contactEmail=overlay.querySelector('#complaintEmail').value.trim();
+
+        if(!category||!subject||!description){
+            errorBox.textContent='Please fill Category, Subject and Description.';
+            errorBox.style.display='block';
+            return;
+        }
+
+        if(contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail)){
+            errorBox.textContent='Please enter a valid email address.';
+            errorBox.style.display='block';
+            return;
+        }
+
+        const submitBtn=overlay.querySelector('#memberComplaintSubmit');
+        submitBtn.disabled=true;
+        submitBtn.textContent='Submitting...';
+
+        try{
+            const {data,error}=await sb.from('complaints').insert({
+                user_id:user.id,
+                category,
+                subject,
+                description,
+                contact_phone:contactPhone||null,
+                contact_email:contactEmail||null,
+                status:'Submitted'
+            }).select().single();
+
+            if(error) throw error;
+
+            close();
+            toast('Complaint submitted successfully.');
+            await memberPage('complaints',user);
+        }catch(err){
+            console.error('Complaint submission failed:',err);
+            errorBox.textContent=err?.message||'Unable to submit complaint. Please try again.';
+            errorBox.style.display='block';
+            submitBtn.disabled=false;
+            submitBtn.textContent='Submit Complaint';
+        }
+    };
 }
 
 
