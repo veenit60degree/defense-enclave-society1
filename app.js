@@ -132,10 +132,29 @@ async function renderPublic(){
     // Reuse the existing .map div and put the map inside it.
     const mapDiv=document.getElementById('map') || document.querySelector('.map[data-map], .map');
     if(mapDiv){
-        mapDiv.innerHTML=`<iframe title="Defense Enclave Society location" src="https://www.google.com/maps?q=30.777604,76.616637&z=17&output=embed" width="100%" height="420" style="border:0;border-radius:14px;display:block" loading="lazy" allowfullscreen referrerpolicy="no-referrer-when-downgrade"></iframe>`;
+        mapDiv.innerHTML=`<h3 style="margin:0 0 12px 0">Society Map</h3><iframe title="Defense Enclave Society location" src="https://www.google.com/maps?q=30.777604,76.616637&z=17&output=embed" width="100%" height="420" style="border:0;border-radius:14px;display:block" loading="lazy" allowfullscreen referrerpolicy="no-referrer-when-downgrade"></iframe>`;
     }
 
     // Existing Photo Gallery: albums -> thumbnails -> full-screen photo viewer.
+    const gallerySection=publicSectionByHeading(['Photo Gallery','Gallery']);
+    if(gallerySection){
+        const galleryHeading=gallerySection.querySelector('h1,h2,h3,h4,.section-title,.eyebrow');
+        if(galleryHeading && !galleryHeading.querySelector('[data-public-gallery-link]')){
+            const link=document.createElement('a');
+            link.href='#';
+            link.textContent=' (View all photos)';
+            link.setAttribute('data-public-gallery-link','1');
+            link.style.cssText='font-size:.82em;font-weight:500;text-decoration:none;cursor:pointer;margin-left:4px;';
+            link.addEventListener('click',e=>{
+                e.preventDefault();
+                const albums=window.__publicGalleryAlbums||{};
+                const first=Object.keys(albums)[0];
+                if(first) window.__publicGalleryOpenAlbum(first);
+                else toast('No photos available.');
+            });
+            galleryHeading.appendChild(link);
+        }
+    }
     const galleryGrid=document.getElementById('galleryGrid') ||
         publicContentContainer(['Photo Gallery','Gallery'],['.gallery-grid','.photos-grid','.cards-grid']);
     if(galleryGrid){
@@ -157,7 +176,7 @@ async function renderPublic(){
                 const overlay=document.createElement('div');
                 overlay.id='publicGalleryAlbumOverlay';
                 overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:99999;overflow:auto;padding:30px;';
-                overlay.innerHTML=`<div style="max-width:1100px;margin:auto;background:#fff;border-radius:16px;padding:20px"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><h2 style="margin:0">${escapePublic(album)}</h2><button id="publicGalleryAlbumClose" class="outline-btn">Close</button></div><div class="gallery-grid" style="margin-top:18px">${photos.map((x,i)=>`<button type="button" class="public-gallery-thumb" data-photo-index="${i}" style="border:0;background:none;padding:0;cursor:pointer"><img src="${escapePublic(x.public_url||'')}" alt="${escapePublic(x.file_name||'Photo')}" style="width:100%;height:190px;object-fit:cover;border-radius:12px;display:block"></button>`).join('')}</div></div>`;
+                overlay.innerHTML=`<div style="max-width:1100px;margin:auto;background:#fff;border-radius:16px;padding:20px"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><h2 style="margin:0">${escapePublic(album)}</h2><button id="publicGalleryAlbumClose" class="outline-btn">Close</button></div><div class="gallery-grid" style="margin-top:18px;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px">${photos.map((x,i)=>`<button type="button" class="public-gallery-thumb" data-photo-index="${i}" style="border:0;background:none;padding:0;cursor:pointer"><img src="${escapePublic(x.public_url||'')}" alt="${escapePublic(x.file_name||'Photo')}" style="width:110px;height:80px;object-fit:cover;border-radius:8px;display:block"></button>`).join('')}</div></div>`;
                 document.body.appendChild(overlay);
                 overlay.querySelector('#publicGalleryAlbumClose').onclick=()=>overlay.remove();
                 overlay.addEventListener('click',e=>{
@@ -173,16 +192,11 @@ async function renderPublic(){
                     viewer.onclick=e=>{if(e.target===viewer)viewer.remove();};
                 });
             };
-            galleryGrid.innerHTML=`<div style="display:flex;justify-content:flex-end;margin-bottom:14px"><button type="button" class="outline-btn" id="publicGalleryViewAll">View all photos</button></div>${albums.map(album=>{
+            galleryGrid.innerHTML=`${albums.map(album=>{
                 const photos=grouped[album];
                 const cover=photos.find(x=>x.public_url)?.public_url||'';
                 return `<div class="card" style="cursor:pointer" data-public-album="${escapePublic(album)}"><div class="photo">${cover?`<img src="${escapePublic(cover)}" alt="${escapePublic(album)}" style="width:100%;height:210px;object-fit:cover">`:'<div style="height:210px;display:flex;align-items:center;justify-content:center">📷</div>'}</div><div class="card-body"><h3>${escapePublic(album)}</h3><div class="muted">${photos.length} photo${photos.length===1?'':'s'}</div></div></div>`;
             }).join('') || '<div class="muted">No photo albums available.</div>'}`;
-            galleryGrid.querySelector('#publicGalleryViewAll')?.addEventListener('click',()=>{
-                const first=albums[0];
-                if(first) window.__publicGalleryOpenAlbum(first);
-                else toast('No photos available.');
-            });
             galleryGrid.querySelectorAll('[data-public-album]').forEach(card=>card.addEventListener('click',()=>window.__publicGalleryOpenAlbum(card.getAttribute('data-public-album'))));
         }
     }
