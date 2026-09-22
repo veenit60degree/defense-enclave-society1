@@ -1,3 +1,39 @@
+
+/* Public/logout page: section card layout.
+   Matches the existing Society Work white-card appearance. */
+<style id="public-section-card-layout">
+#public #events.public-section,
+#public #gallery.public-section,
+#public #map.public-section,
+#public #complaints.public-section,
+#public section#events,
+#public section#gallery,
+#public section#map,
+#public section#complaints {
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 4px 18px rgba(16,24,40,.06);
+  padding: 24px;
+  margin: 24px 0;
+  box-sizing: border-box;
+}
+
+@media (max-width: 700px) {
+  #public #events.public-section,
+  #public #gallery.public-section,
+  #public #map.public-section,
+  #public #complaints.public-section,
+  #public section#events,
+  #public section#gallery,
+  #public section#map,
+  #public section#complaints {
+    padding: 16px;
+    border-radius: 14px;
+    margin: 16px 0;
+  }
+}
+</style>
+
 /* Defense Enclave Admin Buttons: 2026-09-19 */
 //const CONFIG={SUPABASE_URL:'https://gujtekpteezejmtaxtcj.supabase.co',SUPABASE_ANON_KEY:'sb_publishable_KvdsKcUr_vuvPrg7xU11Ww_q1H7vhg1'};
 
