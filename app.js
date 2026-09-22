@@ -58,36 +58,39 @@ async function renderPublic(){
         return;
     }
 
-    // Finance is intentionally NOT loaded/rendered on the public page.
     const [members,works,events,gallery,maintenance,about]=await Promise.all([
         sb.from('profiles').select('id,full_name,phone,house_number,address,role,is_active').eq('role','member').eq('is_active',true),
         sb.from('society_work').select('*').order('created_at',{ascending:false}),
         sb.from('events').select('*').order('event_date',{ascending:false}),
         sb.from('gallery_photos').select('*').order('created_at',{ascending:false}),
         sb.from('maintenance').select('*').order('created_at',{ascending:false}),
-        sb.from('society_about').select('id,description').eq('id',1).maybeSingle()
+        sb.from('society_about').select('*').eq('id',1).maybeSingle()
     ]);
 
-    console.log('PUBLIC MEMBERS:',members.data,'ERROR:',members.error);
-    console.log('PUBLIC EVENTS:',events.data,'ERROR:',events.error);
-    console.log('PUBLIC MAINTENANCE:',maintenance.data,'ERROR:',maintenance.error);
-    console.log('PUBLIC ABOUT:',about.data,'ERROR:',about.error);
+    console.log('[PUBLIC] members:',members.data,'error:',members.error);
+    console.log('[PUBLIC] events:',events.data,'error:',events.error);
+    console.log('[PUBLIC] gallery:',gallery.data,'error:',gallery.error);
+    console.log('[PUBLIC] maintenance:',maintenance.data,'error:',maintenance.error);
+    console.log('[PUBLIC] about:',about.data,'error:',about.error);
 
-    // ---------- Existing Society Members section ----------
+    // Always reuse the already-rendered public sections. No new sections are created.
     const memberGrid=document.getElementById('memberGrid') ||
-        publicContentContainer(['Society Members','Members'],['.member-grid','.members-grid','.cards-grid','.grid-3']);
+        publicContentContainer(['Society Members'],['.member-grid','.members-grid','.cards-grid','.grid-3']);
     if(memberGrid){
-        memberGrid.innerHTML=(members.data||[]).map(p=>{
-            const initials=(p.full_name||'M').split(/\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase();
-            const address=[p.house_number,p.address].filter(Boolean).join(', ');
-            return `<div class="member-card"><div class="member-photo">${escapePublic(initials)}</div><div><strong>${escapePublic(p.full_name||'Member')}</strong><div class="muted">${escapePublic(p.phone||'Phone not available')}</div><div class="muted">${escapePublic(address||'Address not available')}</div></div></div>`;
-        }).join('') || '<div class="muted">No members available.</div>';
+        if(members.error){
+            memberGrid.innerHTML='<div class="muted">Unable to load members.</div>';
+        }else{
+            memberGrid.innerHTML=(members.data||[]).map(p=>{
+                const initials=(p.full_name||'M').split(/\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase();
+                const address=[p.house_number,p.address].filter(Boolean).join(', ');
+                return `<div class="member-card"><div class="member-photo">${escapePublic(initials)}</div><div><strong>${escapePublic(p.full_name||'Member')}</strong><div class="muted">${escapePublic(p.phone||'Phone not available')}</div><div class="muted">${escapePublic(address||'Address not available')}</div></div></div>`;
+            }).join('') || '<div class="muted">No registered members found.</div>';
+        }
     }
 
-    // ---------- Existing Society Work section ----------
     const workTable=document.getElementById('workTable') ||
-        publicContentContainer(['Society Work','Work'],['.work-table','.table-wrap table']);
-    if(workTable && works.data){
+        publicContentContainer(['Society Work'],['.work-table','.table-wrap table']);
+    if(workTable && !works.error && works.data){
         const rows=works.data;
         if(workTable.tagName==='TABLE'){
             workTable.innerHTML=`<thead><tr><th>Project</th><th>Description</th><th>Status</th><th>Progress</th><th>Target</th></tr></thead><tbody>${rows.map(w=>{
@@ -97,46 +100,91 @@ async function renderPublic(){
         }
     }
 
-    // ---------- Existing Events section ----------
     const eventGrid=document.getElementById('eventGrid') ||
-        publicContentContainer(['Events','Upcoming Events'],['.event-grid','.events-grid','.cards-grid']);
+        publicContentContainer(['Events'],['.event-grid','.events-grid','.cards-grid']);
     if(eventGrid){
-        eventGrid.innerHTML=(events.data||[]).map(e=>`<div class="card"><div class="photo">📅</div><div class="card-body"><div class="event-date">${escapePublic(e.event_date||e.date||'')}</div><h3>${escapePublic(e.title||e.name||'')}</h3><div class="muted">${escapePublic(e.location||e.place||e.description||'')}</div></div></div>`).join('') || '<div class="muted">No events available.</div>';
-    }
-
-    // ---------- Existing Maintenance section ----------
-    const maintenanceGrid=document.getElementById('maintenanceGrid') ||
-        publicContentContainer(['Maintenance','Active Maintenance'],['.maintenance-grid','.maintenance-list','.cards-grid','.table-wrap']);
-    if(maintenanceGrid){
-        maintenanceGrid.innerHTML=(maintenance.data||[]).map(x=>`<div class="card"><div class="card-body"><h3>${escapePublic(x.item||x.title||x.name||'Maintenance')}</h3><div class="muted">${escapePublic(x.description||'')}</div><div><strong>₹${Number(x.amount||0).toLocaleString('en-IN')}</strong></div><span class="status">${escapePublic(x.status||'')}</span></div></div>`).join('') || '<div class="muted">No maintenance records available.</div>';
-    }
-
-    // ---------- Existing About Us section ----------
-    const aboutContainer=document.getElementById('aboutContent') ||
-        publicContentContainer(['About Us','About Society','About'],['.about-content','.about-description','.about-text']);
-    if(aboutContainer){
-        const description=about.data?.description||'';
-        aboutContainer.innerHTML=description
-            ? `<div class="about-description">${escapePublic(description).replace(/\n/g,'<br>')}</div>`
-            : '<div class="muted">About information is not available.</div>';
-    }
-
-    // ---------- Existing Society Map section ----------
-    // Reuse the existing `map` div; do not create another section.
-    const mapSection=document.getElementById('map') || publicSectionByHeading(['Society Map']);
-    if(mapSection){
-        const mapDiv=mapSection.matches('.map') ? mapSection :
-            (mapSection.querySelector('.map') || mapSection.querySelector('[data-map]') || mapSection);
-        if(mapDiv){
-            mapDiv.innerHTML=`<iframe title="Defense Enclave Society location" src="https://www.google.com/maps?q=30.777604,76.616637&z=16&output=embed" width="100%" height="420" style="border:0;border-radius:14px;display:block;" loading="lazy" allowfullscreen referrerpolicy="no-referrer-when-downgrade"></iframe>`;
+        if(events.error){
+            eventGrid.innerHTML='<div class="muted">Unable to load events.</div>';
+        }else{
+            eventGrid.innerHTML=(events.data||[]).map(e=>`<div class="card"><div class="photo">📅</div><div class="card-body"><div class="event-date">${escapePublic(e.event_date||e.date||'')}</div><h3>${escapePublic(e.title||e.name||'')}</h3><div class="muted">${escapePublic(e.location||e.place||e.description||'')}</div></div></div>`).join('') || '<div class="muted">No events available.</div>';
         }
     }
 
-    // ---------- Existing Gallery section ----------
+    const maintenanceGrid=document.getElementById('maintenanceGrid') ||
+        publicContentContainer(['Maintenance'],['.maintenance-grid','.maintenance-list','.cards-grid','.table-wrap']);
+    if(maintenanceGrid){
+        maintenanceGrid.innerHTML=maintenance.error
+            ? '<div class="muted">Unable to load maintenance information.</div>'
+            : (maintenance.data||[]).map(x=>`<div class="card"><div class="card-body"><h3>${escapePublic(x.item||x.title||x.name||'Maintenance')}</h3><div class="muted">${escapePublic(x.description||'')}</div><div><strong>₹${Number(x.amount||0).toLocaleString('en-IN')}</strong></div><span class="status">${escapePublic(x.status||'')}</span></div></div>`).join('') || '<div class="muted">No maintenance records available.</div>';
+    }
+
+    const aboutContainer=document.getElementById('aboutContent') ||
+        publicContentContainer(['About Us'],['.about-content','.about-description','.about-text']);
+    if(aboutContainer){
+        const description=about.data?.description||about.data?.about||about.data?.content||'';
+        aboutContainer.innerHTML=about.error
+            ? '<div class="muted">Unable to load About Us information.</div>'
+            : description
+                ? `<div class="about-description">${escapePublic(description).replace(/\n/g,'<br>')}</div>`
+                : '<div class="muted">About information is not available.</div>';
+    }
+
+    // Reuse the existing .map div and put the map inside it.
+    const mapDiv=document.getElementById('map') || document.querySelector('.map[data-map], .map');
+    if(mapDiv){
+        mapDiv.innerHTML=`<iframe title="Defense Enclave Society location" src="https://www.google.com/maps?q=30.777604,76.616637&z=17&output=embed" width="100%" height="420" style="border:0;border-radius:14px;display:block" loading="lazy" allowfullscreen referrerpolicy="no-referrer-when-downgrade"></iframe>`;
+    }
+
+    // Existing Photo Gallery: albums -> thumbnails -> full-screen photo viewer.
     const galleryGrid=document.getElementById('galleryGrid') ||
-        publicContentContainer(['Gallery','Photo Gallery'],['.gallery-grid','.photos-grid','.cards-grid']);
+        publicContentContainer(['Photo Gallery','Gallery'],['.gallery-grid','.photos-grid','.cards-grid']);
     if(galleryGrid){
-        galleryGrid.innerHTML=(gallery.data||[]).map((g,i)=>`<div class="card"><div class="photo">${g.public_url?`<img src="${escapePublic(g.public_url)}" alt="${escapePublic(g.file_name||'Gallery photo')}" style="width:100%;height:100%;object-fit:cover">`:['◉','★','♧','✦','✓','◎'][i%6]}</div><div class="card-body"><strong>${escapePublic(g.file_name||'Gallery Photo')}</strong></div></div>`).join('') || '<div class="muted">No gallery photos available.</div>';
+        if(gallery.error){
+            galleryGrid.innerHTML='<div class="muted">Unable to load photo gallery.</div>';
+        }else{
+            const rows=(gallery.data||[]).filter(x=>x.file_name!=='.folder');
+            const grouped={};
+            rows.forEach(x=>{
+                const path=String(x.storage_path||'').replace(/^\/+/, '');
+                const parts=path.split('/');
+                const album=parts.length>1 ? parts[0] : 'General';
+                (grouped[album] ||= []).push(x);
+            });
+            const albums=Object.keys(grouped).sort((a,b)=>a.localeCompare(b));
+            window.__publicGalleryAlbums=grouped;
+            window.__publicGalleryOpenAlbum=function(album){
+                const photos=window.__publicGalleryAlbums?.[album]||[];
+                const overlay=document.createElement('div');
+                overlay.id='publicGalleryAlbumOverlay';
+                overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:99999;overflow:auto;padding:30px;';
+                overlay.innerHTML=`<div style="max-width:1100px;margin:auto;background:#fff;border-radius:16px;padding:20px"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><h2 style="margin:0">${escapePublic(album)}</h2><button id="publicGalleryAlbumClose" class="outline-btn">Close</button></div><div class="gallery-grid" style="margin-top:18px">${photos.map((x,i)=>`<button type="button" class="public-gallery-thumb" data-photo-index="${i}" style="border:0;background:none;padding:0;cursor:pointer"><img src="${escapePublic(x.public_url||'')}" alt="${escapePublic(x.file_name||'Photo')}" style="width:100%;height:190px;object-fit:cover;border-radius:12px;display:block"></button>`).join('')}</div></div>`;
+                document.body.appendChild(overlay);
+                overlay.querySelector('#publicGalleryAlbumClose').onclick=()=>overlay.remove();
+                overlay.addEventListener('click',e=>{
+                    const b=e.target.closest('.public-gallery-thumb');
+                    if(!b)return;
+                    const photo=photos[Number(b.dataset.photoIndex)];
+                    if(!photo?.public_url)return;
+                    const viewer=document.createElement('div');
+                    viewer.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.94);z-index:100000;display:flex;align-items:center;justify-content:center;padding:20px;';
+                    viewer.innerHTML=`<button id="publicGalleryPhotoClose" style="position:absolute;top:18px;right:22px;font-size:28px;color:#fff;background:none;border:0;cursor:pointer">×</button><img src="${escapePublic(photo.public_url)}" alt="${escapePublic(photo.file_name||'Photo')}" style="max-width:95vw;max-height:90vh;object-fit:contain;border-radius:8px">`;
+                    document.body.appendChild(viewer);
+                    viewer.querySelector('#publicGalleryPhotoClose').onclick=()=>viewer.remove();
+                    viewer.onclick=e=>{if(e.target===viewer)viewer.remove();};
+                });
+            };
+            galleryGrid.innerHTML=`<div style="display:flex;justify-content:flex-end;margin-bottom:14px"><button type="button" class="outline-btn" id="publicGalleryViewAll">View all photos</button></div>${albums.map(album=>{
+                const photos=grouped[album];
+                const cover=photos.find(x=>x.public_url)?.public_url||'';
+                return `<div class="card" style="cursor:pointer" data-public-album="${escapePublic(album)}"><div class="photo">${cover?`<img src="${escapePublic(cover)}" alt="${escapePublic(album)}" style="width:100%;height:210px;object-fit:cover">`:'<div style="height:210px;display:flex;align-items:center;justify-content:center">📷</div>'}</div><div class="card-body"><h3>${escapePublic(album)}</h3><div class="muted">${photos.length} photo${photos.length===1?'':'s'}</div></div></div>`;
+            }).join('') || '<div class="muted">No photo albums available.</div>'}`;
+            galleryGrid.querySelector('#publicGalleryViewAll')?.addEventListener('click',()=>{
+                const first=albums[0];
+                if(first) window.__publicGalleryOpenAlbum(first);
+                else toast('No photos available.');
+            });
+            galleryGrid.querySelectorAll('[data-public-album]').forEach(card=>card.addEventListener('click',()=>window.__publicGalleryOpenAlbum(card.getAttribute('data-public-album'))));
+        }
     }
 }
 
