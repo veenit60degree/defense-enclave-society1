@@ -20,142 +20,264 @@ if (
 
 const demo={members:[['RS','Raj Sharma','A-101'],['PK','Priya Kapoor','A-102'],['MG','Manoj Gupta','A-103'],['AJ','Alex Johnson','A-104'],['SK','Sonia Kaur','B-201'],['VS','Vikas Singh','B-202'],['AM','Anita Mehta','B-203'],['NK','Nitin Kumar','C-301'],['PS','Pooja Sethi','C-302']],works:[['Main Gate Repair','Repair and repaint main entrance gate','Ongoing',72,'12 Sep 2026'],['Street Light Upgrade','Replace 18 old lights with LED fixtures','Ongoing',45,'18 Sep 2026'],['Park Renovation','Benches, pathway and plantation work','Pending',0,'25 Sep 2026'],['Water Tank Cleaning','Annual cleaning and inspection','Completed',100,'05 Sep 2026']],events:[['20 Sep 2026','Monthly General Meeting','Community Hall · 6:00 PM','◷'],['02 Oct 2026','Cleanliness Drive','Main Park · 7:00 AM','♧'],['18 Oct 2026','Family Sports Day','Society Ground · 4:00 PM','★']],gallery:['Society Meeting','Park Activity','Festival Evening','Cleanliness Drive','Community Gathering']};
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)}
+function publicSectionByHeading(labels){
+    const wanted=(labels||[]).map(x=>String(x).trim().toLowerCase());
+    const nodes=[...document.querySelectorAll('section,article,.section,.panel,main > div,body > div')];
+    return nodes.find(node=>{
+        const h=node.querySelector('h1,h2,h3,h4,.section-title,.eyebrow');
+        const text=(h?.textContent||'').trim().toLowerCase();
+        return wanted.some(x=>text===x || text.includes(x));
+    })||null;
+}
+
+function publicContentContainer(labels, preferredSelectors=[]){
+    const section=publicSectionByHeading(labels);
+    if(!section)return null;
+    for(const selector of preferredSelectors){
+        const el=section.querySelector(selector);
+        if(el)return el;
+    }
+    // Reuse the existing section and only create a content holder inside it.
+    // This does NOT create another section/layout.
+    let holder=section.querySelector('[data-public-dynamic-content]');
+    if(!holder){
+        holder=document.createElement('div');
+        holder.setAttribute('data-public-dynamic-content','1');
+        section.appendChild(holder);
+    }
+    return holder;
+}
+
+function escapePublic(v){
+    return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 async function renderPublic(){
-    const empty={society_fund:0,total_expenses:0,active_maintenance:0,pending_tasks:0};
-    let finance={...empty};
-    if(sb){
-      try{
-        const {data,error}=await sb.from('society_finance').select('society_fund,total_expenses,active_maintenance,pending_tasks').eq('id',1).maybeSingle();
-        if(error) console.error('Public finance load error:',error); else if(data) finance=data;
-      }catch(e){console.error('Public finance load exception:',e);}
+    if(!sb){
+        console.warn('Public render: Supabase client is not available.');
+        return;
     }
-    const stats=document.getElementById('publicStats');
-    if(stats) stats.innerHTML=[
-      ['Society Fund',`₹${Number(finance.society_fund||0).toLocaleString('en-IN')}`,'Current balance'],
-      ['Total Expenses',`₹${Number(finance.total_expenses||0).toLocaleString('en-IN')}`,'This year'],
-      ['Active Maintenance',`₹${Number(finance.active_maintenance||0).toLocaleString('en-IN')}`,'Active maintenance'],
-      ['Pending Tasks',String(Number(finance.pending_tasks||0)),'Needs attention']
-    ].map(x=>`<div class="stat"><div class="stat-head">${x[0]}<span>●</span></div><div class="value">${x[1]}</div><div class="trend">${x[2]}</div></div>`).join('');
 
-    if(!sb) return;
-    const [members,works,events,gallery]=await Promise.all([
-      sb.from('profiles').select('id,full_name,phone,house_number,role,is_active').eq('role','member').eq('is_active',true),
-      sb.from('society_work').select('*').order('created_at',{ascending:false}),
-      sb.from('events').select('*').order('event_date',{ascending:false}),
-      sb.from('gallery_photos').select('*').order('created_at',{ascending:false})
+    const [members,works,events,gallery,maintenance,about]=await Promise.all([
+        sb.from('profiles').select('id,full_name,phone,house_number,address,role,is_active').eq('role','member').eq('is_active',true),
+        sb.from('society_work').select('*').order('created_at',{ascending:false}),
+        sb.from('events').select('*').order('event_date',{ascending:false}),
+        sb.from('gallery_photos').select('*').order('created_at',{ascending:false}),
+        sb.from('maintenance').select('*').order('created_at',{ascending:false}),
+        sb.from('society_about').select('*').eq('id',1).maybeSingle()
     ]);
-    if(members.error) console.error('Public members load error:',members.error);
-    if(works.error) console.error('Public work load error:',works.error);
-    if(events.error) console.error('Public events load error:',events.error);
-    if(gallery.error) console.error('Public gallery load error:',gallery.error);
 
-    const memberGrid=document.getElementById('memberGrid');
-    if(memberGrid) memberGrid.innerHTML=(members.data||[]).map(p=>{
-      const initials=(p.full_name||'M').split(/\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase();
-      return `<div class="member-card"><div class="member-photo">${initials}</div><div><strong>${p.full_name||'Member'}</strong><div class="muted">House ${p.house_number||''}</div><span class="status ongoing" style="margin-top:6px">Active Member</span></div></div>`;
-    }).join('') || '<div class="muted">No members available.</div>';
+    console.log('[PUBLIC] members:',members.data,'error:',members.error);
+    console.log('[PUBLIC] events:',events.data,'error:',events.error);
+    console.log('[PUBLIC] gallery:',gallery.data,'error:',gallery.error);
+    console.log('[PUBLIC] maintenance:',maintenance.data,'error:',maintenance.error);
+    console.log('[PUBLIC] about:',about.data,'error:',about.error);
 
-    const workTable=document.getElementById('workTable');
-    if(workTable){
-      const rows=works.data||[];
-      workTable.innerHTML=`<thead><tr><th>Project</th><th>Description</th><th>Status</th><th>Progress</th><th>Target</th></tr></thead><tbody>${rows.map(w=>{
-        const name=w.name||w.title||w.work_name||w.project_name||w.work_title||w.project||w.work||w.activity||w.task||w.subject||'';
-        return `<tr><td><strong>${name}</strong></td><td>${w.description||w.details||''}</td><td><span class="status ${(w.status||'').toLowerCase()}">${w.status||''}</span></td><td><div class="progress"><i style="width:${Number(w.progress||0)}%"></i></div>${Number(w.progress||0)}%</td><td>${w.target_date||w.target||w.due_date||''}</td></tr>`;
-      }).join('')}</tbody>`;
+    // Always reuse the already-rendered public sections. No new sections are created.
+    const memberGrid=document.getElementById('memberGrid') ||
+        publicContentContainer(['Society Members'],['.member-grid','.members-grid','.cards-grid','.grid-3']);
+    if(memberGrid){
+        if(members.error){
+            memberGrid.innerHTML='<div class="muted">Unable to load members.</div>';
+        }else{
+            memberGrid.innerHTML=(members.data||[]).map(p=>{
+                const initials=(p.full_name||'M').split(/\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase();
+                const address=[p.house_number,p.address].filter(Boolean).join(', ');
+                return `<div class="member-card"><div class="member-photo">${escapePublic(initials)}</div><div><strong>${escapePublic(p.full_name||'Member')}</strong><div class="muted">${escapePublic(p.phone||'Phone not available')}</div><div class="muted">${escapePublic(address||'Address not available')}</div></div></div>`;
+            }).join('') || '<div class="muted">No registered members found.</div>';
+        }
     }
 
-    const eventGrid=document.getElementById('eventGrid');
-    if(eventGrid) eventGrid.innerHTML=(events.data||[]).map(e=>`<div class="card"><div class="photo">📅</div><div class="card-body"><div class="event-date">${e.event_date||e.date||''}</div><h3>${e.title||e.name||''}</h3><div class="muted">${e.location||e.place||e.description||''}</div></div></div>`).join('') || '<div class="muted">No events available.</div>';
+    const workTable=document.getElementById('workTable') ||
+        publicContentContainer(['Society Work'],['.work-table','.table-wrap table']);
+    if(workTable && !works.error && works.data){
+        const rows=works.data;
+        if(workTable.tagName==='TABLE'){
+            workTable.innerHTML=`<thead><tr><th>Project</th><th>Description</th><th>Status</th><th>Progress</th><th>Target</th></tr></thead><tbody>${rows.map(w=>{
+                const name=w.name||w.title||w.work_name||w.project_name||w.work_title||w.project||w.work||w.activity||w.task||w.subject||'';
+                return `<tr><td><strong>${escapePublic(name)}</strong></td><td>${escapePublic(w.description||w.details||'')}</td><td>${escapePublic(w.status||'')}</td><td>${Number(w.progress||0)}%</td><td>${escapePublic(w.target_date||w.target||w.due_date||'')}</td></tr>`;
+            }).join('')}</tbody>`;
+        }
+    }
 
-    const galleryGrid=document.getElementById('galleryGrid');
-    if(galleryGrid) galleryGrid.innerHTML=(gallery.data||[]).map((g,i)=>`<div class="card"><div class="photo">${g.public_url?`<img src="${g.public_url}" alt="${g.file_name||'Gallery photo'}" style="width:100%;height:100%;object-fit:cover">`:['◉','★','♧','✦','✓','◎'][i%6]}</div><div class="card-body"><strong>${g.file_name||'Gallery Photo'}</strong></div></div>`).join('') || '<div class="muted">No gallery photos available.</div>';
+    const eventGrid=document.getElementById('eventGrid') ||
+        publicContentContainer(['Events'],['.event-grid','.events-grid','.cards-grid']);
+    if(eventGrid){
+        if(events.error){
+            eventGrid.innerHTML='<div class="muted">Unable to load events.</div>';
+        }else{
+            eventGrid.innerHTML=(events.data||[]).map(e=>`<div class="card"><div class="photo">📅</div><div class="card-body"><div class="event-date">${escapePublic(e.event_date||e.date||'')}</div><h3>${escapePublic(e.title||e.name||'')}</h3><div class="muted">${escapePublic(e.location||e.place||e.description||'')}</div></div></div>`).join('') || '<div class="muted">No events available.</div>';
+        }
+    }
+
+    const maintenanceGrid=document.getElementById('maintenanceGrid') ||
+        publicContentContainer(['Maintenance'],['.maintenance-grid','.maintenance-list','.cards-grid','.table-wrap']);
+    if(maintenanceGrid){
+        maintenanceGrid.innerHTML=maintenance.error
+            ? '<div class="muted">Unable to load maintenance information.</div>'
+            : (maintenance.data||[]).map(x=>`<div class="card"><div class="card-body"><h3>${escapePublic(x.item||x.title||x.name||'Maintenance')}</h3><div class="muted">${escapePublic(x.description||'')}</div><div><strong>₹${Number(x.amount||0).toLocaleString('en-IN')}</strong></div><span class="status">${escapePublic(x.status||'')}</span></div></div>`).join('') || '<div class="muted">No maintenance records available.</div>';
+    }
+
+    // About Us: reuse the EXISTING About Us content/card.
+    // Do not append another dynamic block below the existing layout.
+    const aboutSection=publicSectionByHeading(['About Us']);
+    if(aboutSection){
+        // Remove any dynamic holder that an older version may have appended.
+        aboutSection.querySelectorAll('[data-public-dynamic-content]').forEach(el=>el.remove());
+
+        // Prefer the existing About content/card instead of creating a new one.
+        let aboutContainer=document.getElementById('aboutContent') ||
+            aboutSection.querySelector('.about-content,.about-card,.about-box,.panel,.card');
+
+        // If the page does not use a known class, use the first direct DIV after
+        // the heading as the existing content container.
+        if(!aboutContainer){
+            const heading=aboutSection.querySelector('h1,h2,h3,h4,.section-title,.eyebrow');
+            aboutContainer=[...aboutSection.children].find(el=>
+                el!==heading && el.tagName==='DIV'
+            ) || null;
+        }
+
+        if(aboutContainer){
+            const description=about.data?.description||about.data?.about||about.data?.content||'';
+            aboutContainer.innerHTML=about.error
+                ? '<div class="muted">Unable to load About Us information.</div>'
+                : description
+                    ? `<div class="about-description">${escapePublic(description).replace(/\n/g,'<br>')}</div>`
+                    : '<div class="muted">About information is not available.</div>';
+        }
+    }
+
+    // Reuse the existing .map div and put the map inside it.
+    const mapDiv=document.getElementById('map') || document.querySelector('.map[data-map], .map');
+    if(mapDiv){
+        mapDiv.innerHTML=`<h3 style="margin:0 0 12px 0">Society Map</h3><iframe title="Defense Enclave Society location" src="https://www.google.com/maps?q=30.777604,76.616637&z=17&output=embed" width="100%" height="420" style="border:0;border-radius:14px;display:block" loading="lazy" allowfullscreen referrerpolicy="no-referrer-when-downgrade"></iframe>`;
+    }
+
+    // Existing Photo Gallery: albums -> thumbnails -> full-screen photo viewer.
+    const gallerySection=publicSectionByHeading(['Photo Gallery','Gallery']);
+    if(gallerySection){
+        const galleryHeading=gallerySection.querySelector('h1,h2,h3,h4,.section-title,.eyebrow');
+        if(galleryHeading && !galleryHeading.querySelector('[data-public-gallery-link]')){
+            const link=document.createElement('a');
+            link.href='#';
+            link.textContent=' (View all photos)';
+            link.setAttribute('data-public-gallery-link','1');
+            link.style.cssText='font-size:.82em;font-weight:500;text-decoration:none;cursor:pointer;margin-left:4px;';
+            link.addEventListener('click',e=>{
+                e.preventDefault();
+                const albums=window.__publicGalleryAlbums||{};
+                const first=Object.keys(albums)[0];
+                if(first) window.__publicGalleryOpenAlbum(first);
+                else toast('No photos available.');
+            });
+            galleryHeading.appendChild(link);
+        }
+    }
+    const galleryGrid=document.getElementById('galleryGrid') ||
+        publicContentContainer(['Photo Gallery','Gallery'],['.gallery-grid','.photos-grid','.cards-grid']);
+    if(galleryGrid){
+        if(gallery.error){
+            galleryGrid.innerHTML='<div class="muted">Unable to load photo gallery.</div>';
+        }else{
+            const rows=(gallery.data||[]).filter(x=>x.file_name!=='.folder');
+            const grouped={};
+            rows.forEach(x=>{
+                const path=String(x.storage_path||'').replace(/^\/+/, '');
+                const parts=path.split('/');
+                const album=parts.length>1 ? parts[0] : 'General';
+                (grouped[album] ||= []).push(x);
+            });
+            const albums=Object.keys(grouped).sort((a,b)=>a.localeCompare(b));
+            window.__publicGalleryAlbums=grouped;
+            window.__publicGalleryOpenAlbum=function(album){
+                const photos=window.__publicGalleryAlbums?.[album]||[];
+                const overlay=document.createElement('div');
+                overlay.id='publicGalleryAlbumOverlay';
+                overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:99999;overflow:auto;padding:30px;';
+                overlay.innerHTML=`<div style="max-width:1100px;margin:auto;background:#fff;border-radius:16px;padding:20px"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><h2 style="margin:0">${escapePublic(album)}</h2><button id="publicGalleryAlbumClose" class="outline-btn">Close</button></div><div class="gallery-grid" style="margin-top:18px;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px">${photos.map((x,i)=>`<button type="button" class="public-gallery-thumb" data-photo-index="${i}" style="border:0;background:none;padding:0;cursor:pointer"><img src="${escapePublic(x.public_url||'')}" alt="${escapePublic(x.file_name||'Photo')}" style="width:110px;height:80px;object-fit:cover;border-radius:8px;display:block"></button>`).join('')}</div></div>`;
+                document.body.appendChild(overlay);
+                overlay.querySelector('#publicGalleryAlbumClose').onclick=()=>overlay.remove();
+                overlay.addEventListener('click',e=>{
+                    const b=e.target.closest('.public-gallery-thumb');
+                    if(!b)return;
+                    const photo=photos[Number(b.dataset.photoIndex)];
+                    if(!photo?.public_url)return;
+                    const viewer=document.createElement('div');
+                    viewer.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.94);z-index:100000;display:flex;align-items:center;justify-content:center;padding:20px;';
+                    viewer.innerHTML=`<button id="publicGalleryPhotoClose" style="position:absolute;top:18px;right:22px;font-size:28px;color:#fff;background:none;border:0;cursor:pointer">×</button><img src="${escapePublic(photo.public_url)}" alt="${escapePublic(photo.file_name||'Photo')}" style="max-width:95vw;max-height:90vh;object-fit:contain;border-radius:8px">`;
+                    document.body.appendChild(viewer);
+                    viewer.querySelector('#publicGalleryPhotoClose').onclick=()=>viewer.remove();
+                    viewer.onclick=e=>{if(e.target===viewer)viewer.remove();};
+                });
+            };
+            galleryGrid.innerHTML=`${albums.map(album=>{
+                const photos=grouped[album];
+                const cover=photos.find(x=>x.public_url)?.public_url||'';
+                return `<div class="card" style="cursor:pointer" data-public-album="${escapePublic(album)}"><div class="photo">${cover?`<img src="${escapePublic(cover)}" alt="${escapePublic(album)}" style="width:100%;height:210px;object-fit:cover">`:'<div style="height:210px;display:flex;align-items:center;justify-content:center">📷</div>'}</div><div class="card-body"><h3>${escapePublic(album)}</h3><div class="muted">${photos.length} photo${photos.length===1?'':'s'}</div></div></div>`;
+            }).join('') || '<div class="muted">No photo albums available.</div>'}`;
+            galleryGrid.querySelectorAll('[data-public-album]').forEach(card=>card.addEventListener('click',()=>window.__publicGalleryOpenAlbum(card.getAttribute('data-public-album'))));
+        }
+    }
 }
 
 renderPublic().catch(e=>console.error('Initial public render:',e));
+const authModal=document.getElementById('authModal');
+function preparePublicRegistrationForm(){
+    const registerBox=document.getElementById('authRegister');
+    if(!registerBox)return;
 
-/* ===== PUBLIC CREATE MEMBER ACCOUNT FORM =====
- * Reuse the existing auth dialog. Add any missing member fields and make
- * the registration area vertically scrollable instead of creating a new
- * popup/layout.
- */
-function ensurePublicRegisterForm(){
-    const box=document.getElementById('authRegister');
-    if(!box)return;
+    // Reuse the existing Create Member Account form. Only add fields that are
+    // missing; nothing already present in the attached file is removed.
+    const form=registerBox.querySelector('form') || registerBox;
 
-    box.style.maxHeight='min(72vh, 620px)';
-    box.style.overflowY='auto';
-    box.style.overflowX='hidden';
-    box.style.paddingRight='6px';
-    box.style.boxSizing='border-box';
-    box.style.webkitOverflowScrolling='touch';
+    // Match the Admin -> Add Member fields: name, house/flat, phone, email,
+    // password, confirm password and address.
+    const fieldStyle='width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;';
+    const existingAddress=document.getElementById('regAddress');
 
-    const fieldStyle='width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;background:#fff;';
-    const labelStyle='display:block;font-weight:600;margin:0 0 6px;';
-    const wrapStyle='margin-bottom:14px;';
+    if(!document.getElementById('regConfirmPassword')){
+        const passwordInput=document.getElementById('regPassword');
+        if(passwordInput){
+            const wrap=passwordInput.closest('label')?.parentElement || passwordInput.parentElement;
+            const block=document.createElement('div');
+            block.style.cssText='margin-bottom:15px;';
+            block.innerHTML=`<label for="regConfirmPassword" style="display:block;font-weight:600;margin-bottom:6px;">Confirm Password <span style="color:#d92d20;">*</span></label><input id="regConfirmPassword" type="password" minlength="6" maxlength="72" placeholder="Re-enter password" style="${fieldStyle}"><div id="regConfirmPasswordError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>`;
+            (wrap?.parentElement || form).insertBefore(block, wrap?.nextSibling || null);
+        }
+    }
 
-    const addField=(id,label,type,placeholder,required=true)=>{
-        if(document.getElementById(id))return;
-        const wrap=document.createElement('div');
-        wrap.dataset.publicMemberField='1';
-        wrap.style.cssText=wrapStyle;
-        wrap.innerHTML=`<label for="${id}" style="${labelStyle}">${label}${required?' <span style="color:#d92d20;">*</span>':''}</label>
-          <input id="${id}" type="${type}" ${type==='password'?'autocomplete="new-password"':''} placeholder="${placeholder}" ${required?'required':''} style="${fieldStyle}">`;
-        const button=box.querySelector('#registerBtn');
-        if(button && button.parentElement)button.parentElement.insertBefore(wrap,button);
-        else box.appendChild(wrap);
-    };
-
-    addField('regName','Member Name','text','Enter member name');
-    addField('regHouse','House / Flat Number','text','Enter house / flat number');
-    addField('regPhone','Phone Number','tel','Enter phone number');
-    addField('regEmail','Email','email','Enter email address');
-    addField('regPassword','Password','password','Enter password');
-    addField('regConfirmPassword','Confirm Password','password','Confirm password');
-    addField('regAddress','Address','text','Enter address',false);
-
+    // Add a small show/hide toggle to the password fields without replacing
+    // the existing inputs.
     ['regPassword','regConfirmPassword'].forEach(id=>{
         const input=document.getElementById(id);
-        if(!input || input.dataset.eyeReady==='1')return;
-        input.dataset.eyeReady='1';
-        const parent=input.parentElement;
-        if(!parent)return;
-        parent.style.position='relative';
-        input.style.paddingRight='46px';
-        const eye=document.createElement('button');
-        eye.type='button';
-        eye.setAttribute('aria-label','Show password');
-        eye.textContent='👁';
-        eye.style.cssText='position:absolute;right:8px;bottom:7px;width:34px;height:34px;border:0;background:transparent;cursor:pointer;font-size:17px;';
-        eye.onclick=()=>{
-            const visible=input.type==='text';
-            input.type=visible?'password':'text';
-            eye.setAttribute('aria-label',visible?'Show password':'Hide password');
-            eye.textContent=visible?'👁':'🙈';
-        };
-        parent.appendChild(eye);
+        if(!input || input.dataset.toggleReady==='1')return;
+        input.dataset.toggleReady='1';
+        const holder=document.createElement('div');
+        holder.style.cssText='position:relative;';
+        input.parentNode.insertBefore(holder,input);
+        holder.appendChild(input);
+        const btn=document.createElement('button');
+        btn.type='button';
+        btn.textContent='Show';
+        btn.style.cssText='position:absolute;right:8px;top:50%;transform:translateY(-50%);border:0;background:transparent;color:#475467;cursor:pointer;font-size:13px;';
+        btn.onclick=()=>{const visible=input.type==='text';input.type=visible?'password':'text';btn.textContent=visible?'Show':'Hide';};
+        holder.appendChild(btn);
+        input.style.paddingRight='58px';
+    });
+
+    // Ensure the popup itself scrolls vertically on smaller screens while
+    // preserving the existing modal and all existing content.
+    const popup=registerBox.closest('.modal-card,.modal-content,.dialog,.popup,.overlay-card') || registerBox.parentElement;
+    [registerBox,popup].filter(Boolean).forEach(el=>{
+        el.style.maxHeight='calc(100vh - 80px)';
+        el.style.overflowY='auto';
+        el.style.webkitOverflowScrolling='touch';
     });
 }
-
-const authModal=document.getElementById('authModal');
-const showLogin=()=>{
-    ensurePublicRegisterForm();
-    document.getElementById('authHeading').textContent='Member Login';
-    document.getElementById('authLogin').classList.remove('hidden');
-    document.getElementById('authRegister').classList.add('hidden');
-    authModal.classList.remove('hidden');
-};
-const showReg=()=>{
-    ensurePublicRegisterForm();
-    document.getElementById('authHeading').textContent='Create Member Account';
-    document.getElementById('authLogin').classList.add('hidden');
-    document.getElementById('authRegister').classList.remove('hidden');
-    authModal.classList.remove('hidden');
-    setTimeout(()=>document.getElementById('regName')?.focus(),50);
-};
-ensurePublicRegisterForm();
-document.getElementById('openLogin').onclick=showLogin;
-document.getElementById('openRegister').onclick=showReg;
-document.getElementById('authClose').onclick=()=>authModal.classList.add('hidden');
+const showLogin=()=>{document.getElementById('authHeading').textContent='Member Login';document.getElementById('authLogin').classList.remove('hidden');document.getElementById('authRegister').classList.add('hidden');authModal.classList.remove('hidden')};
+const showReg=()=>{document.getElementById('authHeading').textContent='Create Member Account';document.getElementById('authLogin').classList.add('hidden');document.getElementById('authRegister').classList.remove('hidden');preparePublicRegistrationForm();authModal.classList.remove('hidden');};
+document.getElementById('openLogin').onclick=showLogin;document.getElementById('openRegister').onclick=showReg;document.getElementById('authClose').onclick=()=>authModal.classList.add('hidden');
     setPublicLoginButtonVisible(false);document.getElementById('switchRegister').onclick=showReg;document.getElementById('switchLogin').onclick=showLogin;
 
 /* ===== PUBLIC TOP NAVIGATION FIX ===== */
@@ -232,102 +354,27 @@ async function login(){
     else openMemberDashboard(user);
     toast('Login successful');
 }
-let publicRegisterBusy=false;
-let publicRegisterLastAttempt=0;
 async function register(){
-    ensurePublicRegisterForm();
-    if(publicRegisterBusy)return;
-
-    const now=Date.now();
-    if(now-publicRegisterLastAttempt<5000){
-        return toast('Please wait a few seconds before trying again.');
-    }
-
-    const name=document.getElementById('regName')?.value.trim()||'';
-    const email=document.getElementById('regEmail')?.value.trim().toLowerCase()||'';
-    const password=document.getElementById('regPassword')?.value||'';
-    const confirmPassword=document.getElementById('regConfirmPassword')?.value||'';
-    const phone=document.getElementById('regPhone')?.value.trim()||'';
-    const house_no=document.getElementById('regHouse')?.value.trim()||'';
-    const address=document.getElementById('regAddress')?.value.trim()||'';
-
-    if(!name||!email||!password||!confirmPassword||!house_no||!phone){
-        return toast('Please fill all required member fields.');
-    }
-    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
-        return toast('Please enter a valid email address.');
-    }
-    if(!/^\+?[0-9 ()-]{7,20}$/.test(phone)){
-        return toast('Please enter a valid phone number.');
-    }
-    if(password.length<6)return toast('Password must be at least 6 characters.');
-    if(password!==confirmPassword)return toast('Passwords do not match.');
-    if(!sb)return toast('Supabase is not configured yet.');
-
-    publicRegisterBusy=true;
-    publicRegisterLastAttempt=now;
-    const registerBtn=document.getElementById('registerBtn');
-    const originalText=registerBtn?.textContent||'Create Member Account';
-    if(registerBtn){registerBtn.disabled=true;registerBtn.textContent='Creating...';registerBtn.style.opacity='.7';}
-
-    try{
-        /*
-         * One signup request is made per click. Supabase may send a
-         * confirmation email when "Confirm email" is enabled, and that
-         * email is subject to Supabase's email rate limit.
-         *
-         * The service-role admin API must NOT be called from browser JS.
-         * For a no-email-confirmation flow, disable "Confirm email" in
-         * Supabase Authentication settings, or use a dedicated server-side
-         * registration Edge Function with auth.admin.createUser().
-         */
-        const {data,error}=await sb.auth.signUp({
-            email,
-            password,
-            options:{data:{full_name:name,phone}}
-        });
-
-        if(error){
-            console.error('Public member registration error:',error);
-            const msg=String(error.message||'');
-            if(/rate limit|rate_limit|email.*limit/i.test(msg)){
-                throw new Error('Email rate limit exceeded. Please wait before creating another account. If you do not want confirmation emails, disable "Confirm email" in Supabase Authentication settings.');
-            }
-            throw new Error(msg||'Registration failed.');
-        }
-        if(!data.user)throw new Error('Registration could not be completed.');
-
-        const profileResult=await sb.from('profiles').update({
-            full_name:name,
-            email:data.user.email||email,
-            phone:phone||null,
-            house_number:house_no,
-            address:address||null,
-            role:'member',
-            is_active:true,
-            updated_at:new Date().toISOString()
-        }).eq('id',data.user.id);
-
-        if(profileResult.error){
-            console.error('Profile update error:',profileResult.error);
-            throw new Error('Account was created, but member profile details could not be saved: '+profileResult.error.message);
-        }
-
-        authModal.classList.add('hidden');
-        if(!data.session){
-            showLogin();
-            return toast('Registration successful. Please verify your email before login.');
-        }
-
-        openMemberDashboard({...data.user,name,email,phone,house_no,address,role:'member'});
-        toast('Registration complete');
-    }catch(error){
-        console.error('Create Member Account failed:',error);
-        toast(error?.message||'Unable to create member account.');
-    }finally{
-        publicRegisterBusy=false;
-        if(registerBtn){registerBtn.disabled=false;registerBtn.textContent=originalText;registerBtn.style.opacity='1';}
-    }
+    const name=document.getElementById('regName').value.trim();
+    const email=document.getElementById('regEmail').value.trim();
+    const password=document.getElementById('regPassword').value;
+    const phone=document.getElementById('regPhone').value.trim();
+    const house_no=document.getElementById('regHouse').value.trim();
+    const address=document.getElementById('regAddress').value.trim();
+    const confirmPassword=document.getElementById('regConfirmPassword')?.value || '';
+    if(!name||!email||!password||!house_no||!phone)return toast('Please fill name, email, phone, house and password');
+    if(password.length<6)return toast('Password must be at least 6 characters');
+    if(confirmPassword!==password)return toast('Passwords do not match');
+    if(!sb)return toast('Supabase is not configured yet');
+    const {data,error}=await sb.auth.signUp({email,password,options:{data:{full_name:name}}});
+    if(error)return toast(error.message);
+    if(!data.user)return toast('Registration could not be completed');
+    const profileResult=await sb.from('profiles').update({full_name:name,email:data.user.email||email,phone:phone||null,house_number:house_no,address:address||null}).eq('id',data.user.id);
+    if(profileResult.error){console.error('Profile update error:',profileResult.error);return toast('Account created, but profile details could not be saved');}
+    authModal.classList.add('hidden');
+    if(!data.session){showLogin();return toast('Registration successful. Please verify your email before login.');}
+    openMemberDashboard({...data.user,name,email,phone,house_no,address,role:'member'});
+    toast('Registration complete');
 }
 document.getElementById('loginBtn').onclick=login;
 document.getElementById('registerBtn').onclick=register;
