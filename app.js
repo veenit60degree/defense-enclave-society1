@@ -1722,37 +1722,67 @@ async function adminEditMember(i){
     if(!x)return;
     if(!sb)return toast('Supabase is not configured.');
 
+    const esc=societyAdminModalEsc;
+    const currentEmail=x.email||x.auth_email||'';
+
+    const passwordField=(id,label,placeholder)=>{
+        return `
+        <div style="margin-bottom:15px;">
+          <label for="${id}" style="display:block;font-weight:600;margin-bottom:6px;">${label}</label>
+          <div style="position:relative;">
+            <input id="${id}" type="password" autocomplete="new-password"
+              placeholder="${placeholder}"
+              style="width:100%;box-sizing:border-box;padding:11px 44px 11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
+            <button type="button" data-password-toggle="${id}"
+              aria-label="Show password"
+              style="position:absolute;right:8px;top:50%;transform:translateY(-50%);width:34px;height:34px;border:0;background:transparent;cursor:pointer;font-size:17px;color:#475467;">
+              👁
+            </button>
+          </div>
+          <div style="font-size:12px;color:#667085;margin-top:5px;">Leave blank to keep the current password.</div>
+          <div id="${id}Error" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
+        </div>`;
+    };
+
     const body=`
     <form id="memberEditModalForm" novalidate>
       <div id="memberEditGeneralError" style="display:none;margin-bottom:14px;padding:11px 12px;border-radius:9px;background:#fff1f1;color:#b42318;font-size:13px;"></div>
 
       <div style="margin-bottom:15px;">
         <label for="editMemberFullName" style="display:block;font-weight:600;margin-bottom:6px;">Member name <span style="color:#d92d20;">*</span></label>
-        <input id="editMemberFullName" type="text" maxlength="150" value="${societyAdminModalEsc(x.full_name||x.name||'')}" placeholder="Enter member full name"
+        <input id="editMemberFullName" type="text" maxlength="150" value="${esc(x.full_name||x.name||'')}" placeholder="Enter member full name"
           style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
-        <div style="font-size:12px;color:#667085;margin-top:5px;">Example: Raj Sharma</div>
         <div id="editMemberFullNameError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
       </div>
 
       <div style="margin-bottom:15px;">
         <label for="editMemberHouse" style="display:block;font-weight:600;margin-bottom:6px;">House / Flat number <span style="color:#d92d20;">*</span></label>
-        <input id="editMemberHouse" type="text" maxlength="50" value="${societyAdminModalEsc(x.house_number||x.house_no||'')}" placeholder="Enter house / flat number"
+        <input id="editMemberHouse" type="text" maxlength="50" value="${esc(x.house_number||x.house_no||'')}" placeholder="Enter house / flat number"
           style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
-        <div style="font-size:12px;color:#667085;margin-top:5px;">Example: A-101</div>
         <div id="editMemberHouseError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
       </div>
 
       <div style="margin-bottom:15px;">
         <label for="editMemberPhone" style="display:block;font-weight:600;margin-bottom:6px;">Phone</label>
-        <input id="editMemberPhone" type="tel" maxlength="20" value="${societyAdminModalEsc(x.phone||'')}" placeholder="Enter phone number"
+        <input id="editMemberPhone" type="tel" maxlength="20" value="${esc(x.phone||'')}" placeholder="Enter phone number"
           style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
-        <div style="font-size:12px;color:#667085;margin-top:5px;">Example: 9876543210</div>
       </div>
+
+      <div style="margin-bottom:15px;">
+        <label for="editMemberEmail" style="display:block;font-weight:600;margin-bottom:6px;">Email</label>
+        <input id="editMemberEmail" type="email" maxlength="254" value="${esc(currentEmail)}" placeholder="Enter email address" autocomplete="email"
+          style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
+        <div style="font-size:12px;color:#667085;margin-top:5px;">This updates the member's Supabase login email.</div>
+        <div id="editMemberEmailError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
+      </div>
+
+      ${passwordField('editMemberPassword','New Password','Enter new password')}
+      ${passwordField('editMemberConfirmPassword','Confirm New Password','Re-enter new password')}
 
       <div style="margin-bottom:15px;">
         <label for="editMemberAddress" style="display:block;font-weight:600;margin-bottom:6px;">Address</label>
         <textarea id="editMemberAddress" rows="3" maxlength="500" placeholder="Enter address"
-          style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;resize:vertical;">${societyAdminModalEsc(x.address||'')}</textarea>
+          style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;resize:vertical;">${esc(x.address||'')}</textarea>
       </div>
 
       <div style="margin-bottom:20px;">
@@ -1762,7 +1792,6 @@ async function adminEditMember(i){
           <option value="member" ${String(x.role||'member').toLowerCase()==='member'?'selected':''}>Member</option>
           <option value="admin" ${String(x.role||'').toLowerCase()==='admin'?'selected':''}>Admin</option>
         </select>
-        <div style="font-size:12px;color:#667085;margin-top:5px;">Select the user's society role.</div>
         <div id="editMemberRoleError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
       </div>
     </form>`;
@@ -1770,42 +1799,118 @@ async function adminEditMember(i){
     const {overlay,close}=societyAdminModalShell(
         'memberEditModal',
         'Edit Member',
-        'Update all member details and save them together.',
+        'Update member details, email, or password.',
         body,
         'Update Member'
     );
 
+    overlay.querySelectorAll('[data-password-toggle]').forEach(btn=>{
+        btn.addEventListener('click',()=>{
+            const input=overlay.querySelector('#'+btn.dataset.passwordToggle);
+            if(!input)return;
+            const showing=input.type==='text';
+            input.type=showing?'password':'text';
+            btn.textContent=showing?'👁':'🙈';
+            btn.setAttribute('aria-label',showing?'Show password':'Hide password');
+        });
+    });
+
     overlay.querySelector('#memberEditModalForm').onsubmit=async e=>{
         e.preventDefault();
-        societyAdminClearField(overlay,'editMemberFullName','editMemberFullNameError');
-        societyAdminClearField(overlay,'editMemberHouse','editMemberHouseError');
-        societyAdminClearField(overlay,'editMemberRole','editMemberRoleError');
+
+        const clear=(id,errorId)=>societyAdminClearField(overlay,id,errorId);
+        ['editMemberFullName','editMemberHouse','editMemberEmail','editMemberPassword','editMemberConfirmPassword','editMemberRole']
+            .forEach(id=>clear(id,id+'Error'));
 
         const full_name=overlay.querySelector('#editMemberFullName').value.trim();
         const house_number=overlay.querySelector('#editMemberHouse').value.trim();
         const phone=overlay.querySelector('#editMemberPhone').value.trim();
+        const email=overlay.querySelector('#editMemberEmail').value.trim().toLowerCase();
+        const password=overlay.querySelector('#editMemberPassword').value;
+        const confirmPassword=overlay.querySelector('#editMemberConfirmPassword').value;
         const address=overlay.querySelector('#editMemberAddress').value.trim();
         const role=overlay.querySelector('#editMemberRole').value;
+
         let valid=true;
 
-        if(!full_name){societyAdminFieldError(overlay,'editMemberFullName','editMemberFullNameError','Please enter the member name.');valid=false;}
-        if(!house_number){societyAdminFieldError(overlay,'editMemberHouse','editMemberHouseError','Please enter the house / flat number.');valid=false;}
-        if(!['member','admin'].includes(role)){societyAdminFieldError(overlay,'editMemberRole','editMemberRoleError','Please select a valid role.');valid=false;}
+        if(!full_name){
+            societyAdminFieldError(overlay,'editMemberFullName','editMemberFullNameError','Please enter the member name.');
+            valid=false;
+        }
+        if(!house_number){
+            societyAdminFieldError(overlay,'editMemberHouse','editMemberHouseError','Please enter the house / flat number.');
+            valid=false;
+        }
+        if(email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+            societyAdminFieldError(overlay,'editMemberEmail','editMemberEmailError','Please enter a valid email address.');
+            valid=false;
+        }
+        if(password && password.length<6){
+            societyAdminFieldError(overlay,'editMemberPassword','editMemberPasswordError','Password must be at least 6 characters.');
+            valid=false;
+        }
+        if(password!==confirmPassword){
+            societyAdminFieldError(overlay,'editMemberConfirmPassword','editMemberConfirmPasswordError','Passwords do not match.');
+            valid=false;
+        }
+        if(!['member','admin'].includes(role)){
+            societyAdminFieldError(overlay,'editMemberRole','editMemberRoleError','Please select a valid role.');
+            valid=false;
+        }
         if(!valid)return;
 
-        const {error}=await sb.from('profiles').update({full_name,house_number,phone,address,role}).eq('id',x.id);
-        if(error){
+        try{
+            const {data:{session},error:sessionError}=await sb.auth.getSession();
+            if(sessionError)throw sessionError;
+            if(!session?.access_token)throw new Error('Admin session is not available. Please login again.');
+
+            const {data:fnData,error:fnError}=await sb.functions.invoke(
+                'admin-create-member',
+                {
+                    body:{
+                        action:'update',
+                        user_id:x.id,
+                        full_name,
+                        house_number,
+                        phone:phone||null,
+                        email:email||null,
+                        password:password||null,
+                        address:address||null,
+                        role
+                    },
+                    headers:{
+                        Authorization:`Bearer ${session.access_token}`
+                    }
+                }
+            );
+
+            if(fnError){
+                console.error('admin-create-member update error:',fnError);
+                let message=fnError.message||'Failed to update member.';
+                try{
+                    const response=fnError.context;
+                    if(response && typeof response.clone==='function'){
+                        const payload=await response.clone().json();
+                        if(payload?.error)message=payload.error;
+                    }
+                }catch(_){}
+                throw new Error(message);
+            }
+
+            if(fnData?.error)throw new Error(fnData.error);
+            if(!fnData?.success)throw new Error('Member was not updated.');
+
+            close();
+            toast('Member updated');
+            await adminPage('members',window.__adminUser);
+        }catch(error){
+            console.error('Member update failed:',error);
             const ge=overlay.querySelector('#memberEditGeneralError');
-            ge.textContent='Member update failed: '+error.message;
+            ge.textContent='Member update failed: '+(error?.message||error);
             ge.style.display='block';
-            return;
         }
-        close();
-        toast('Member updated');
-        await adminPage('members',window.__adminUser);
     };
 }
-
 
 // async function adminDeleteMember(i){
 //  const x=window.__memberRows?.[i]; if(!x||!confirm('Remove this member?'))return;
