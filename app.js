@@ -2992,21 +2992,63 @@ function openMemberComplaintForm(user){
         submitBtn.textContent='Submitting...';
 
         try{
-            const {data,error}=await sb.from('complaints').insert({
-                user_id:user.id,
+            // Always use the authenticated Supabase user's UUID.
+            // Do not rely only on the dashboard `user.id` object because
+            // RLS checks complaints.user_id against auth.uid().
+            const {data:sessionData,error:sessionError}=await sb.auth.getSession();
+
+            if(sessionError){
+                throw new Error('Unable to get login session: '+sessionError.message);
+            }
+
+            const authUser=sessionData?.session?.user;
+
+            if(!authUser?.id){
+                throw new Error('Your login session has expired. Please logout and login again.');
+            }
+
+            // Confirm the authenticated user still has a profile.
+            const {data:profile,error:profileError}=await sb
+                .from('profiles')
+                .select('id')
+                .eq('id',authUser.id)
+                .maybeSingle();
+
+            if(profileError){
+                throw new Error('Unable to verify member profile: '+profileError.message);
+            }
+
+            if(!profile){
+                throw new Error('Member profile was not found for the logged-in account.');
+            }
+
+            const complaintPayload={
+                user_id:authUser.id,
                 category,
                 subject,
                 description,
                 contact_phone:contactPhone||null,
                 contact_email:contactEmail||null,
                 status:'Submitted'
-            }).select().single();
+            };
+
+            console.log('Submitting complaint:',{
+                user_id:authUser.id,
+                category,
+                subject
+            });
+
+            const {data,error}=await sb
+                .from('complaints')
+                .insert(complaintPayload)
+                .select()
+                .single();
 
             if(error) throw error;
 
             close();
             toast('Complaint submitted successfully.');
-            await memberPage('complaints',user);
+            await memberPage('complaints',{...user,id:authUser.id});
         }catch(err){
             console.error('Complaint submission failed:',err);
             errorBox.textContent=err?.message||'Unable to submit complaint. Please try again.';
