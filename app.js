@@ -20,229 +20,124 @@ if (
 
 const demo={members:[['RS','Raj Sharma','A-101'],['PK','Priya Kapoor','A-102'],['MG','Manoj Gupta','A-103'],['AJ','Alex Johnson','A-104'],['SK','Sonia Kaur','B-201'],['VS','Vikas Singh','B-202'],['AM','Anita Mehta','B-203'],['NK','Nitin Kumar','C-301'],['PS','Pooja Sethi','C-302']],works:[['Main Gate Repair','Repair and repaint main entrance gate','Ongoing',72,'12 Sep 2026'],['Street Light Upgrade','Replace 18 old lights with LED fixtures','Ongoing',45,'18 Sep 2026'],['Park Renovation','Benches, pathway and plantation work','Pending',0,'25 Sep 2026'],['Water Tank Cleaning','Annual cleaning and inspection','Completed',100,'05 Sep 2026']],events:[['20 Sep 2026','Monthly General Meeting','Community Hall · 6:00 PM','◷'],['02 Oct 2026','Cleanliness Drive','Main Park · 7:00 AM','♧'],['18 Oct 2026','Family Sports Day','Society Ground · 4:00 PM','★']],gallery:['Society Meeting','Park Activity','Festival Evening','Cleanliness Drive','Community Gathering']};
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)}
+function publicSectionByHeading(labels){
+    const wanted=(labels||[]).map(x=>String(x).trim().toLowerCase());
+    const nodes=[...document.querySelectorAll('section,article,.section,.panel,main > div,body > div')];
+    return nodes.find(node=>{
+        const h=node.querySelector('h1,h2,h3,h4,.section-title,.eyebrow');
+        const text=(h?.textContent||'').trim().toLowerCase();
+        return wanted.some(x=>text===x || text.includes(x));
+    })||null;
+}
+
+function publicContentContainer(labels, preferredSelectors=[]){
+    const section=publicSectionByHeading(labels);
+    if(!section)return null;
+    for(const selector of preferredSelectors){
+        const el=section.querySelector(selector);
+        if(el)return el;
+    }
+    // Reuse the existing section and only create a content holder inside it.
+    // This does NOT create another section/layout.
+    let holder=section.querySelector('[data-public-dynamic-content]');
+    if(!holder){
+        holder=document.createElement('div');
+        holder.setAttribute('data-public-dynamic-content','1');
+        section.appendChild(holder);
+    }
+    return holder;
+}
+
+function escapePublic(v){
+    return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 async function renderPublic(){
-    /*
-     * PUBLIC / LOGGED-OUT PAGE
-     * IMPORTANT: Reuse the sections that already exist in the HTML.
-     * Do NOT create new Society Members / Events / Maintenance / Map / About
-     * sections here. We only replace the dynamic data inside those sections.
-     * Society Finance is intentionally NOT loaded on the public page.
-     */
     if(!sb){
-        console.error('Public render: Supabase client is not available.');
+        console.warn('Public render: Supabase client is not available.');
         return;
     }
 
-    // Find an existing section by its normal page id. We never append a new
-    // section, which prevents duplicate layouts.
-    const findSection=(...ids)=>{
-        for(const id of ids){
-            const el=document.getElementById(id);
-            if(el)return el;
-        }
-        return null;
-    };
-
-    const membersSection=findSection('members','societyMembers','publicMembers');
-    const eventsSection=findSection('events','societyEvents','publicEvents');
-    const maintenanceSection=findSection('maintenance','societyMaintenance','publicMaintenance');
-    const mapSection=findSection('map','societyMap','publicMap');
-    const aboutSection=findSection('about','aboutUs','societyAbout','publicAbout');
-
-    // Use the existing data containers. If the existing section has no named
-    // container, use its existing grid/table/content element. We do not create
-    // another section or another heading.
-    const existingContent=(section, selectors)=>{
-        if(!section)return null;
-        for(const selector of selectors){
-            const el=section.querySelector(selector);
-            if(el)return el;
-        }
-        return null;
-    };
-
-    const memberGrid=document.getElementById('memberGrid') || existingContent(membersSection,[
-        '.member-grid','.card-grid','[data-members]'
+    // Finance is intentionally NOT loaded/rendered on the public page.
+    const [members,works,events,gallery,maintenance,about]=await Promise.all([
+        sb.from('profiles').select('id,full_name,phone,house_number,address,role,is_active').eq('role','member').eq('is_active',true),
+        sb.from('society_work').select('*').order('created_at',{ascending:false}),
+        sb.from('events').select('*').order('event_date',{ascending:false}),
+        sb.from('gallery_photos').select('*').order('created_at',{ascending:false}),
+        sb.from('maintenance').select('*').order('created_at',{ascending:false}),
+        sb.from('society_about').select('id,description').eq('id',1).maybeSingle()
     ]);
 
-    const eventGrid=document.getElementById('eventGrid') || existingContent(eventsSection,[
-        '.event-grid','.card-grid','[data-events]'
-    ]);
+    console.log('PUBLIC MEMBERS:',members.data,'ERROR:',members.error);
+    console.log('PUBLIC EVENTS:',events.data,'ERROR:',events.error);
+    console.log('PUBLIC MAINTENANCE:',maintenance.data,'ERROR:',maintenance.error);
+    console.log('PUBLIC ABOUT:',about.data,'ERROR:',about.error);
 
-    const maintenanceTable=document.getElementById('maintenanceTable') || existingContent(maintenanceSection,[
-        'tbody','.table-wrap','table','[data-maintenance]','.card-grid'
-    ]);
-
-    const mapFrame=mapSection?.querySelector('iframe');
-    const aboutContent=document.getElementById('aboutContent') || existingContent(aboutSection,[
-        '[data-about]','.about-content','.about-text','.panel p','.card-body p','p'
-    ]);
-
-    // Public data is intentionally loaded separately. One RLS/query failure
-    // must not stop the remaining sections from updating.
-    const [membersResult,eventsResult,maintenanceResult,aboutResult,worksResult,galleryResult]=await Promise.all([
-        sb.from('profiles')
-          .select('id,full_name,phone,house_number,address,role,is_active')
-          .eq('role','member')
-          .eq('is_active',true)
-          .order('full_name',{ascending:true}),
-        sb.from('events')
-          .select('*')
-          .order('event_date',{ascending:true}),
-        sb.from('maintenance')
-          .select('*')
-          .order('created_at',{ascending:false}),
-        sb.from('society_about')
-          .select('*')
-          .eq('id',1)
-          .maybeSingle(),
-        sb.from('society_work')
-          .select('*')
-          .order('created_at',{ascending:false}),
-        sb.from('gallery_photos')
-          .select('*')
-          .order('created_at',{ascending:false})
-    ]);
-
-    console.log('PUBLIC MEMBERS:',membersResult.data,'ERROR:',membersResult.error);
-    console.log('PUBLIC EVENTS:',eventsResult.data,'ERROR:',eventsResult.error);
-    console.log('PUBLIC MAINTENANCE:',maintenanceResult.data,'ERROR:',maintenanceResult.error);
-    console.log('PUBLIC ABOUT:',aboutResult.data,'ERROR:',aboutResult.error);
-
-    // -------------------- Society Members --------------------
+    // ---------- Existing Society Members section ----------
+    const memberGrid=document.getElementById('memberGrid') ||
+        publicContentContainer(['Society Members','Members'],['.member-grid','.members-grid','.cards-grid','.grid-3']);
     if(memberGrid){
-        if(membersResult.error){
-            console.error('Public members load error:',membersResult.error);
-            memberGrid.innerHTML='<div class="muted">Unable to load members. Please check the public SELECT policy for profiles.</div>';
-        }else{
-            const rows=membersResult.data||[];
-            memberGrid.innerHTML=rows.map(p=>{
-                const initials=(p.full_name||'M').split(/\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase();
-                const address=[p.house_number,p.address].filter(Boolean).join(', ');
-                return `<div class="member-card">
-                    <div class="member-photo">${escapePublic(initials)}</div>
-                    <div>
-                        <strong>${escapePublic(p.full_name||'Member')}</strong>
-                        <div class="muted">${escapePublic(address||'Address not available')}</div>
-                        <div class="muted" style="margin-top:4px">${escapePublic(p.phone||'Phone not available')}</div>
-                        <span class="status ongoing" style="margin-top:6px">Active Member</span>
-                    </div>
-                </div>`;
-            }).join('') || '<div class="muted">No active members available.</div>';
-        }
-    }else{
-        console.warn('Existing Society Members data container was not found. No new layout was created.');
+        memberGrid.innerHTML=(members.data||[]).map(p=>{
+            const initials=(p.full_name||'M').split(/\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase();
+            const address=[p.house_number,p.address].filter(Boolean).join(', ');
+            return `<div class="member-card"><div class="member-photo">${escapePublic(initials)}</div><div><strong>${escapePublic(p.full_name||'Member')}</strong><div class="muted">${escapePublic(p.phone||'Phone not available')}</div><div class="muted">${escapePublic(address||'Address not available')}</div></div></div>`;
+        }).join('') || '<div class="muted">No members available.</div>';
     }
 
-    // -------------------- Events --------------------
-    if(eventGrid){
-        if(eventsResult.error){
-            console.error('Public events load error:',eventsResult.error);
-            eventGrid.innerHTML='<div class="muted">Unable to load events. Please check the public SELECT policy for events.</div>';
-        }else{
-            const rows=eventsResult.data||[];
-            eventGrid.innerHTML=rows.map(e=>`<div class="card">
-                <div class="photo">📅</div>
-                <div class="card-body">
-                    <div class="event-date">${escapePublic(e.event_date||e.date||'')}</div>
-                    <h3>${escapePublic(e.title||e.name||'Event')}</h3>
-                    <div class="muted">${escapePublic(e.location||e.place||e.description||'')}</div>
-                </div>
-            </div>`).join('') || '<div class="muted">No events available.</div>';
-        }
-    }else{
-        console.warn('Existing Events data container was not found. No new layout was created.');
-    }
-
-    // -------------------- Maintenance --------------------
-    if(maintenanceSection){
-        if(maintenanceResult.error){
-            console.error('Public maintenance load error:',maintenanceResult.error);
-        }else if(maintenanceTable){
-            const rows=maintenanceResult.data||[];
-            const html=rows.map(x=>`<tr>
-                <td><strong>${escapePublic(x.item||x.title||x.name||x.description||'Maintenance')}</strong></td>
-                <td>₹${Number(x.amount||0).toLocaleString('en-IN')}</td>
-                <td><span class="status ${(String(x.status||'').toLowerCase())}">${escapePublic(x.status||'')}</span></td>
-            </tr>`).join('') || '<tr><td colspan="3" class="muted">No maintenance records available.</td></tr>';
-
-            if(maintenanceTable.tagName==='TBODY'){
-                maintenanceTable.innerHTML=html;
-            }else if(maintenanceTable.tagName==='TABLE'){
-                const tbody=maintenanceTable.querySelector('tbody');
-                if(tbody)tbody.innerHTML=html;
-            }else if(maintenanceTable.classList.contains('table-wrap')){
-                const tbody=maintenanceTable.querySelector('tbody');
-                if(tbody)tbody.innerHTML=html;
-            }else{
-                // Existing maintenance content area: update only its data,
-                // without adding another section or duplicate heading.
-                maintenanceTable.innerHTML=`<table class="table"><thead><tr><th>Maintenance</th><th>Amount</th><th>Status</th></tr></thead><tbody>${html}</tbody></table>`;
-            }
-        }else{
-            console.warn('Existing Maintenance data container was not found. No new layout was created.');
-        }
-    }
-
-    // -------------------- Society Map --------------------
-    // Reuse the existing map iframe/container. Never create another map block.
-    if(mapSection){
-        if(mapFrame){
-            mapFrame.src='https://www.google.com/maps?q=30.777604,76.616637&z=17&output=embed';
-            mapFrame.title='Defense Enclave Society Map';
-        }else{
-            const existingMapLink=mapSection.querySelector('a[href*="maps.app.goo.gl"],a[href*="google.com/maps"]');
-            if(existingMapLink)existingMapLink.href='https://maps.app.goo.gl/A9TuNFyh9xzpTynU8';
-            console.warn('Existing Society Map iframe was not found; no new map layout was created.');
-        }
-    }
-
-    // -------------------- About Us --------------------
-    // Update the existing About Us text only. Do not add another heading,
-    // address block, or a second About Us section.
-    if(aboutContent){
-        if(aboutResult.error){
-            console.error('Public About load error:',aboutResult.error);
-        }else{
-            const row=aboutResult.data||{};
-            const description=row.description||row.about||row.content||row.text||'';
-            if(aboutContent.tagName==='P' || aboutContent.tagName==='DIV' || aboutContent.tagName==='SPAN'){
-                aboutContent.textContent=description || aboutContent.textContent || '';
-            }else{
-                aboutContent.textContent=description || '';
-            }
-        }
-    }else if(aboutSection){
-        console.warn('Existing About Us data container was not found. No new About Us layout was created.');
-    }
-
-    // -------------------- Existing Society Work --------------------
-    const workTable=document.getElementById('workTable');
-    if(workTable){
-        if(worksResult.error){
-            console.error('Public work load error:',worksResult.error);
-        }else{
-            const rows=worksResult.data||[];
+    // ---------- Existing Society Work section ----------
+    const workTable=document.getElementById('workTable') ||
+        publicContentContainer(['Society Work','Work'],['.work-table','.table-wrap table']);
+    if(workTable && works.data){
+        const rows=works.data;
+        if(workTable.tagName==='TABLE'){
             workTable.innerHTML=`<thead><tr><th>Project</th><th>Description</th><th>Status</th><th>Progress</th><th>Target</th></tr></thead><tbody>${rows.map(w=>{
                 const name=w.name||w.title||w.work_name||w.project_name||w.work_title||w.project||w.work||w.activity||w.task||w.subject||'';
-                return `<tr><td><strong>${escapePublic(name)}</strong></td><td>${escapePublic(w.description||w.details||'')}</td><td><span class="status ${(w.status||'').toLowerCase()}">${escapePublic(w.status||'')}</span></td><td><div class="progress"><i style="width:${Number(w.progress||0)}%"></i></div>${Number(w.progress||0)}%</td><td>${escapePublic(w.target_date||w.target||w.due_date||'')}</td></tr>`;
+                return `<tr><td><strong>${escapePublic(name)}</strong></td><td>${escapePublic(w.description||w.details||'')}</td><td>${escapePublic(w.status||'')}</td><td>${Number(w.progress||0)}%</td><td>${escapePublic(w.target_date||w.target||w.due_date||'')}</td></tr>`;
             }).join('')}</tbody>`;
         }
     }
 
-    // -------------------- Existing Gallery --------------------
-    const galleryGrid=document.getElementById('galleryGrid');
-    if(galleryGrid){
-        if(galleryResult.error){
-            console.error('Public gallery load error:',galleryResult.error);
-        }else{
-            galleryGrid.innerHTML=(galleryResult.data||[]).map((g,i)=>`<div class="card"><div class="photo">${g.public_url?`<img src="${escapePublic(g.public_url)}" alt="${escapePublic(g.file_name||'Gallery photo')}" style="width:100%;height:100%;object-fit:cover">`:['◉','★','♧','✦','✓','◎'][i%6]}</div><div class="card-body"><strong>${escapePublic(g.file_name||'Gallery Photo')}</strong></div></div>`).join('') || '<div class="muted">No gallery photos available.</div>';
+    // ---------- Existing Events section ----------
+    const eventGrid=document.getElementById('eventGrid') ||
+        publicContentContainer(['Events','Upcoming Events'],['.event-grid','.events-grid','.cards-grid']);
+    if(eventGrid){
+        eventGrid.innerHTML=(events.data||[]).map(e=>`<div class="card"><div class="photo">📅</div><div class="card-body"><div class="event-date">${escapePublic(e.event_date||e.date||'')}</div><h3>${escapePublic(e.title||e.name||'')}</h3><div class="muted">${escapePublic(e.location||e.place||e.description||'')}</div></div></div>`).join('') || '<div class="muted">No events available.</div>';
+    }
+
+    // ---------- Existing Maintenance section ----------
+    const maintenanceGrid=document.getElementById('maintenanceGrid') ||
+        publicContentContainer(['Maintenance','Active Maintenance'],['.maintenance-grid','.maintenance-list','.cards-grid','.table-wrap']);
+    if(maintenanceGrid){
+        maintenanceGrid.innerHTML=(maintenance.data||[]).map(x=>`<div class="card"><div class="card-body"><h3>${escapePublic(x.item||x.title||x.name||'Maintenance')}</h3><div class="muted">${escapePublic(x.description||'')}</div><div><strong>₹${Number(x.amount||0).toLocaleString('en-IN')}</strong></div><span class="status">${escapePublic(x.status||'')}</span></div></div>`).join('') || '<div class="muted">No maintenance records available.</div>';
+    }
+
+    // ---------- Existing About Us section ----------
+    const aboutContainer=document.getElementById('aboutContent') ||
+        publicContentContainer(['About Us','About Society','About'],['.about-content','.about-description','.about-text']);
+    if(aboutContainer){
+        const description=about.data?.description||'';
+        aboutContainer.innerHTML=description
+            ? `<div class="about-description">${escapePublic(description).replace(/\n/g,'<br>')}</div>`
+            : '<div class="muted">About information is not available.</div>';
+    }
+
+    // ---------- Existing Society Map section ----------
+    // Reuse the existing `map` div; do not create another section.
+    const mapSection=document.getElementById('map') || publicSectionByHeading(['Society Map']);
+    if(mapSection){
+        const mapDiv=mapSection.matches('.map') ? mapSection :
+            (mapSection.querySelector('.map') || mapSection.querySelector('[data-map]') || mapSection);
+        if(mapDiv){
+            mapDiv.innerHTML=`<iframe title="Defense Enclave Society location" src="https://www.google.com/maps?q=30.777604,76.616637&z=16&output=embed" width="100%" height="420" style="border:0;border-radius:14px;display:block;" loading="lazy" allowfullscreen referrerpolicy="no-referrer-when-downgrade"></iframe>`;
         }
     }
-}
 
-function escapePublic(value){
-    return String(value??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    // ---------- Existing Gallery section ----------
+    const galleryGrid=document.getElementById('galleryGrid') ||
+        publicContentContainer(['Gallery','Photo Gallery'],['.gallery-grid','.photos-grid','.cards-grid']);
+    if(galleryGrid){
+        galleryGrid.innerHTML=(gallery.data||[]).map((g,i)=>`<div class="card"><div class="photo">${g.public_url?`<img src="${escapePublic(g.public_url)}" alt="${escapePublic(g.file_name||'Gallery photo')}" style="width:100%;height:100%;object-fit:cover">`:['◉','★','♧','✦','✓','◎'][i%6]}</div><div class="card-body"><strong>${escapePublic(g.file_name||'Gallery Photo')}</strong></div></div>`).join('') || '<div class="muted">No gallery photos available.</div>';
+    }
 }
 
 renderPublic().catch(e=>console.error('Initial public render:',e));
