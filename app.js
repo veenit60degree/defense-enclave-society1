@@ -57,46 +57,167 @@ function escapePublic(v){
 function publicFormGroupFor(id){
     const el=document.getElementById(id);
     if(!el)return null;
+
+    // Find the smallest useful wrapper containing only this field.
+    // This works with both the original two-column form and the current
+    // responsive public form without changing the existing HTML layout.
     let node=el;
-    for(let i=0;i<4 && node && node.parentElement;i++){
+    let best=el.parentElement||el;
+    while(node && node.parentElement){
         const parent=node.parentElement;
-        if(parent.tagName==='FORM' || parent.id==='authRegister' || parent.id==='authModal') break;
-        const text=(parent.innerText||'').trim().toLowerCase();
-        if(text.length>0 && (text.includes('name') || text.includes('phone') || text.includes('email') || text.includes('house') || text.includes('address') || text.includes('password') || text.includes('profile photo') || text.includes('confirm password'))) node=parent;
-        else break;
+        if(parent.id==='authRegister' || parent.id==='authModal' || parent.tagName==='FORM') break;
+        const controls=[...parent.querySelectorAll('input,textarea,select')]
+            .filter(x=>x.id);
+        if(controls.length===1 && controls[0].id===id){
+            best=parent;
+            node=parent;
+            continue;
+        }
+        if(controls.length>1)break;
+        node=parent;
     }
-    return node;
+    return best;
+}
+
+function createPublicConfirmPasswordField(register,passwordEl){
+    if(!register)return null;
+
+    let existing=document.getElementById('regConfirmPassword');
+    if(existing)return publicFormGroupFor('regConfirmPassword');
+
+    const passwordGroup=publicFormGroupFor('regPassword');
+    if(!passwordGroup)return null;
+
+    const group=document.createElement('div');
+    group.setAttribute('data-public-confirm-password-group','1');
+    group.style.marginBottom='15px';
+    group.innerHTML=`
+      <label for="regConfirmPassword" style="display:block;font-weight:600;margin-bottom:6px;">
+        Confirm Password <span style="color:#d92d20;">*</span>
+      </label>
+      <div style="position:relative;">
+        <input id="regConfirmPassword" type="password" minlength="6" maxlength="72"
+          placeholder="Re-enter password"
+          style="width:100%;box-sizing:border-box;padding:11px 70px 11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
+        <button type="button" id="regConfirmPasswordToggle"
+          style="position:absolute;right:10px;top:50%;transform:translateY(-50%);border:0;background:none;color:#475467;font-weight:600;cursor:pointer;padding:4px 6px;">
+          Show
+        </button>
+      </div>
+      <div id="regConfirmPasswordError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>`;
+
+    passwordGroup.parentElement.insertBefore(group,passwordGroup.nextSibling);
+
+    const input=group.querySelector('#regConfirmPassword');
+    const toggle=group.querySelector('#regConfirmPasswordToggle');
+    toggle.onclick=()=>{
+        const show=input.type==='password';
+        input.type=show?'text':'password';
+        toggle.textContent=show?'Hide':'Show';
+    };
+
+    return group;
 }
 
 function fixPublicMemberForm(){
     const register=document.getElementById('authRegister');
     if(!register)return;
 
-    // Keep the existing form and fields; only reorder the existing field groups.
-    const addressGroup=publicFormGroupFor('regAddress');
-    const passwordGroup=publicFormGroupFor('regPassword');
-    const confirmGroup=publicFormGroupFor('regConfirmPassword') || publicFormGroupFor('memberConfirmPassword');
+    // Keep the existing form and existing fields. Only arrange the fields in
+    // the requested order and create Confirm Password if the attached page
+    // does not already contain it.
+    const getGroup=id=>publicFormGroupFor(id);
+    const nameGroup=getGroup('regName');
+    const phoneGroup=getGroup('regPhone');
+    const emailGroup=getGroup('regEmail');
+    const houseGroup=getGroup('regHouse');
+    const passwordGroup=getGroup('regPassword');
 
-    if(addressGroup && passwordGroup && passwordGroup.parentElement){
-        passwordGroup.parentElement.insertBefore(addressGroup,passwordGroup);
+    let confirmGroup=getGroup('regConfirmPassword') || getGroup('memberConfirmPassword');
+    if(!confirmGroup)confirmGroup=createPublicConfirmPasswordField(register,document.getElementById('regPassword'));
+
+    const photoEl=[...register.querySelectorAll('input[type="file"]')].find(x=>{
+        const label=register.querySelector(`label[for="${CSS.escape(x.id||'')}" ]`);
+        return /profile\s*photo|photo/i.test(label?.textContent||'');
+    }) || register.querySelector('input[type="file"]');
+    const photoGroup=photoEl ? publicFormGroupFor(photoEl.id) : null;
+    const addressGroup=getGroup('regAddress');
+
+    // Reuse the existing form's layout container. Move only field groups;
+    // no duplicate sections or dialogs are created.
+    const groups=[nameGroup,phoneGroup,emailGroup,houseGroup,passwordGroup,confirmGroup,photoGroup,addressGroup]
+        .filter((x,i,a)=>x && a.indexOf(x)===i);
+
+    if(groups.length){
+        const parent=groups[0].parentElement;
+        if(parent && groups.every(x=>x.parentElement===parent)){
+            groups.forEach(x=>parent.appendChild(x));
+        }else{
+            // If the original form uses nested/grid wrappers, place each group
+            // immediately after the previous requested group.
+            for(let i=1;i<groups.length;i++){
+                const previous=groups[i-1];
+                const current=groups[i];
+                if(previous?.parentElement===current?.parentElement){
+                    previous.parentElement.insertBefore(current,previous.nextSibling);
+                }
+            }
+        }
     }
-    if(confirmGroup && passwordGroup && passwordGroup.parentElement){
+
+    // Ensure Confirm Password is immediately after Password even when the
+    // form uses a grid wrapper.
+    if(confirmGroup && passwordGroup && passwordGroup.parentElement===confirmGroup.parentElement){
         passwordGroup.parentElement.insertBefore(confirmGroup,passwordGroup.nextSibling);
     }
 
-    // The popup itself gets an inner vertical scroll without changing its existing layout.
+    // Address must be after Profile Photo. If there is no photo field,
+    // address is placed after Confirm Password.
+    const afterGroup=photoGroup||confirmGroup;
+    if(addressGroup && afterGroup && addressGroup.parentElement===afterGroup.parentElement){
+        afterGroup.parentElement.insertBefore(addressGroup,afterGroup.nextSibling);
+    }
+
+    // Add/repair show-hide controls without replacing the existing password.
+    const addToggle=(inputId,toggleId)=>{
+        const input=document.getElementById(inputId);
+        if(!input)return;
+        let toggle=document.getElementById(toggleId);
+        if(!toggle){
+            const wrap=input.parentElement;
+            if(!wrap)return;
+            wrap.style.position='relative';
+            toggle=document.createElement('button');
+            toggle.type='button';
+            toggle.id=toggleId;
+            toggle.textContent='Show';
+            toggle.style.cssText='position:absolute;right:10px;top:50%;transform:translateY(-50%);border:0;background:none;color:#475467;font-weight:600;cursor:pointer;padding:4px 6px;';
+            wrap.appendChild(toggle);
+        }
+        toggle.onclick=()=>{
+            const show=input.type==='password';
+            input.type=show?'text':'password';
+            toggle.textContent=show?'Hide':'Show';
+        };
+    };
+    addToggle('regPassword','regPasswordToggle');
+    addToggle('regConfirmPassword','regConfirmPasswordToggle');
+
+    // Inner vertical scrolling for the popup.
     const candidates=[
         register.closest('.modal-body'),
         register.closest('.modal-content'),
+        register.closest('[role="dialog"]'),
         register.parentElement
     ].filter(Boolean);
     const scrollHost=candidates.find(x=>x.contains(register))||register;
-    scrollHost.style.maxHeight='calc(100vh - 140px)';
+    scrollHost.style.maxHeight='calc(100vh - 100px)';
     scrollHost.style.overflowY='auto';
     scrollHost.style.overflowX='hidden';
     scrollHost.style.webkitOverflowScrolling='touch';
 
-    // This message is only a demo/configuration notice. Hide it when Supabase is configured.
+    // Supabase is configured in this file, so hide the old demo/configuration
+    // notice if it exists in the attached page.
     if(sb){
         register.querySelectorAll('*').forEach(el=>{
             const t=(el.textContent||'').trim();
