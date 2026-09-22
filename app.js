@@ -52,16 +52,7 @@ async function renderPublic(){
     const memberGrid=document.getElementById('memberGrid');
     if(memberGrid) memberGrid.innerHTML=(members.data||[]).map(p=>{
       const initials=(p.full_name||'M').split(/\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase();
-      const phone=p.phone||'Not available';
-      const address=p.address||((p.house_number||'') ? `House ${p.house_number}` : 'Address not available');
-      return `<div class="member-card">
-        <div class="member-photo">${initials}</div>
-        <div>
-          <strong>${p.full_name||'Member'}</strong>
-          <div class="muted">Phone: ${phone}</div>
-          <div class="muted">Address: ${address}</div>
-        </div>
-      </div>`;
+      return `<div class="member-card"><div class="member-photo">${initials}</div><div><strong>${p.full_name||'Member'}</strong><div class="muted">House ${p.house_number||''}</div><span class="status ongoing" style="margin-top:6px">Active Member</span></div></div>`;
     }).join('') || '<div class="muted">No members available.</div>';
 
     const workTable=document.getElementById('workTable');
@@ -80,64 +71,6 @@ async function renderPublic(){
     if(galleryGrid) galleryGrid.innerHTML=(gallery.data||[]).map((g,i)=>`<div class="card"><div class="photo">${g.public_url?`<img src="${g.public_url}" alt="${g.file_name||'Gallery photo'}" style="width:100%;height:100%;object-fit:cover">`:['◉','★','♧','✦','✓','◎'][i%6]}</div><div class="card-body"><strong>${g.file_name||'Gallery Photo'}</strong></div></div>`).join('') || '<div class="muted">No gallery photos available.</div>';
 }
 
-
-/* ============================================================
-   SOCIETY MAP
-   Fixed society location:
-   https://maps.app.goo.gl/A9TuNFyh9xzpTynU8
-   Coordinates: 30.777604, 76.616637
-   ============================================================ */
-const SOCIETY_MAP_LAT = 30.777604;
-const SOCIETY_MAP_LNG = 76.616637;
-const SOCIETY_MAP_URL = 'https://maps.app.goo.gl/A9TuNFyh9xzpTynU8';
-
-function renderSocietyMap(){
-  const mapEl=document.getElementById('societyMap');
-  if(!mapEl)return;
-
-  const lat=SOCIETY_MAP_LAT;
-  const lng=SOCIETY_MAP_LNG;
-
-  mapEl.innerHTML=`
-    <div style="position:relative;width:100%;height:420px;border-radius:14px;overflow:hidden;border:1px solid rgba(0,0,0,.12);background:#eef2f5">
-      <iframe
-        title="Defense Enclave Society Map"
-        src="https://www.google.com/maps?q=${lat},${lng}&z=17&output=embed"
-        width="100%"
-        height="100%"
-        style="border:0;display:block"
-        loading="lazy"
-        referrerpolicy="no-referrer-when-downgrade">
-      </iframe>
-    </div>
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:10px;flex-wrap:wrap">
-      <div class="muted">Society location: ${lat}, ${lng}</div>
-      <a class="outline-btn" href="${SOCIETY_MAP_URL}" target="_blank" rel="noopener noreferrer">
-        Open in Google Maps
-      </a>
-    </div>`;
-}
-
-if(document.readyState==='loading'){
-  document.addEventListener('DOMContentLoaded',renderSocietyMap);
-}else{
-  renderSocietyMap();
-}
-
-
-(function ensureSocietyMapContainer(){
-  const headings=[...document.querySelectorAll('h2,h3')];
-  const h=headings.find(x=>(x.textContent||'').trim().toLowerCase()==='society map');
-  if(h && !document.getElementById('societyMap')){
-    const panel=h.closest('.panel')||h.parentElement?.parentElement;
-    if(panel){
-      const el=document.createElement('div');
-      el.id='societyMap';
-      panel.appendChild(el);
-      renderSocietyMap();
-    }
-  }
-})();
 renderPublic().catch(e=>console.error('Initial public render:',e));
 const authModal=document.getElementById('authModal');const showLogin=()=>{document.getElementById('authHeading').textContent='Member Login';document.getElementById('authLogin').classList.remove('hidden');document.getElementById('authRegister').classList.add('hidden');authModal.classList.remove('hidden')};const showReg=()=>{document.getElementById('authHeading').textContent='Create Member Account';document.getElementById('authLogin').classList.add('hidden');document.getElementById('authRegister').classList.remove('hidden');authModal.classList.remove('hidden')};document.getElementById('openLogin').onclick=showLogin;document.getElementById('openRegister').onclick=showReg;document.getElementById('authClose').onclick=()=>authModal.classList.add('hidden');
     setPublicLoginButtonVisible(false);document.getElementById('switchRegister').onclick=showReg;document.getElementById('switchLogin').onclick=showLogin;
@@ -2397,12 +2330,20 @@ else if(p==='maintenance'){
     ${(rows||[]).map((x,i)=>`<tr><td>${x.complaint_no||x.ticket_no||x.id||''}</td><td>${x.category||''}</td><td>${x.subject||x.title||x.description||x.message||''}</td><td>${x.status||''}</td><td>${x.created_at?new Date(x.created_at).toLocaleDateString('en-IN'):''}</td><td><button class="outline-btn" onclick="adminUpdateComplaint(${i})">Update</button></td></tr>`).join('')}
     </tbody></table></div>${rows?.length?'':`<div class="muted" style="padding:18px">No complaints saved yet.</div>`}</div>`;
 }else if(p==='map'){
-    const {data:rows,error}=await sb.from('society_map').select('*').limit(1);
-    if(error){ console.error('Society Map load error:',error); return toast('Unable to load Society Map: '+error.message); }
-    const map=rows?.[0];
-    window.__societyMap=map||null;
-    c.innerHTML=`<div class="hero"><div><h2>Society Map</h2><div class="muted">Showing only the Society Map saved in the database.</div></div></div>
-    <div class="panel"><label>Society Map PDF<input id="mapPdf" type="file" accept="application/pdf"></label><br><button class="primary-btn" onclick="adminUploadMap()">Upload / Replace PDF</button>${map?.public_url?`<div style="margin-top:16px"><iframe src="${map.public_url}" style="width:100%;height:700px;border:0"></iframe></div><div style="margin-top:10px"><a href="${map.public_url}" target="_blank">Open saved Society Map PDF</a></div>`:`<div class="muted" style="margin-top:16px">No Society Map saved yet.</div>`}</div>`;
+    c.innerHTML=`<div class="hero"><div><h2>Society Map</h2><div class="muted">Defense Enclave Society location</div></div></div>
+    <div class="panel">
+      <div style="border-radius:14px;overflow:hidden;border:1px solid rgba(0,0,0,.12)">
+        <iframe
+          title="Defense Enclave Society Map"
+          src="https://www.google.com/maps?q=30.777604,76.616637&z=17&output=embed"
+          width="100%" height="520" style="border:0;display:block"
+          loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;flex-wrap:wrap">
+        <div class="muted">30.777604, 76.616637</div>
+        <a class="outline-btn" href="https://maps.app.goo.gl/A9TuNFyh9xzpTynU8" target="_blank" rel="noopener noreferrer">Open in Google Maps</a>
+      </div>
+    </div>`;
 }else if(p==='about'){
   await adminAboutPage(c);
 }
