@@ -118,15 +118,34 @@ async function renderPublic(){
             : (maintenance.data||[]).map(x=>`<div class="card"><div class="card-body"><h3>${escapePublic(x.item||x.title||x.name||'Maintenance')}</h3><div class="muted">${escapePublic(x.description||'')}</div><div><strong>₹${Number(x.amount||0).toLocaleString('en-IN')}</strong></div><span class="status">${escapePublic(x.status||'')}</span></div></div>`).join('') || '<div class="muted">No maintenance records available.</div>';
     }
 
-    const aboutContainer=document.getElementById('aboutContent') ||
-        publicContentContainer(['About Us'],['.about-content','.about-description','.about-text']);
-    if(aboutContainer){
-        const description=about.data?.description||about.data?.about||about.data?.content||'';
-        aboutContainer.innerHTML=about.error
-            ? '<div class="muted">Unable to load About Us information.</div>'
-            : description
-                ? `<div class="about-description">${escapePublic(description).replace(/\n/g,'<br>')}</div>`
-                : '<div class="muted">About information is not available.</div>';
+    // About Us: reuse the EXISTING About Us content/card.
+    // Do not append another dynamic block below the existing layout.
+    const aboutSection=publicSectionByHeading(['About Us']);
+    if(aboutSection){
+        // Remove any dynamic holder that an older version may have appended.
+        aboutSection.querySelectorAll('[data-public-dynamic-content]').forEach(el=>el.remove());
+
+        // Prefer the existing About content/card instead of creating a new one.
+        let aboutContainer=document.getElementById('aboutContent') ||
+            aboutSection.querySelector('.about-content,.about-card,.about-box,.panel,.card');
+
+        // If the page does not use a known class, use the first direct DIV after
+        // the heading as the existing content container.
+        if(!aboutContainer){
+            const heading=aboutSection.querySelector('h1,h2,h3,h4,.section-title,.eyebrow');
+            aboutContainer=[...aboutSection.children].find(el=>
+                el!==heading && el.tagName==='DIV'
+            ) || null;
+        }
+
+        if(aboutContainer){
+            const description=about.data?.description||about.data?.about||about.data?.content||'';
+            aboutContainer.innerHTML=about.error
+                ? '<div class="muted">Unable to load About Us information.</div>'
+                : description
+                    ? `<div class="about-description">${escapePublic(description).replace(/\n/g,'<br>')}</div>`
+                    : '<div class="muted">About information is not available.</div>';
+        }
     }
 
     // Reuse the existing .map div and put the map inside it.
