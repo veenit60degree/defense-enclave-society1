@@ -265,6 +265,9 @@ function openPublicMembersPage(members){
 }
 
 async function renderPublic(){
+function escapeHtml(v){
+  return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
     if(!sb){
         console.warn('Public render: Supabase client is not available.');
         return;
@@ -442,6 +445,32 @@ async function renderPublic(){
             galleryGrid.querySelectorAll('[data-public-album]').forEach(card=>card.addEventListener('click',()=>window.__publicGalleryOpenAlbum(card.getAttribute('data-public-album'))));
         }
     }
+
+  // Public/logout page: read-only complaint status board.
+  // Requires a safe public view named public_complaint_status.
+  let publicComplaintSection=document.getElementById('publicComplaintsSection');
+  if(!publicComplaintSection){
+    publicComplaintSection=document.createElement('section');
+    publicComplaintSection.id='publicComplaintsSection';
+    publicComplaintSection.className='section';
+    const societyWork=[...document.querySelectorAll('#public h1,#public h2,#public h3')].find(el=>el.textContent.trim()==='Society Work');
+    const parent=societyWork?.closest('section')||document.getElementById('public');
+    parent?.insertAdjacentElement('afterend',publicComplaintSection);
+  }
+  publicComplaintSection.innerHTML=`<div class="section-head"><div><div class="eyebrow">COMPLAINTS</div><h2>Complaints</h2><div class="muted">Complaint status visible to all visitors.</div></div></div><div id="publicComplaintsTableWrap" class="table-wrap"><div class="muted" style="padding:18px">Loading complaints...</div></div>`;
+
+  const publicWrap=document.getElementById('publicComplaintsTableWrap');
+  if(publicWrap){
+    const r=await sb.from('public_complaint_status').select('complaint_number,member_name,category,subject,status,created_at').order('created_at',{ascending:false});
+    if(r.error){
+      console.error('Public complaints load:',r.error);
+      publicWrap.innerHTML='<div class="muted" style="padding:18px">Complaint status is currently unavailable.</div>';
+    }else{
+      const st=v=>String(v||'submitted').toLowerCase()==='in_progress'?'In Progress':String(v||'submitted').toLowerCase()==='resolved'?'Completed':String(v||'submitted').toLowerCase()==='rejected'?'Rejected':'Submitted';
+      const rows=r.data||[];
+      publicWrap.innerHTML=rows.length?`<table class="table"><thead><tr><th>Complaint No.</th><th>Member Name</th><th>Category</th><th>Complaint</th><th>Status</th><th>Date</th></tr></thead><tbody>${rows.map(x=>`<tr><td><strong>${escapeHtml(String(x.complaint_number??''))}</strong></td><td>${escapeHtml(x.member_name||'Member')}</td><td>${escapeHtml(x.category||'')}</td><td>${escapeHtml(x.subject||'')}</td><td>${escapeHtml(st(x.status))}</td><td>${x.created_at?new Date(x.created_at).toLocaleDateString('en-IN'):''}</td></tr>`).join('')}</tbody></table>`:'<div class="muted" style="padding:18px">No complaints available.</div>';
+    }
+  }
 }
 
 renderPublic().catch(e=>console.error('Initial public render:',e));
@@ -2450,11 +2479,76 @@ async function adminDeleteMember(i) {
 
 
 async function adminUpdateComplaint(i){
- const x=window.__complaintRows?.[i]; if(!x)return;
- const status=prompt('Complaint status:',x.status||'In Progress'); if(status===null)return;
- const {error}=await sb.from('complaints').update({status}).eq('id',x.id);
- if(error)return toast('Complaint update failed: '+error.message);
- toast('Complaint updated'); await adminPage('complaints',window.__adminUser);
+  const x=window.__complaintRows?.[i];
+  if(!x)return;
+
+  const old=document.getElementById('adminComplaintUpdateModal');
+  if(old)old.remove();
+
+  const esc=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  const p=window.__complaintProfileMap?.[x.user_id]||{};
+  const current=['submitted','in_progress','rejected','resolved'].includes(String(x.status||'').toLowerCase())?String(x.status).toLowerCase():'submitted';
+
+  const overlay=document.createElement('div');
+  overlay.id='adminComplaintUpdateModal';
+  overlay.style.cssText='position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(15,23,42,.58);backdrop-filter:blur(3px);overflow:auto;';
+  overlay.innerHTML=`<div style="width:min(650px,100%);max-height:calc(100vh - 40px);overflow:auto;background:#fff;border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.30);padding:24px;box-sizing:border-box;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+      <div><h2 style="margin:0 0 5px;">Update Complaint</h2><div style="font-size:13px;color:#667085;">Complaint #${esc(x.complaint_number)}</div></div>
+      <button type="button" id="adminComplaintClose" style="width:36px;height:36px;border:0;border-radius:50%;background:#f2f4f7;font-size:24px;cursor:pointer;">&times;</button>
+    </div>
+    <form id="adminComplaintUpdateForm">
+      <div class="form-grid">
+        <label>Member Name<input value="${esc(p.full_name||p.email||'Member')}" disabled></label>
+        <label>Category<input value="${esc(x.category||'')}" disabled></label>
+      </div>
+      <label>Subject<input value="${esc(x.subject||'')}" disabled></label>
+      <label>Description><textarea rows="5" disabled>${esc(x.description||'')}</textarea></label>
+      <label>Complaint Status
+        <select id="adminComplaintStatus" required>
+          <option value="submitted" ${current==='submitted'?'selected':''}>Submitted</option>
+          <option value="in_progress" ${current==='in_progress'?'selected':''}>In Progress</option>
+          <option value="rejected" ${current==='rejected'?'selected':''}>Rejected</option>
+          <option value="resolved" ${current==='resolved'?'selected':''}>Completed</option>
+        </select>
+      </label>
+      <label>Update Remarks<textarea id="adminComplaintRemarks" rows="5" maxlength="3000" placeholder="Enter update remarks...">${esc(x.admin_comment||'')}</textarea></label>
+      <div id="adminComplaintUpdateError" style="display:none;margin:12px 0;padding:10px;border-radius:8px;background:#fff1f1;color:#b42318;"></div>
+      <div style="display:flex;justify-content:flex-end;gap:10px;padding-top:15px;border-top:1px solid #eaecf0;">
+        <button type="button" id="adminComplaintCancel" class="outline-btn">Cancel</button>
+        <button type="submit" id="adminComplaintSave" class="primary-btn">Update Complaint</button>
+      </div>
+    </form>
+  </div>`;
+
+  // Fix accidental malformed label markup if present in template.
+  overlay.innerHTML=overlay.innerHTML.replace('<label>Description>','<label>Description');
+
+  document.body.appendChild(overlay);
+  const close=()=>overlay.remove();
+  overlay.querySelector('#adminComplaintClose').onclick=close;
+  overlay.querySelector('#adminComplaintCancel').onclick=close;
+  overlay.addEventListener('click',e=>{if(e.target===overlay)close();});
+
+  overlay.querySelector('#adminComplaintUpdateForm').onsubmit=async e=>{
+    e.preventDefault();
+    const errBox=overlay.querySelector('#adminComplaintUpdateError');
+    const btn=overlay.querySelector('#adminComplaintSave');
+    errBox.style.display='none'; btn.disabled=true; btn.textContent='Updating...';
+
+    try{
+      const status=overlay.querySelector('#adminComplaintStatus').value;
+      const remarks=overlay.querySelector('#adminComplaintRemarks').value.trim();
+      const payload={status,admin_comment:remarks||null,updated_at:new Date().toISOString(),resolved_at:status==='resolved'?new Date().toISOString():null};
+      const {error}=await sb.from('complaints').update(payload).eq('id',x.id);
+      if(error)throw error;
+      close(); toast('Complaint updated successfully.'); await adminPage('complaints',window.__adminUser);
+    }catch(error){
+      console.error('Complaint update failed:',error);
+      errBox.textContent=error?.message||'Unable to update complaint.';
+      errBox.style.display='block'; btn.disabled=false; btn.textContent='Update Complaint';
+    }
+  };
 }
 
 async function adminUploadMap(){
@@ -2695,13 +2789,39 @@ else if(p==='maintenance'){
     ${(rows||[]).map((x,i)=>`<tr><td><strong>${x.full_name||x.name||x.email||''}</strong><br><span class="muted">${x.email||''}</span></td><td>${x.house_number||x.house_no||''}</td><td>${x.phone||''}</td><td>${x.role||'member'}</td><td><button class="outline-btn" onclick="adminEditMember(${i})">Edit</button> <button class="outline-btn" onclick="adminDeleteMember(${i})">Delete</button></td></tr>`).join('')}
     </tbody></table></div>${rows?.length?'':`<div class="muted" style="padding:18px">No member profiles saved yet.</div>`}</div>`;
 }else if(p==='complaints'){
-    const {data:rows,error}=await sb.from('complaints').select('*').order('created_at',{ascending:false});
-    if(error){ console.error('Complaints load error:',error); return toast('Unable to load Complaints: '+error.message); }
-    window.__complaintRows=rows||[];
-    c.innerHTML=`<div class="hero"><div><h2>Complaints</h2><div class="muted">Showing only complaints saved in the database.</div></div></div>
-    <div class="panel"><div class="table-wrap"><table class="table"><thead><tr><th>ID</th><th>Category</th><th>Complaint</th><th>Status</th><th>Date</th><th>Action</th></tr></thead><tbody>
-    ${(rows||[]).map((x,i)=>`<tr><td>${x.complaint_no||x.ticket_no||x.id||''}</td><td>${x.category||''}</td><td>${x.subject||x.title||x.description||x.message||''}</td><td>${x.status||''}</td><td>${x.created_at?new Date(x.created_at).toLocaleDateString('en-IN'):''}</td><td><button class="outline-btn" onclick="adminUpdateComplaint(${i})">Update</button></td></tr>`).join('')}
-    </tbody></table></div>${rows?.length?'':`<div class="muted" style="padding:18px">No complaints saved yet.</div>`}</div>`;
+  const {data:rows,error}=await sb.from('complaints').select('*').order('created_at',{ascending:false});
+  if(error)return toast('Unable to load Complaints: '+error.message);
+
+  const complaintRows=rows||[];
+  const ids=[...new Set(complaintRows.map(x=>x.user_id).filter(Boolean))];
+  let profiles={};
+  if(ids.length){
+    const r=await sb.from('profiles').select('id,full_name,email,house_number').in('id',ids);
+    if(r.error)console.error('Complaint profile load:',r.error);
+    (r.data||[]).forEach(p=>profiles[p.id]=p);
+  }
+
+  window.__complaintRows=complaintRows;
+  window.__complaintProfileMap=profiles;
+
+  const statusText=s=>{
+    s=String(s||'submitted').toLowerCase();
+    return s==='in_progress'?'In Progress':s==='resolved'?'Completed':s==='rejected'?'Rejected':'Submitted';
+  };
+
+  c.innerHTML=`<div class="hero"><div><div class="eyebrow">ADMINISTRATION</div><h2>Complaints</h2><div class="muted">Manage member complaints and update status and remarks.</div></div></div>
+  <div class="panel"><div class="table-wrap"><table class="table">
+  <thead><tr><th>Complaint No.</th><th>Member Name</th><th>Category</th><th>Subject</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
+  <tbody>${complaintRows.map((x,i)=>{const p=profiles[x.user_id]||{};return `<tr>
+    <td><strong>${x.complaint_number??''}</strong></td>
+    <td>${p.full_name||p.email||'Member'}</td>
+    <td>${x.category||''}</td>
+    <td>${x.subject||''}</td>
+    <td><span class="status ${String(x.status||'submitted').toLowerCase()}">${statusText(x.status)}</span></td>
+    <td>${x.created_at?new Date(x.created_at).toLocaleDateString('en-IN'):''}</td>
+    <td><button class="outline-btn" onclick="adminUpdateComplaint(${i})">Update</button></td>
+  </tr>`}).join('')}</tbody></table></div>
+  ${complaintRows.length?'':'<div class="muted" style="padding:18px">No complaints saved yet.</div>'}</div>`;
 }else if(p==='map'){
     c.innerHTML=`<div class="hero"><div><h2>Society Map</h2><div class="muted">Defense Enclave Society location</div></div></div>
     <div class="panel">
@@ -2722,256 +2842,6 @@ else if(p==='maintenance'){
 }
 }
 function openMemberDashboard(user){document.getElementById('public').classList.add('hidden');const app=document.getElementById('memberApp');app.className='app-shell';app.innerHTML=`<aside class="sidebar"><div class="brand"><div class="brand-mark">DE</div><div><strong>Defense Enclave</strong><span>Member Portal</span></div></div><nav><button class="nav-item active" data-p="dash">⌂ <span>Dashboard</span></button><button class="nav-item" data-p="profile">♙ <span>My Profile</span></button><button class="nav-item" data-p="complaints">⚑ <span>Complaints</span></button><button class="nav-item" data-p="work">▣ <span>Society Work</span></button><button class="nav-item" data-p="events">◷ <span>Events</span></button><button class="nav-item" data-p="gallery">▧ <span>Gallery</span></button></nav><div class="sidebar-bottom"><div class="user-mini"><div class="avatar">${(user.name||'A J').split(' ').map(x=>x[0]).slice(0,2).join('')}</div><div><strong>${user.name||'Member'}</strong><span>${user.house_no||'Member'}</span></div></div><button class="outline-btn" id="memberLogout">Log out</button></div></aside><main class="main"><header class="topbar"><div><div class="eyebrow">DEFENSE ENCLAVE SOCIETY</div><h1 id="memberTitle">Member Dashboard</h1></div><div class="top-actions"><button class="icon-btn" id="memberTour">?</button><div class="avatar">${(user.name||'A J').split(' ').map(x=>x[0]).slice(0,2).join('')}</div></div></header><section id="memberContent" class="content"></section></main>`;const nav=app.querySelector('nav');nav.onclick=e=>{const b=e.target.closest('.nav-item');if(!b)return;memberPage(b.dataset.p,user)};document.getElementById('memberLogout').onclick=async()=>{if(sb){const {error}=await sb.auth.signOut();if(error)return toast(error.message)}app.classList.add('hidden');document.getElementById('public').classList.remove('hidden');setPublicLoginButtonVisible(true);toast('Logged out')};document.getElementById('memberTour').onclick=()=>toast('Tour: dashboard → profile → complaints → work → events → gallery');memberPage('dash',user)}
-
-/* ============================================================
-   MEMBER COMPLAINT FORM
-   Uses the authenticated Supabase user's UUID for RLS.
-   complaint_number is an IDENTITY column and is generated by DB.
-   ============================================================ */
-function openMemberComplaintForm(user){
-    if(!sb || !sb.auth){
-        toast('Supabase is not configured.');
-        return;
-    }
-
-    const old=document.getElementById('memberComplaintModal');
-    if(old) old.remove();
-
-    const esc=(v)=>String(v??'')
-        .replace(/&/g,'&amp;')
-        .replace(/</g,'&lt;')
-        .replace(/>/g,'&gt;')
-        .replace(/"/g,'&quot;')
-        .replace(/'/g,'&#39;');
-
-    const overlay=document.createElement('div');
-    overlay.id='memberComplaintModal';
-    overlay.style.cssText='position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;background:rgba(15,23,42,.58);backdrop-filter:blur(3px);overflow:auto;';
-
-    overlay.innerHTML=`
-      <div role="dialog" aria-modal="true"
-           style="width:min(650px,100%);max-height:calc(100vh - 40px);overflow:auto;background:#fff;border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.30);padding:24px;box-sizing:border-box;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
-          <div>
-            <h2 style="margin:0 0 4px;font-size:22px;">New Complaint</h2>
-            <div style="font-size:13px;color:#667085;">Submit a complaint to the society committee.</div>
-          </div>
-          <button type="button" id="memberComplaintClose"
-                  style="width:36px;height:36px;border:0;border-radius:50%;background:#f2f4f7;font-size:24px;line-height:1;cursor:pointer;">&times;</button>
-        </div>
-
-        <form id="memberComplaintForm" novalidate>
-          <div id="memberComplaintError"
-               style="display:none;margin-bottom:14px;padding:11px 12px;border-radius:9px;background:#fff1f1;color:#b42318;font-size:13px;"></div>
-
-          <div style="margin-bottom:15px;">
-            <label for="complaintCategory" style="display:block;font-weight:600;margin-bottom:6px;">
-              Category <span style="color:#d92d20;">*</span>
-            </label>
-            <select id="complaintCategory" required
-                    style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;background:#fff;">
-              <option value="">Select category</option>
-              <option value="Maintenance">Maintenance</option>
-              <option value="Security">Security</option>
-              <option value="Cleanliness">Cleanliness</option>
-              <option value="Water">Water</option>
-              <option value="Electricity">Electricity</option>
-              <option value="Parking">Parking</option>
-              <option value="Noise">Noise</option>
-              <option value="Other">Other</option>
-            </select>
-          </div>
-
-          <div style="margin-bottom:15px;">
-            <label for="complaintSubject" style="display:block;font-weight:600;margin-bottom:6px;">
-              Subject <span style="color:#d92d20;">*</span>
-            </label>
-            <input id="complaintSubject" maxlength="150" required
-                   placeholder="Briefly describe the complaint"
-                   style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
-          </div>
-
-          <div style="margin-bottom:15px;">
-            <label for="complaintDescription" style="display:block;font-weight:600;margin-bottom:6px;">
-              Description <span style="color:#d92d20;">*</span>
-            </label>
-            <textarea id="complaintDescription" rows="6" maxlength="3000" required
-                      placeholder="Provide complete details of the issue..."
-                      style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;resize:vertical;"></textarea>
-          </div>
-
-          <div style="margin-bottom:15px;">
-            <label for="complaintPhone" style="display:block;font-weight:600;margin-bottom:6px;">Contact Phone</label>
-            <input id="complaintPhone" value="${esc(user?.phone||'')}" placeholder="Phone number"
-                   style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
-          </div>
-
-          <div style="margin-bottom:20px;">
-            <label for="complaintEmail" style="display:block;font-weight:600;margin-bottom:6px;">Contact Email</label>
-            <input id="complaintEmail" type="email" value="${esc(user?.email||'')}" placeholder="Email address"
-                   style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
-          </div>
-
-          <div style="font-size:12px;color:#667085;margin-bottom:18px;">
-            Complaint number will be generated automatically by the database.
-          </div>
-
-          <div style="display:flex;justify-content:flex-end;gap:10px;padding-top:15px;border-top:1px solid #eaecf0;">
-            <button type="button" id="memberComplaintCancel"
-                    style="padding:11px 18px;border:1px solid #d0d5dd;border-radius:9px;background:#fff;cursor:pointer;font-size:14px;">
-              Cancel
-            </button>
-            <button type="submit" id="memberComplaintSubmit"
-                    style="padding:11px 20px;border:0;border-radius:9px;background:#2563eb;color:#fff;cursor:pointer;font-weight:600;font-size:14px;">
-              Submit Complaint
-            </button>
-          </div>
-        </form>
-      </div>`;
-
-    document.body.appendChild(overlay);
-
-    const close=()=>overlay.remove();
-
-    overlay.querySelector('#memberComplaintClose').onclick=close;
-    overlay.querySelector('#memberComplaintCancel').onclick=close;
-    overlay.addEventListener('click',e=>{
-        if(e.target===overlay) close();
-    });
-
-    overlay.querySelector('#memberComplaintForm').onsubmit=async e=>{
-        e.preventDefault();
-
-        const errorBox=overlay.querySelector('#memberComplaintError');
-        errorBox.style.display='none';
-        errorBox.textContent='';
-
-        const category=overlay.querySelector('#complaintCategory').value.trim();
-        const subject=overlay.querySelector('#complaintSubject').value.trim();
-        const description=overlay.querySelector('#complaintDescription').value.trim();
-        const contactPhone=overlay.querySelector('#complaintPhone').value.trim();
-        const contactEmail=overlay.querySelector('#complaintEmail').value.trim();
-
-        if(!category || !subject || !description){
-            errorBox.textContent='Please fill Category, Subject and Description.';
-            errorBox.style.display='block';
-            return;
-        }
-
-        if(contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail)){
-            errorBox.textContent='Please enter a valid email address.';
-            errorBox.style.display='block';
-            return;
-        }
-
-        const submitBtn=overlay.querySelector('#memberComplaintSubmit');
-        submitBtn.disabled=true;
-        submitBtn.textContent='Submitting...';
-
-        try{
-            // IMPORTANT:
-            // Get the UUID from the real Supabase Auth session.
-            // RLS checks complaints.user_id = auth.uid().
-            const {data:sessionData,error:sessionError}=await sb.auth.getSession();
-
-            if(sessionError){
-                throw new Error('Unable to get login session: '+sessionError.message);
-            }
-
-            const authUser=sessionData?.session?.user;
-
-            if(!authUser?.id){
-                throw new Error('Your login session has expired. Please logout and login again.');
-            }
-
-            console.log('[COMPLAINT] Auth user ID:',authUser.id);
-            console.log('[COMPLAINT] Auth email:',authUser.email);
-
-            // Verify the profile belongs to the authenticated user.
-            const {data:profile,error:profileError}=await sb
-                .from('profiles')
-                .select('id,email,role')
-                .eq('id',authUser.id)
-                .maybeSingle();
-
-            if(profileError){
-                throw new Error('Unable to verify member profile: '+profileError.message);
-            }
-
-            if(!profile){
-                throw new Error('Member profile was not found for the logged-in account.');
-            }
-
-            if(String(profile.role||'').toLowerCase()!=='member'){
-                throw new Error('Only member accounts can submit complaints.');
-            }
-
-            // DO NOT send complaint_number.
-            // Your complaint_number column is an IDENTITY column.
-            const complaintPayload={
-                user_id:authUser.id,
-                category,
-                subject,
-                description,
-                contact_phone:contactPhone || null,
-                contact_email:contactEmail || null,
-                status:'submitted'
-            };
-
-            console.log('[COMPLAINT] Payload:',complaintPayload);
-
-            const {data,error}=await sb
-                .from('complaints')
-                .insert(complaintPayload)
-                .select('*')
-                .single();
-
-            if(error){
-                console.error('[COMPLAINT] Supabase insert error:',error);
-                throw error;
-            }
-
-            console.log('[COMPLAINT] Created:',data);
-
-            close();
-            toast(
-                data?.complaint_number
-                    ? `Complaint #${data.complaint_number} submitted successfully.`
-                    : 'Complaint submitted successfully.'
-            );
-
-            // Refresh the member complaints page using the authenticated UUID.
-            const refreshedUser={
-                ...user,
-                id:authUser.id,
-                email:authUser.email,
-                phone:profile.email===authUser.email ? (user?.phone||'') : (user?.phone||'')
-            };
-
-            await memberPage('complaints',refreshedUser);
-
-        }catch(err){
-            console.error('[COMPLAINT] Submission failed:',err);
-
-            let message=err?.message || 'Unable to submit complaint. Please try again.';
-
-            if(/row-level security|violates row-level security/i.test(message)){
-                message=
-                    'Complaint was rejected by Supabase security policy. '+
-                    'Please logout, login again, and try once more. Check browser Console for [COMPLAINT] Auth user ID.';
-            }
-
-            errorBox.textContent=message;
-            errorBox.style.display='block';
-
-        }finally{
-            submitBtn.disabled=false;
-            submitBtn.textContent='Submit Complaint';
-        }
-    };
-}
-
-
 async function memberPage(p,user){
   const c=document.getElementById('memberContent'),t=document.getElementById('memberTitle');
   document.querySelectorAll('#memberApp .nav-item').forEach(b=>b.classList.toggle('active',b.dataset.p===p));
@@ -3115,7 +2985,7 @@ async function memberPage(p,user){
       const {data:rows,error}=await sb.from('gallery_photos').select('*').order('created_at',{ascending:false}); if(error)throw error;
       c.innerHTML=`<div class="hero"><div><h2>Photo Gallery</h2><div class="muted">Community photos from the database.</div></div></div><div class="gallery-grid">${(rows||[]).map((g,i)=>`<div class="card"><div class="photo">${g.public_url?`<img src="${g.public_url}" alt="${g.file_name||'Gallery photo'}" style="width:100%;height:100%;object-fit:cover">`:['◉','★','♧','✦','✓','◎'][i%6]}</div><div class="card-body"><strong>${g.file_name||'Gallery Photo'}</strong></div></div>`).join('')}</div>`;
     }
-    document.getElementById('newComplaint')?.addEventListener('click',()=>openMemberComplaintForm(user));
+    document.getElementById('newComplaint')?.addEventListener('click',()=>toast('Complaint form is ready.'));
   }catch(e){console.error('Member page load failed:',e);c.innerHTML=`<div class="panel"><div class="muted">Unable to load this page: ${e?.message||e}</div></div>`;}
 }
 
