@@ -2863,11 +2863,11 @@ else if(p==='maintenance'){
 }
 }
 function openMemberDashboard(user){document.getElementById('public').classList.add('hidden');const app=document.getElementById('memberApp');app.className='app-shell';app.innerHTML=`<aside class="sidebar"><div class="brand"><div class="brand-mark">DE</div><div><strong>Defense Enclave</strong><span>Member Portal</span></div></div><nav><button class="nav-item active" data-p="dash">⌂ <span>Dashboard</span></button>
-<button class="nav-item" data-m="finance">₹ <span>Society Finance</span></button><button class="nav-item" data-p="profile">♙ <span>My Profile</span></button><button class="nav-item" data-p="complaints">⚑ <span>Complaints</span></button><button class="nav-item" data-p="work">▣ <span>Society Work</span></button><button class="nav-item" data-p="events">◷ <span>Events</span></button><button class="nav-item" data-p="gallery">▧ <span>Gallery</span></button></nav><div class="sidebar-bottom"><div class="user-mini"><div class="avatar">${(user.name||'A J').split(' ').map(x=>x[0]).slice(0,2).join('')}</div><div><strong>${user.name||'Member'}</strong><span>${user.house_no||'Member'}</span></div></div><button class="outline-btn" id="memberLogout">Log out</button></div></aside><main class="main"><header class="topbar"><div><div class="eyebrow">DEFENSE ENCLAVE SOCIETY</div><h1 id="memberTitle">Member Dashboard</h1></div><div class="top-actions"><button class="icon-btn" id="memberTour">?</button><div class="avatar">${(user.name||'A J').split(' ').map(x=>x[0]).slice(0,2).join('')}</div></div></header><section id="memberContent" class="content"></section></main>`;const nav=app.querySelector('nav');nav.onclick=e=>{const b=e.target.closest('.nav-item');if(!b)return;memberPage(b.dataset.p,user)};document.getElementById('memberLogout').onclick=async()=>{if(sb){const {error}=await sb.auth.signOut();if(error)return toast(error.message)}app.classList.add('hidden');document.getElementById('public').classList.remove('hidden');setPublicLoginButtonVisible(true);toast('Logged out')};document.getElementById('memberTour').onclick=()=>toast('Tour: dashboard → profile → complaints → work → events → gallery');memberPage('dash',user)}
+<button class="nav-item" data-p="finance">₹ <span>Society Finance</span></button><button class="nav-item" data-p="profile">♙ <span>My Profile</span></button><button class="nav-item" data-p="complaints">⚑ <span>Complaints</span></button><button class="nav-item" data-p="work">▣ <span>Society Work</span></button><button class="nav-item" data-p="events">◷ <span>Events</span></button><button class="nav-item" data-p="gallery">▧ <span>Gallery</span></button></nav><div class="sidebar-bottom"><div class="user-mini"><div class="avatar">${(user.name||'A J').split(' ').map(x=>x[0]).slice(0,2).join('')}</div><div><strong>${user.name||'Member'}</strong><span>${user.house_no||'Member'}</span></div></div><button class="outline-btn" id="memberLogout">Log out</button></div></aside><main class="main"><header class="topbar"><div><div class="eyebrow">DEFENSE ENCLAVE SOCIETY</div><h1 id="memberTitle">Member Dashboard</h1></div><div class="top-actions"><button class="icon-btn" id="memberTour">?</button><div class="avatar">${(user.name||'A J').split(' ').map(x=>x[0]).slice(0,2).join('')}</div></div></header><section id="memberContent" class="content"></section></main>`;const nav=app.querySelector('nav');nav.onclick=e=>{const b=e.target.closest('.nav-item');if(!b)return;memberPage(b.dataset.p,user)};document.getElementById('memberLogout').onclick=async()=>{if(sb){const {error}=await sb.auth.signOut();if(error)return toast(error.message)}app.classList.add('hidden');document.getElementById('public').classList.remove('hidden');setPublicLoginButtonVisible(true);toast('Logged out')};document.getElementById('memberTour').onclick=()=>toast('Tour: dashboard → profile → complaints → work → events → gallery');memberPage('dash',user)}
 async function memberPage(p,user){
   const c=document.getElementById('memberContent'),t=document.getElementById('memberTitle');
   document.querySelectorAll('#memberApp .nav-item').forEach(b=>b.classList.toggle('active',b.dataset.p===p));
-  t.textContent={dash:'Member Dashboard',profile:'My Profile',complaints:'Complaints',work:'Society Work',events:'Events',gallery:'Photo Gallery'}[p]||'Member Dashboard';
+  t.textContent={dash:'Member Dashboard',finance:'Society Finance',profile:'My Profile',complaints:'Complaints',work:'Society Work',events:'Events',gallery:'Photo Gallery'}[p]||'Member Dashboard';
   if(!sb)return;
   try{
     if(p==='profile'){
@@ -2984,6 +2984,74 @@ async function memberPage(p,user){
           }
         };
       };
+    }else if(p==='finance'){
+      const {data:f,error}=await sb.from('society_finance')
+        .select('society_fund,total_expenses,active_maintenance,pending_tasks,updated_at')
+        .eq('id',1)
+        .maybeSingle();
+
+      if(error){
+        console.error('Member finance load error:',error);
+        c.innerHTML=`<div class="panel"><h3>Society Finance</h3><div class="muted">Unable to load finance information.</div></div>`;
+        return;
+      }
+
+      const v=f||{
+        society_fund:0,
+        total_expenses:0,
+        active_maintenance:0,
+        pending_tasks:0
+      };
+
+      c.innerHTML=`<div class="hero">
+        <div>
+          <div class="eyebrow">MEMBER VIEW</div>
+          <h2>Society Finance</h2>
+          <div class="muted">Current society finance information. This page is read-only for members.</div>
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-head">Society Fund<span>●</span></div>
+          <div class="value">₹${Number(v.society_fund||0).toLocaleString('en-IN')}</div>
+          <div class="trend">Current database value</div>
+        </div>
+        <div class="stat">
+          <div class="stat-head">Total Expenses<span>●</span></div>
+          <div class="value">₹${Number(v.total_expenses||0).toLocaleString('en-IN')}</div>
+          <div class="trend">Current database value</div>
+        </div>
+        <div class="stat">
+          <div class="stat-head">Active Maintenance<span>●</span></div>
+          <div class="value">₹${Number(v.active_maintenance||0).toLocaleString('en-IN')}</div>
+          <div class="trend">Current database value</div>
+        </div>
+        <div class="stat">
+          <div class="stat-head">Pending Tasks<span>●</span></div>
+          <div class="value">${Number(v.pending_tasks||0)}</div>
+          <div class="trend">Current database value</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Society Finance Details</h3>
+        <div class="form-grid">
+          <label>Society Fund
+            <input type="text" value="₹${Number(v.society_fund||0).toLocaleString('en-IN')}" readonly>
+          </label>
+          <label>Total Expenses
+            <input type="text" value="₹${Number(v.total_expenses||0).toLocaleString('en-IN')}" readonly>
+          </label>
+          <label>Active Maintenance
+            <input type="text" value="₹${Number(v.active_maintenance||0).toLocaleString('en-IN')}" readonly>
+          </label>
+          <label>Pending Tasks
+            <input type="text" value="${Number(v.pending_tasks||0)}" readonly>
+          </label>
+        </div>
+        ${v.updated_at?`<div class="muted" style="margin-top:14px">Last updated: ${new Date(v.updated_at).toLocaleString('en-IN')}</div>`:''}
+      </div>`;
     }else if(p==='dash'){
       const [{data:finance},{data:work},{data:complaints}]=await Promise.all([
         sb.from('society_finance').select('*').eq('id',1).maybeSingle(),
