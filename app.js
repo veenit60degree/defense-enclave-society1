@@ -52,6 +52,104 @@ function escapePublic(v){
     return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
+
+/* ===== CURRENT PUBLIC UI FIXES ===== */
+function publicFormGroupFor(id){
+    const el=document.getElementById(id);
+    if(!el)return null;
+    let node=el;
+    for(let i=0;i<4 && node && node.parentElement;i++){
+        const parent=node.parentElement;
+        if(parent.tagName==='FORM' || parent.id==='authRegister' || parent.id==='authModal') break;
+        const text=(parent.innerText||'').trim().toLowerCase();
+        if(text.length>0 && (text.includes('name') || text.includes('phone') || text.includes('email') || text.includes('house') || text.includes('address') || text.includes('password') || text.includes('profile photo') || text.includes('confirm password'))) node=parent;
+        else break;
+    }
+    return node;
+}
+
+function fixPublicMemberForm(){
+    const register=document.getElementById('authRegister');
+    if(!register)return;
+
+    // Keep the existing form and fields; only reorder the existing field groups.
+    const addressGroup=publicFormGroupFor('regAddress');
+    const passwordGroup=publicFormGroupFor('regPassword');
+    const confirmGroup=publicFormGroupFor('regConfirmPassword') || publicFormGroupFor('memberConfirmPassword');
+
+    if(addressGroup && passwordGroup && passwordGroup.parentElement){
+        passwordGroup.parentElement.insertBefore(addressGroup,passwordGroup);
+    }
+    if(confirmGroup && passwordGroup && passwordGroup.parentElement){
+        passwordGroup.parentElement.insertBefore(confirmGroup,passwordGroup.nextSibling);
+    }
+
+    // The popup itself gets an inner vertical scroll without changing its existing layout.
+    const candidates=[
+        register.closest('.modal-body'),
+        register.closest('.modal-content'),
+        register.parentElement
+    ].filter(Boolean);
+    const scrollHost=candidates.find(x=>x.contains(register))||register;
+    scrollHost.style.maxHeight='calc(100vh - 140px)';
+    scrollHost.style.overflowY='auto';
+    scrollHost.style.overflowX='hidden';
+    scrollHost.style.webkitOverflowScrolling='touch';
+
+    // This message is only a demo/configuration notice. Hide it when Supabase is configured.
+    if(sb){
+        register.querySelectorAll('*').forEach(el=>{
+            const t=(el.textContent||'').trim();
+            if(t.includes('This preview runs in demo mode until you connect Supabase using the included configuration file.')){
+                el.style.display='none';
+            }
+        });
+    }
+}
+
+function addPublicMembersViewAll(section,members){
+    if(!section)return;
+    const heading=section.querySelector('h1,h2,h3,h4') || Array.from(section.children).find(x=>/^society members$/i.test((x.textContent||'').trim()));
+    if(!heading)return;
+
+    let link=heading.querySelector('[data-public-members-view-all]');
+    if(!link){
+        link=document.createElement('button');
+        link.type='button';
+        link.setAttribute('data-public-members-view-all','1');
+        link.textContent='(View all)';
+        link.style.cssText='margin-left:8px;border:0;background:none;padding:0;color:#079c79;font:inherit;font-size:.82em;font-weight:600;cursor:pointer;text-decoration:none;vertical-align:baseline;';
+        heading.appendChild(link);
+    }
+
+    link.onclick=()=>openPublicMembersPage(members);
+}
+
+function openPublicMembersPage(members){
+    const old=document.getElementById('publicMembersAllOverlay');
+    if(old)old.remove();
+
+    const rows=Array.isArray(members)?members:[];
+    const overlay=document.createElement('div');
+    overlay.id='publicMembersAllOverlay';
+    overlay.style.cssText='position:fixed;inset:0;background:rgba(245,249,250,.98);z-index:99998;overflow:auto;padding:24px;box-sizing:border-box;';
+    overlay.innerHTML=`<div style="max-width:1100px;margin:0 auto;background:#fff;border-radius:16px;padding:24px;box-sizing:border-box;box-shadow:0 12px 40px rgba(0,0,0,.12)">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px">
+            <h2 style="margin:0">Society Members</h2>
+            <button type="button" id="publicMembersAllClose" style="border:0;background:none;font-size:28px;cursor:pointer;line-height:1">×</button>
+        </div>
+        <div class="public-all-members-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px">
+            ${rows.map(p=>{
+                const initials=(p.full_name||'M').split(/\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase();
+                const address=[p.house_number,p.address].filter(Boolean).join(', ');
+                return `<div class="member-card"><div class="member-photo">${escapePublic(initials)}</div><div><strong>${escapePublic(p.full_name||'Member')}</strong><div class="muted">${escapePublic(p.phone||'Phone not available')}</div><div class="muted">${escapePublic(address||'Address not available')}</div></div></div>`;
+            }).join('') || '<div class="muted">No registered members found.</div>'}
+        </div>
+    </div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector('#publicMembersAllClose').onclick=()=>overlay.remove();
+}
+
 async function renderPublic(){
     if(!sb){
         console.warn('Public render: Supabase client is not available.');
@@ -74,17 +172,28 @@ async function renderPublic(){
     console.log('[PUBLIC] about:',about.data,'error:',about.error);
 
     // Always reuse the already-rendered public sections. No new sections are created.
+    const memberSection=publicSectionByHeading(['Society Members']);
     const memberGrid=document.getElementById('memberGrid') ||
         publicContentContainer(['Society Members'],['.member-grid','.members-grid','.cards-grid','.grid-3']);
     if(memberGrid){
         if(members.error){
             memberGrid.innerHTML='<div class="muted">Unable to load members.</div>';
         }else{
-            memberGrid.innerHTML=(members.data||[]).map(p=>{
+            const memberRows=members.data||[];
+            memberGrid.innerHTML=memberRows.map(p=>{
                 const initials=(p.full_name||'M').split(/\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase();
                 const address=[p.house_number,p.address].filter(Boolean).join(', ');
                 return `<div class="member-card"><div class="member-photo">${escapePublic(initials)}</div><div><strong>${escapePublic(p.full_name||'Member')}</strong><div class="muted">${escapePublic(p.phone||'Phone not available')}</div><div class="muted">${escapePublic(address||'Address not available')}</div></div></div>`;
             }).join('') || '<div class="muted">No registered members found.</div>';
+
+            // Public/logout page: keep the existing member section and make only its
+            // member list internally scrollable. Four rows fit before scrolling.
+            memberGrid.style.maxHeight='420px';
+            memberGrid.style.overflowY='auto';
+            memberGrid.style.overflowX='hidden';
+            memberGrid.style.paddingRight='6px';
+            memberGrid.style.webkitOverflowScrolling='touch';
+            addPublicMembersViewAll(memberSection,memberRows);
         }
     }
 
@@ -222,63 +331,8 @@ async function renderPublic(){
 }
 
 renderPublic().catch(e=>console.error('Initial public render:',e));
-const authModal=document.getElementById('authModal');
-function preparePublicRegistrationForm(){
-    const registerBox=document.getElementById('authRegister');
-    if(!registerBox)return;
-
-    // Reuse the existing Create Member Account form. Only add fields that are
-    // missing; nothing already present in the attached file is removed.
-    const form=registerBox.querySelector('form') || registerBox;
-
-    // Match the Admin -> Add Member fields: name, house/flat, phone, email,
-    // password, confirm password and address.
-    const fieldStyle='width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;';
-    const existingAddress=document.getElementById('regAddress');
-
-    if(!document.getElementById('regConfirmPassword')){
-        const passwordInput=document.getElementById('regPassword');
-        if(passwordInput){
-            const wrap=passwordInput.closest('label')?.parentElement || passwordInput.parentElement;
-            const block=document.createElement('div');
-            block.style.cssText='margin-bottom:15px;';
-            block.innerHTML=`<label for="regConfirmPassword" style="display:block;font-weight:600;margin-bottom:6px;">Confirm Password <span style="color:#d92d20;">*</span></label><input id="regConfirmPassword" type="password" minlength="6" maxlength="72" placeholder="Re-enter password" style="${fieldStyle}"><div id="regConfirmPasswordError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>`;
-            (wrap?.parentElement || form).insertBefore(block, wrap?.nextSibling || null);
-        }
-    }
-
-    // Add a small show/hide toggle to the password fields without replacing
-    // the existing inputs.
-    ['regPassword','regConfirmPassword'].forEach(id=>{
-        const input=document.getElementById(id);
-        if(!input || input.dataset.toggleReady==='1')return;
-        input.dataset.toggleReady='1';
-        const holder=document.createElement('div');
-        holder.style.cssText='position:relative;';
-        input.parentNode.insertBefore(holder,input);
-        holder.appendChild(input);
-        const btn=document.createElement('button');
-        btn.type='button';
-        btn.textContent='Show';
-        btn.style.cssText='position:absolute;right:8px;top:50%;transform:translateY(-50%);border:0;background:transparent;color:#475467;cursor:pointer;font-size:13px;';
-        btn.onclick=()=>{const visible=input.type==='text';input.type=visible?'password':'text';btn.textContent=visible?'Show':'Hide';};
-        holder.appendChild(btn);
-        input.style.paddingRight='58px';
-    });
-
-    // Ensure the popup itself scrolls vertically on smaller screens while
-    // preserving the existing modal and all existing content.
-    const popup=registerBox.closest('.modal-card,.modal-content,.dialog,.popup,.overlay-card') || registerBox.parentElement;
-    [registerBox,popup].filter(Boolean).forEach(el=>{
-        el.style.maxHeight='calc(100vh - 80px)';
-        el.style.overflowY='auto';
-        el.style.webkitOverflowScrolling='touch';
-    });
-}
-const showLogin=()=>{document.getElementById('authHeading').textContent='Member Login';document.getElementById('authLogin').classList.remove('hidden');document.getElementById('authRegister').classList.add('hidden');authModal.classList.remove('hidden')};
-const showReg=()=>{document.getElementById('authHeading').textContent='Create Member Account';document.getElementById('authLogin').classList.add('hidden');document.getElementById('authRegister').classList.remove('hidden');preparePublicRegistrationForm();authModal.classList.remove('hidden');};
-document.getElementById('openLogin').onclick=showLogin;document.getElementById('openRegister').onclick=showReg;document.getElementById('authClose').onclick=()=>authModal.classList.add('hidden');
-    setPublicLoginButtonVisible(false);document.getElementById('switchRegister').onclick=showReg;document.getElementById('switchLogin').onclick=showLogin;
+const authModal=document.getElementById('authModal');const showLogin=()=>{document.getElementById('authHeading').textContent='Member Login';document.getElementById('authLogin').classList.remove('hidden');document.getElementById('authRegister').classList.add('hidden');authModal.classList.remove('hidden')};const showReg=()=>{document.getElementById('authHeading').textContent='Create Member Account';document.getElementById('authLogin').classList.add('hidden');document.getElementById('authRegister').classList.remove('hidden');authModal.classList.remove('hidden');setTimeout(fixPublicMemberForm,0)};document.getElementById('openLogin').onclick=showLogin;document.getElementById('openRegister').onclick=showReg;document.getElementById('authClose').onclick=()=>authModal.classList.add('hidden');
+    setPublicLoginButtonVisible(false);document.getElementById('switchRegister').onclick=showReg;document.getElementById('switchLogin').onclick=showLogin;setTimeout(fixPublicMemberForm,0);
 
 /* ===== PUBLIC TOP NAVIGATION FIX ===== */
 function setPublicLoginButtonVisible(visible){
@@ -361,10 +415,8 @@ async function register(){
     const phone=document.getElementById('regPhone').value.trim();
     const house_no=document.getElementById('regHouse').value.trim();
     const address=document.getElementById('regAddress').value.trim();
-    const confirmPassword=document.getElementById('regConfirmPassword')?.value || '';
-    if(!name||!email||!password||!house_no||!phone)return toast('Please fill name, email, phone, house and password');
+    if(!name||!email||!password||!house_no)return toast('Please fill name, email, house and password');
     if(password.length<6)return toast('Password must be at least 6 characters');
-    if(confirmPassword!==password)return toast('Passwords do not match');
     if(!sb)return toast('Supabase is not configured yet');
     const {data,error}=await sb.auth.signUp({email,password,options:{data:{full_name:name}}});
     if(error)return toast(error.message);
