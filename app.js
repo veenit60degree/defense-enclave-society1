@@ -3119,13 +3119,11 @@ function openMemberComplaintForm(user){
               Category <span style="color:#d92d20;">*</span>
               <select id="complaintCategory" required>
                 <option value="">Select category</option>
-                <option value="Maintenance">Maintenance</option>
-                <option value="Security">Security</option>
-                <option value="Cleanliness">Cleanliness</option>
-                <option value="Water">Water</option>
+               <option value="Maintenance">Maintenance</option>
                 <option value="Electricity">Electricity</option>
-                <option value="Parking">Parking</option>
-                <option value="Noise">Noise</option>
+                <option value="Damaged_road">Damaged road</option>
+                 <option value="Sewage">Sewage</option>
+                <option value="Security">Security</option>
                 <option value="Other">Other</option>
               </select>
             </label>
