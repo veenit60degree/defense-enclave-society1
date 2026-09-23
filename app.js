@@ -500,7 +500,7 @@ const authModal=document.getElementById('authModal');const showLogin=()=>{docume
 
 /* ===== PUBLIC TOP NAVIGATION FIX ===== */
 function setPublicLoginButtonVisible(visible){
-    const btn=document.getElementById('openLogin');
+    const btn=document.getElementById('login_btn_panel');
     if(!btn)return;
     btn.style.display=visible ? '' : 'none';
     btn.hidden=!visible;
