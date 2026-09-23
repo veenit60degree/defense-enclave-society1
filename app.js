@@ -2499,35 +2499,7 @@ async function adminDeleteMember(i) {
 
 
 
-async async function adminDeleteComplaint(i){
-  const x=window.__complaintRows?.[i];
-  if(!x)return;
-
-  const complaintNo=x.complaint_number??'';
-  const confirmed=window.confirm(
-    `Delete complaint${complaintNo?` #${complaintNo}`:''}?\n\nThis action cannot be undone.`
-  );
-  if(!confirmed)return;
-
-  try{
-    if(!sb)throw new Error('Supabase is not configured.');
-
-    const {error}=await sb
-      .from('complaints')
-      .delete()
-      .eq('id',x.id);
-
-    if(error)throw error;
-
-    toast('Complaint deleted successfully.');
-    await adminPage('complaints',window.__adminUser);
-  }catch(error){
-    console.error('Complaint delete failed:',error);
-    toast('Unable to delete complaint: '+(error?.message||'Unknown error'));
-  }
-}
-
-function adminUpdateComplaint(i){
+async function adminUpdateComplaint(i){
   const x=window.__complaintRows?.[i];
   if(!x)return;
 
@@ -2868,10 +2840,7 @@ else if(p==='maintenance'){
     <td>${x.subject||''}</td>
     <td><span class="status ${String(x.status||'submitted').toLowerCase()}">${statusText(x.status)}</span></td>
     <td>${x.created_at?new Date(x.created_at).toLocaleDateString('en-IN'):''}</td>
-    <td>
-      <button class="outline-btn" onclick="adminUpdateComplaint(${i})">Update</button>
-      <button class="outline-btn" onclick="adminDeleteComplaint(${i})" style="margin-left:6px;color:#b42318;border-color:#f3b5b5;">Delete</button>
-    </td>
+    <td><button class="outline-btn" onclick="adminUpdateComplaint(${i})">Update</button></td>
   </tr>`}).join('')}</tbody></table></div>
   ${complaintRows.length?'':'<div class="muted" style="padding:18px">No complaints saved yet.</div>'}</div>`;
 }else if(p==='map'){
@@ -3149,14 +3118,12 @@ function openMemberComplaintForm(user){
             <label>
               Category <span style="color:#d92d20;">*</span>
               <select id="complaintCategory" required>
-                <option value="">Select category</option>
+                 <option value="">Select category</option>
                 <option value="Maintenance">Maintenance</option>
-                <option value="Security">Security</option>
-                <option value="Cleanliness">Cleanliness</option>
-                <option value="Water">Water</option>
                 <option value="Electricity">Electricity</option>
-                <option value="Parking">Parking</option>
-                <option value="Noise">Noise</option>
+                <option value="Damaged_road">Damaged road</option>
+                 <option value="Sewage">Sewage</option>
+                <option value="Security">Security</option>
                 <option value="Other">Other</option>
               </select>
             </label>
