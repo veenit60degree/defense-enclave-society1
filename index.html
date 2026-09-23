@@ -145,61 +145,49 @@ img{max-width:100%;height:auto}
 }
 </style>
 
-
-<style id="member-mobile-top-logout-fix">
-/* Member logout: move it visually to the top-right on small screens.
-   The existing #memberLogout click handler remains unchanged. */
-@media (max-width: 800px){
+<style id="member-logout-image-fix">
+@media (max-width:800px){
   #memberLogout{
     position:fixed !important;
     top:14px !important;
     right:14px !important;
     z-index:10050 !important;
-
     display:inline-flex !important;
     width:auto !important;
     min-width:42px !important;
     height:40px !important;
     padding:0 11px !important;
     margin:0 !important;
-
     align-items:center !important;
     justify-content:center !important;
     gap:0 !important;
     border-radius:999px !important;
-
     font-size:0 !important;
     line-height:1 !important;
     white-space:nowrap !important;
     flex:0 0 auto !important;
+    background:#fff !important;
+    border:1px solid #d5dfe0 !important;
+    box-shadow:none !important;
   }
-
   #memberLogout::before{
-    content:"⏻";
-    display:block;
-    font-size:21px;
-    line-height:1;
-    font-weight:700;
+    content:"" !important;
+    display:block !important;
+    width:22px !important;
+    height:22px !important;
+    background-image:url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAACXBIWXMAAAsTAAALEwEAmpwYAAAC7ElEQVR4nO1YyWoUURQ9Rk1rGkGJidNCP0BBRI34BbqxRWzduHDCxIUIumiCcadudOG41IUiOEXiAC7zBQoGF2LAIZpG0SxUTIwRWi7cguJwi37vddmVhjrwoOlX59x7qt9wbwM5cuT4X9gJ4BOAMf3cUigDmAFQ0/EXwD60aPK1VjJRTki+JUyU6ySfqYkCgEM65DNjr2Py0ZhRDmMRgGMA+hLiBEGEhmPB79F8yUjeMmM9UyKtZ7H54bRM3KLAP2j+Y8LbZQPWrzQW05mjyys+f7PR5PcbiTygZ6oJS4N5MExUSWvI4B0ITX4ZgO8k9h7AUnqupG/yLS0Jy0D0/Dvl7CCtTp2L8ySH5SEGrpPQJIANHvwkA/WwHsAv4t7wTX41gD8kctJTI9SA4Lixr9bAA+dJQDbqgiYaKOhyjfMvuJLnAhgnci/80YgBwUHij2tudbGViFMAimi+gYXGXpDc6uIUkZ4iDI0aEDwhjX444CGRjiI7A32kMehCekWkTRka2EwaIy6kCSLxxdVMA12k8c2FNE2k+RkaKJDG7xAD7a1mYGIWLaFu0vgasollI2VlYEvIJh4k0uEMDRwhjfsupH4i3c7QwF3SqLiQeox6XK51X8TreukVfFEE8JNy2ehCbDPaxJCuaLvqyNiWwi38QXNzwjkivwYwD81DkVpVGWd8BFbpmRsXOIHm4bRREa/0FblmtJShdZEP1mmseOxLIUKdenFwU+H9Jjxrn1GK+QXAklDBPcZx+EIDpY0uAM+NeLsaFb5qiL4BsBbpLptRI87FNMTl9HlsiE9q9xbSbkYoAhgw1nxN/+Ry6oFdIBfZIyNItC+k6e/w0OvQc76aoDkUeHnW/SWuJASM/jO9o/VLj67pdh3d+l2vlgd8w9boxEntzVvYrSdDLeXxOY0N6wo51i4bl13ImNK3vhgZQO6Es1qn+CYuHCkPVmAWoE1v6YrW7CPa2U3rkM8vda6izzoXZjly5EAi/gFswv0FwhSOXwAAAABJRU5ErkJggg==") !important;
+    background-repeat:no-repeat !important;
+    background-position:center !important;
+    background-size:contain !important;
   }
-
-  /* The old member-name/logout row is no longer needed on small screens. */
-  #memberLogout{
-    /* fixed positioning takes the button out of the old row */
-  }
-
-  /* Prevent the old row from leaving an awkward empty area. */
   .sidebar-bottom:has(#memberLogout){
     min-height:0 !important;
     margin-top:0 !important;
     padding-top:8px !important;
     padding-bottom:8px !important;
   }
-
-  .sidebar-bottom:has(#memberLogout) .user-mini{
-    display:none !important;
-  }
+  .sidebar-bottom:has(#memberLogout) .user-mini{display:none !important;}
 }
-
 @media (max-width:480px){
   #memberLogout{
     top:10px !important;
@@ -208,18 +196,10 @@ img{max-width:100%;height:auto}
     height:38px !important;
     padding:0 10px !important;
   }
-
-  #memberLogout::before{
-    font-size:20px;
-  }
+  #memberLogout::before{width:21px !important;height:21px !important;}
 }
-
-/* Landscape phones/tablets: keep the button in the same top-right location. */
 @media (max-width:800px) and (orientation:landscape){
-  #memberLogout{
-    top:10px !important;
-    right:12px !important;
-  }
+  #memberLogout{top:10px !important;right:12px !important;}
 }
 </style>
 
