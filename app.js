@@ -509,6 +509,257 @@ renderPublic().then(()=>applyPublicWhitePanels()).catch(e=>console.error('Initia
 const authModal=document.getElementById('authModal');const showLogin=()=>{document.getElementById('authHeading').textContent='Member Login';document.getElementById('authLogin').classList.remove('hidden');document.getElementById('authRegister').classList.add('hidden');authModal.classList.remove('hidden')};const showReg=()=>{document.getElementById('authHeading').textContent='Create Member Account';document.getElementById('authLogin').classList.add('hidden');document.getElementById('authRegister').classList.remove('hidden');authModal.classList.remove('hidden');setTimeout(fixPublicMemberForm,0)};document.getElementById('openLogin').onclick=showLogin;document.getElementById('openRegister').onclick=showReg;document.getElementById('authClose').onclick=()=>authModal.classList.add('hidden');
     setPublicLoginButtonVisible(false);document.getElementById('switchRegister').onclick=showReg;document.getElementById('switchLogin').onclick=showLogin;setTimeout(fixPublicMemberForm,0);
 
+/* ===== FORGOT PASSWORD / EMAIL OTP ===== */
+(function setupForgotPassword(){
+    function createForgotPasswordUI(){
+        if(document.getElementById('forgotPasswordLink'))return;
+
+        const loginPanel=document.getElementById('authLogin');
+        if(!loginPanel)return;
+
+        const loginButton=document.getElementById('loginBtn');
+        if(!loginButton)return;
+
+        const link=document.createElement('button');
+        link.type='button';
+        link.id='forgotPasswordLink';
+        link.textContent='Forgot Password?';
+        link.style.cssText='display:block;width:100%;margin:10px 0 0;border:0;background:none;color:#2563eb;font-size:14px;font-weight:600;cursor:pointer;text-align:right;padding:4px 0;';
+        loginButton.insertAdjacentElement('afterend',link);
+        link.onclick=showForgotPassword;
+    }
+
+    function showForgotPassword(){
+        const existing=document.getElementById('forgotPasswordOverlay');
+        if(existing)existing.remove();
+
+        const overlay=document.createElement('div');
+        overlay.id='forgotPasswordOverlay';
+        overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100000;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;';
+
+        overlay.innerHTML=`
+          <div style="width:min(430px,100%);max-height:calc(100vh - 40px);overflow:auto;background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.25);padding:24px;box-sizing:border-box;">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:15px;margin-bottom:18px;">
+              <div>
+                <h2 style="margin:0 0 6px;font-size:22px;color:#101828;">Forgot Password</h2>
+                <div style="font-size:14px;color:#667085;line-height:1.5;">Enter your registered email address to receive a verification OTP.</div>
+              </div>
+              <button type="button" id="forgotPasswordClose" aria-label="Close" style="border:0;background:none;font-size:24px;line-height:1;cursor:pointer;color:#667085;padding:0 4px;">&times;</button>
+            </div>
+
+            <div id="forgotPasswordStep1">
+              <label for="forgotPasswordEmail" style="display:block;font-weight:600;font-size:14px;color:#344054;margin-bottom:6px;">Email Address</label>
+              <input id="forgotPasswordEmail" type="email" autocomplete="email" placeholder="Enter your registered email" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
+              <div id="forgotPasswordEmailError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
+              <button type="button" id="sendForgotOtpBtn" style="width:100%;margin-top:14px;padding:11px 14px;border:0;border-radius:9px;background:#2563eb;color:#fff;font-size:15px;font-weight:600;cursor:pointer;">Send OTP</button>
+            </div>
+
+            <div id="forgotPasswordStep2" style="display:none;">
+              <div id="forgotPasswordSentMessage" style="padding:10px 12px;border-radius:9px;background:#f0fdf4;color:#166534;font-size:13px;margin-bottom:14px;"></div>
+
+              <label for="forgotPasswordOtp" style="display:block;font-weight:600;font-size:14px;color:#344054;margin-bottom:6px;">OTP</label>
+              <input id="forgotPasswordOtp" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="Enter OTP received on email" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;letter-spacing:2px;">
+              <div id="forgotPasswordOtpError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
+
+              <div style="margin-top:14px;">
+                <label for="forgotNewPassword" style="display:block;font-weight:600;font-size:14px;color:#344054;margin-bottom:6px;">New Password</label>
+                <input id="forgotNewPassword" type="password" autocomplete="new-password" minlength="6" maxlength="72" placeholder="Enter new password" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
+              </div>
+              <div id="forgotPasswordNewError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
+
+              <div style="margin-top:14px;">
+                <label for="forgotConfirmPassword" style="display:block;font-weight:600;font-size:14px;color:#344054;margin-bottom:6px;">Confirm New Password</label>
+                <input id="forgotConfirmPassword" type="password" autocomplete="new-password" minlength="6" maxlength="72" placeholder="Re-enter new password" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
+              </div>
+              <div id="forgotPasswordConfirmError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
+
+              <button type="button" id="updateForgotPasswordBtn" style="width:100%;margin-top:16px;padding:11px 14px;border:0;border-radius:9px;background:#2563eb;color:#fff;font-size:15px;font-weight:600;cursor:pointer;">Update Password</button>
+              <button type="button" id="resendForgotOtpBtn" style="width:100%;margin-top:8px;padding:10px 14px;border:1px solid #d0d5dd;border-radius:9px;background:#fff;color:#344054;font-size:14px;font-weight:600;cursor:pointer;">Resend OTP</button>
+            </div>
+
+            <button type="button" id="forgotPasswordBack" style="width:100%;margin-top:12px;padding:10px 14px;border:0;background:none;color:#475467;font-size:14px;font-weight:600;cursor:pointer;">Back to Login</button>
+          </div>`;
+
+        document.body.appendChild(overlay);
+
+        const emailInput=overlay.querySelector('#forgotPasswordEmail');
+        const otpInput=overlay.querySelector('#forgotPasswordOtp');
+        const newPasswordInput=overlay.querySelector('#forgotNewPassword');
+        const confirmInput=overlay.querySelector('#forgotConfirmPassword');
+        const sendBtn=overlay.querySelector('#sendForgotOtpBtn');
+        const updateBtn=overlay.querySelector('#updateForgotPasswordBtn');
+        const resendBtn=overlay.querySelector('#resendForgotOtpBtn');
+        const step1=overlay.querySelector('#forgotPasswordStep1');
+        const step2=overlay.querySelector('#forgotPasswordStep2');
+        const sentMessage=overlay.querySelector('#forgotPasswordSentMessage');
+
+        let recoveryEmail='';
+
+        const showError=(id,message)=>{
+            const el=overlay.querySelector('#'+id);
+            if(!el)return;
+            el.textContent=message||'';
+            el.style.display=message?'block':'none';
+        };
+
+        const setBusy=(button,busy,busyText,normalText)=>{
+            if(!button)return;
+            button.disabled=busy;
+            button.style.opacity=busy?'0.65':'1';
+            button.style.cursor=busy?'not-allowed':'pointer';
+            button.textContent=busy?busyText:normalText;
+        };
+
+        async function sendOtp(){
+            showError('forgotPasswordEmailError','');
+            const email=emailInput.value.trim().toLowerCase();
+
+            if(!email){
+                showError('forgotPasswordEmailError','Please enter your email address.');
+                return;
+            }
+            if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+                showError('forgotPasswordEmailError','Please enter a valid email address.');
+                return;
+            }
+            if(!sb){
+                showError('forgotPasswordEmailError','Supabase is not configured yet.');
+                return;
+            }
+
+            setBusy(sendBtn,true,'Sending...','Send OTP');
+            setBusy(resendBtn,true,'Sending...','Resend OTP');
+
+            try{
+                /*
+                 * Supabase sends the recovery email. The Supabase email template
+                 * must expose {{ .Token }} for the user to receive an OTP.
+                 * The OTP is verified below with type: 'recovery'.
+                 */
+                const {error}=await sb.auth.resetPasswordForEmail(email);
+
+                if(error)throw error;
+
+                recoveryEmail=email;
+                step1.style.display='none';
+                step2.style.display='block';
+                sentMessage.textContent='A verification OTP has been sent to '+email+'. Enter the OTP below to continue.';
+                otpInput.focus();
+                toast('OTP sent to your email');
+            }catch(error){
+                console.error('Forgot password OTP error:',error);
+                showError('forgotPasswordEmailError',error?.message||'Unable to send OTP. Please try again.');
+            }finally{
+                setBusy(sendBtn,false,'Sending...','Send OTP');
+                setBusy(resendBtn,false,'Sending...','Resend OTP');
+            }
+        }
+
+        async function updatePassword(){
+            showError('forgotPasswordOtpError','');
+            showError('forgotPasswordNewError','');
+            showError('forgotPasswordConfirmError','');
+
+            const token=otpInput.value.trim();
+            const newPassword=newPasswordInput.value;
+            const confirmPassword=confirmInput.value;
+
+            if(!recoveryEmail){
+                showError('forgotPasswordOtpError','Please enter your email address first.');
+                step1.style.display='block';
+                step2.style.display='none';
+                return;
+            }
+            if(!token){
+                showError('forgotPasswordOtpError','Please enter the OTP received on your email.');
+                return;
+            }
+            if(!/^\d{6,8}$/.test(token)){
+                showError('forgotPasswordOtpError','Please enter a valid OTP.');
+                return;
+            }
+            if(!newPassword){
+                showError('forgotPasswordNewError','Please enter a new password.');
+                return;
+            }
+            if(newPassword.length<6){
+                showError('forgotPasswordNewError','Password must be at least 6 characters.');
+                return;
+            }
+            if(newPassword!==confirmPassword){
+                showError('forgotPasswordConfirmError','Passwords do not match.');
+                return;
+            }
+
+            setBusy(updateBtn,true,'Verifying...','Update Password');
+
+            try{
+                const {data,error}=await sb.auth.verifyOtp({
+                    email:recoveryEmail,
+                    token,
+                    type:'recovery'
+                });
+
+                if(error)throw error;
+                if(!data?.session)throw new Error('OTP verified, but the recovery session could not be created.');
+
+                const {error:updateError}=await sb.auth.updateUser({
+                    password:newPassword
+                });
+
+                if(updateError)throw updateError;
+
+                toast('Password updated successfully. Please login with your new password.');
+
+                await sb.auth.signOut();
+                overlay.remove();
+                showLogin();
+
+                const loginInput=document.getElementById('loginEmail');
+                if(loginInput)loginInput.value=recoveryEmail;
+                const loginPassword=document.getElementById('loginPassword');
+                if(loginPassword)loginPassword.value='';
+            }catch(error){
+                console.error('Password update error:',error);
+                showError('forgotPasswordOtpError',error?.message||'Invalid or expired OTP. Please request a new OTP.');
+            }finally{
+                setBusy(updateBtn,false,'Verifying...','Update Password');
+            }
+        }
+
+        overlay.querySelector('#forgotPasswordClose').onclick=()=>overlay.remove();
+        overlay.querySelector('#forgotPasswordBack').onclick=()=>{
+            overlay.remove();
+            showLogin();
+        };
+        sendBtn.onclick=sendOtp;
+        resendBtn.onclick=sendOtp;
+        updateBtn.onclick=updatePassword;
+
+        emailInput.addEventListener('keydown',e=>{
+            if(e.key==='Enter')sendOtp();
+        });
+        otpInput.addEventListener('input',()=>{
+            otpInput.value=otpInput.value.replace(/\D/g,'').slice(0,8);
+        });
+        overlay.addEventListener('click',e=>{
+            if(e.target===overlay)overlay.remove();
+        });
+
+        emailInput.focus();
+    }
+
+    // The login form already exists in the attached page. Add the link only
+    // after the current DOM is ready, without changing the existing login form.
+    window.showForgotPassword=showForgotPassword;
+    if(document.readyState==='loading'){
+        document.addEventListener('DOMContentLoaded',createForgotPasswordUI);
+    }else{
+        setTimeout(createForgotPasswordUI,0);
+    }
+})();
+
+
 /* ===== PUBLIC TOP NAVIGATION FIX ===== */
 function setPublicLoginButtonVisible(visible){
     const btn=document.getElementById('login_btn_panel');
