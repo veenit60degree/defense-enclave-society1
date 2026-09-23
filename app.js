@@ -844,10 +844,10 @@ async function register(){
     if(!name||!email||!password||!house_no)return toast('Please fill name, email, house and password');
     if(password.length<6)return toast('Password must be at least 6 characters');
     if(!sb)return toast('Supabase is not configured yet');
-    const {data,error}=await sb.auth.signUp({email,password,options:{data:{full_name:name}}});
+    const {data,error}=await sb.auth.signUp({email,password,options:{data:{full_name:name,phone:phone||null,house_number:house_no||null,address:address||null}}});
     if(error)return toast(error.message);
     if(!data.user)return toast('Registration could not be completed');
-    const profileResult=await sb.from('profiles').update({full_name:name,email:data.user.email||email,phone:phone||null,house_number:house_no,address:address||null}).eq('id',data.user.id);
+    const profileResult=await sb.from('profiles').update({full_name:name,email:data.user.email||email,phone:phone||null,house_number:house_no||null,address:address||null}).eq('id',data.user.id);
     if(profileResult.error){console.error('Profile update error:',profileResult.error);return toast('Account created, but profile details could not be saved');}
     authModal.classList.add('hidden');
     if(!data.session){showLogin();return toast('Registration successful. Please verify your email before login.');}
@@ -2361,26 +2361,16 @@ async function adminAddMember(){
             hasAccessToken:!!session.access_token
           });
 
-          const createMemberPayload={
-            full_name:String(full_name||'').trim(),
-            house_number:String(house_number||'').trim(),
-            phone:String(phone||'').trim(),
-            email:String(email||'').trim()||null,
-            password,
-            address:String(address||'').trim()||null,
-            role:'member'
-          };
-
-          console.log('Create Member payload:',{
-            full_name:createMemberPayload.full_name,
-            house_number:createMemberPayload.house_number,
-            phone:createMemberPayload.phone,
-            address:createMemberPayload.address,
-            hasEmail:!!createMemberPayload.email
-          });
-
           const {data:fnData,error:fnError}=await sb.functions.invoke('admin-create-member',{
-            body:createMemberPayload,
+            body:{
+              full_name,
+              house_number,
+              phone,
+              email:email||null,
+              password,
+              address:address||null,
+              role:'member'
+            },
             headers:{
               Authorization:`Bearer ${session.access_token}`
             }
