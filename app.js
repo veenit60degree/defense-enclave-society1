@@ -3339,7 +3339,7 @@ if(document.readyState==='loading'){
     });
   }
   window.setPublicLoginButtonVisible = function(visible){
-    const b=document.getElementById('openLogin');
+    const b=document.getElementById('login_btn_panel');
     if(!b)return;
     b.style.display=visible ? '' : 'none';
     b.hidden=!visible;
