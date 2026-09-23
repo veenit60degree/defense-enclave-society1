@@ -830,7 +830,7 @@ async function login(){
         role:String(profile?.role||'member').trim().toLowerCase()
     };
 
-    if(user.role==='admin') openAdminDashboard(user);
+    if(user.role==='admin' || user.role==='superadmin') openAdminDashboard(user);
     else openMemberDashboard(user);
     toast('Login successful');
 }
