@@ -561,15 +561,10 @@ const authModal=document.getElementById('authModal');const showLogin=()=>{docume
               <input id="forgotPasswordOtp" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="Enter OTP received on email" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;letter-spacing:2px;">
               <div id="forgotPasswordOtpError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
 
-              <button type="button" id="verifyForgotOtpBtn" style="width:100%;margin-top:14px;padding:11px 14px;border:0;border-radius:9px;background:#2563eb;color:#fff;font-size:15px;font-weight:600;cursor:pointer;">Verify OTP</button>
-              <button type="button" id="resendForgotOtpBtn" style="width:100%;margin-top:8px;padding:10px 14px;border:1px solid #d0d5dd;border-radius:9px;background:#fff;color:#344054;font-size:14px;font-weight:600;cursor:pointer;">Resend OTP</button>
-            </div>
-
-            <div id="forgotPasswordStep3" style="display:none;">
-              <div style="padding:10px 12px;border-radius:9px;background:#f0fdf4;color:#166534;font-size:13px;margin-bottom:14px;">OTP verified successfully. Enter your new password.</div>
-
-              <label for="forgotNewPassword" style="display:block;font-weight:600;font-size:14px;color:#344054;margin-bottom:6px;">New Password</label>
-              <input id="forgotNewPassword" type="password" autocomplete="new-password" minlength="6" maxlength="72" placeholder="Enter new password" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
+              <div style="margin-top:14px;">
+                <label for="forgotNewPassword" style="display:block;font-weight:600;font-size:14px;color:#344054;margin-bottom:6px;">New Password</label>
+                <input id="forgotNewPassword" type="password" autocomplete="new-password" minlength="6" maxlength="72" placeholder="Enter new password" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
+              </div>
               <div id="forgotPasswordNewError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
 
               <div style="margin-top:14px;">
@@ -579,6 +574,7 @@ const authModal=document.getElementById('authModal');const showLogin=()=>{docume
               <div id="forgotPasswordConfirmError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
 
               <button type="button" id="updateForgotPasswordBtn" style="width:100%;margin-top:16px;padding:11px 14px;border:0;border-radius:9px;background:#2563eb;color:#fff;font-size:15px;font-weight:600;cursor:pointer;">Update Password</button>
+              <button type="button" id="resendForgotOtpBtn" style="width:100%;margin-top:8px;padding:10px 14px;border:1px solid #d0d5dd;border-radius:9px;background:#fff;color:#344054;font-size:14px;font-weight:600;cursor:pointer;">Resend OTP</button>
             </div>
 
             <button type="button" id="forgotPasswordBack" style="width:100%;margin-top:12px;padding:10px 14px;border:0;background:none;color:#475467;font-size:14px;font-weight:600;cursor:pointer;">Back to Login</button>
@@ -591,12 +587,10 @@ const authModal=document.getElementById('authModal');const showLogin=()=>{docume
         const newPasswordInput=overlay.querySelector('#forgotNewPassword');
         const confirmInput=overlay.querySelector('#forgotConfirmPassword');
         const sendBtn=overlay.querySelector('#sendForgotOtpBtn');
-        const verifyBtn=overlay.querySelector('#verifyForgotOtpBtn');
         const updateBtn=overlay.querySelector('#updateForgotPasswordBtn');
         const resendBtn=overlay.querySelector('#resendForgotOtpBtn');
         const step1=overlay.querySelector('#forgotPasswordStep1');
         const step2=overlay.querySelector('#forgotPasswordStep2');
-        const step3=overlay.querySelector('#forgotPasswordStep3');
         const sentMessage=overlay.querySelector('#forgotPasswordSentMessage');
 
         let recoveryEmail='';
@@ -637,15 +631,19 @@ const authModal=document.getElementById('authModal');const showLogin=()=>{docume
             setBusy(resendBtn,true,'Sending...','Resend OTP');
 
             try{
+                /*
+                 * Supabase sends the recovery email. The Supabase email template
+                 * must expose {{ .Token }} for the user to receive an OTP.
+                 * The OTP is verified below with type: 'recovery'.
+                 */
                 const {error}=await sb.auth.resetPasswordForEmail(email);
+
                 if(error)throw error;
 
                 recoveryEmail=email;
                 step1.style.display='none';
                 step2.style.display='block';
-                step3.style.display='none';
-                sentMessage.textContent='A verification OTP has been sent to '+email+'. Enter the OTP below.';
-                otpInput.value='';
+                sentMessage.textContent='A verification OTP has been sent to '+email+'. Enter the OTP below to continue.';
                 otpInput.focus();
                 toast('OTP sent to your email');
             }catch(error){
@@ -657,15 +655,19 @@ const authModal=document.getElementById('authModal');const showLogin=()=>{docume
             }
         }
 
-        async function verifyOtp(){
+        async function updatePassword(){
             showError('forgotPasswordOtpError','');
+            showError('forgotPasswordNewError','');
+            showError('forgotPasswordConfirmError','');
+
             const token=otpInput.value.trim();
+            const newPassword=newPasswordInput.value;
+            const confirmPassword=confirmInput.value;
 
             if(!recoveryEmail){
+                showError('forgotPasswordOtpError','Please enter your email address first.');
                 step1.style.display='block';
                 step2.style.display='none';
-                step3.style.display='none';
-                showError('forgotPasswordEmailError','Please enter your email address first.');
                 return;
             }
             if(!token){
@@ -676,38 +678,6 @@ const authModal=document.getElementById('authModal');const showLogin=()=>{docume
                 showError('forgotPasswordOtpError','Please enter a valid OTP.');
                 return;
             }
-
-            setBusy(verifyBtn,true,'Verifying...','Verify OTP');
-
-            try{
-                const {data,error}=await sb.auth.verifyOtp({
-                    email:recoveryEmail,
-                    token,
-                    type:'recovery'
-                });
-
-                if(error)throw error;
-                if(!data?.session)throw new Error('OTP verified, but the recovery session could not be created.');
-
-                step2.style.display='none';
-                step3.style.display='block';
-                newPasswordInput.focus();
-                toast('OTP verified successfully');
-            }catch(error){
-                console.error('OTP verification error:',error);
-                showError('forgotPasswordOtpError',error?.message||'Invalid or expired OTP. Please request a new OTP.');
-            }finally{
-                setBusy(verifyBtn,false,'Verifying...','Verify OTP');
-            }
-        }
-
-        async function updatePassword(){
-            showError('forgotPasswordNewError','');
-            showError('forgotPasswordConfirmError','');
-
-            const newPassword=newPasswordInput.value;
-            const confirmPassword=confirmInput.value;
-
             if(!newPassword){
                 showError('forgotPasswordNewError','Please enter a new password.');
                 return;
@@ -721,9 +691,18 @@ const authModal=document.getElementById('authModal');const showLogin=()=>{docume
                 return;
             }
 
-            setBusy(updateBtn,true,'Updating...','Update Password');
+            setBusy(updateBtn,true,'Verifying...','Update Password');
 
             try{
+                const {data,error}=await sb.auth.verifyOtp({
+                    email:recoveryEmail,
+                    token,
+                    type:'recovery'
+                });
+
+                if(error)throw error;
+                if(!data?.session)throw new Error('OTP verified, but the recovery session could not be created.');
+
                 const {error:updateError}=await sb.auth.updateUser({
                     password:newPassword
                 });
@@ -742,9 +721,9 @@ const authModal=document.getElementById('authModal');const showLogin=()=>{docume
                 if(loginPassword)loginPassword.value='';
             }catch(error){
                 console.error('Password update error:',error);
-                showError('forgotPasswordConfirmError',error?.message||'Unable to update password. Please try again.');
+                showError('forgotPasswordOtpError',error?.message||'Invalid or expired OTP. Please request a new OTP.');
             }finally{
-                setBusy(updateBtn,false,'Updating...','Update Password');
+                setBusy(updateBtn,false,'Verifying...','Update Password');
             }
         }
 
@@ -755,7 +734,6 @@ const authModal=document.getElementById('authModal');const showLogin=()=>{docume
         };
         sendBtn.onclick=sendOtp;
         resendBtn.onclick=sendOtp;
-        verifyBtn.onclick=verifyOtp;
         updateBtn.onclick=updatePassword;
 
         emailInput.addEventListener('keydown',e=>{
@@ -764,12 +742,6 @@ const authModal=document.getElementById('authModal');const showLogin=()=>{docume
         otpInput.addEventListener('input',()=>{
             otpInput.value=otpInput.value.replace(/\D/g,'').slice(0,8);
         });
-        otpInput.addEventListener('keydown',e=>{
-            if(e.key==='Enter')verifyOtp();
-        });
-        confirmInput.addEventListener('keydown',e=>{
-            if(e.key==='Enter')updatePassword();
-        });
         overlay.addEventListener('click',e=>{
             if(e.target===overlay)overlay.remove();
         });
@@ -777,6 +749,8 @@ const authModal=document.getElementById('authModal');const showLogin=()=>{docume
         emailInput.focus();
     }
 
+    // The login form already exists in the attached page. Add the link only
+    // after the current DOM is ready, without changing the existing login form.
     window.showForgotPassword=showForgotPassword;
     if(document.readyState==='loading'){
         document.addEventListener('DOMContentLoaded',createForgotPasswordUI);
@@ -896,8 +870,8 @@ function openAdminDashboard(user){
  <button class="nav-item" data-a="complaints">⚑ <span>Complaints</span></button>
  <button class="nav-item" data-a="map">⌖ <span>Society Map</span></button>
   <button class="nav-item" data-a="about">ℹ <span>About</span></button>
- </nav><div class="sidebar-bottom"><div class="user-mini"><div class="avatar">${initials(user.name)}</div><div><strong>${user.name}</strong><span>Administrator</span></div></div><button class="outline-btn" id="adminLogout">Log out</button></div></aside>
- <main class="main"><header class="topbar"><div><div class="eyebrow">DEFENSE ENCLAVE SOCIETY</div><h1 id="adminTitle">Admin Dashboard</h1></div><div class="top-actions"><span class="status ongoing">ADMIN</span><div class="avatar">${initials(user.name)}</div></div></header><section id="adminContent" class="content"></section></main>`;
+ </nav><div class="sidebar-bottom"><div class="user-mini"><div class="avatar">${initials(user.name)}</div><div><strong>${user.name}</strong><span>${String(user.role||'admin').toLowerCase()==='superadmin' ? 'Super Administrator' : 'Administrator'}</span></div></div><button class="outline-btn" id="adminLogout">Log out</button></div></aside>
+ <main class="main"><header class="topbar"><div><div class="eyebrow">DEFENSE ENCLAVE SOCIETY</div><h1 id="adminTitle">Admin Dashboard</h1></div><div class="top-actions"><span class="status ongoing">${String(user.role||'admin').toLowerCase()==='superadmin' ? 'SUPER ADMIN' : 'ADMIN'}</span><div class="avatar">${initials(user.name)}</div></div></header><section id="adminContent" class="content"></section></main>`;
  const nav=app.querySelector('nav'); nav.onclick=e=>{const b=e.target.closest('.nav-item');if(!b)return;adminPage(b.dataset.a,user)};
  document.getElementById('adminLogout').onclick=async()=>{if(sb) await sb.auth.signOut();app.classList.add('hidden');document.getElementById('public').classList.remove('hidden');setPublicLoginButtonVisible(true);toast('Logged out')};
  adminPage('dashboard',user);
@@ -1955,7 +1929,7 @@ async function adminEditEvent(i){
    ============================================================ */
 function isAdminRole(role){
     const r=String(role||'').trim().toLowerCase().replace(/[\s-]+/g,'_');
-    return r==='admin' || r==='administrator' || r==='society_admin';
+    return r==='admin' || r==='administrator' || r==='society_admin' || r==='superadmin';
 }
 
 async function requireAdminDeletePermission(){
@@ -2523,8 +2497,8 @@ async function adminEditMember(i){
 
     const {overlay,close}=societyAdminModalShell(
         'memberEditModal',
-        'Edit Member',
-        'Update member details, email, or password.',
+        String(x.role||'member').toLowerCase()==='admin' ? 'Edit Administrator' : 'Edit Member',
+        String(x.role||'member').toLowerCase()==='admin' ? 'Super Admin can update administrator details, email, password, or role.' : 'Update member details, email, password, or role.',
         body,
         'Update Member'
     );
@@ -2580,6 +2554,10 @@ async function adminEditMember(i){
         }
         if(!['member','admin'].includes(role)){
             societyAdminFieldError(overlay,'editMemberRole','editMemberRoleError','Please select a valid role.');
+            valid=false;
+        }
+        if(String(window.__adminUser?.role||'').toLowerCase()!=='superadmin' && role==='admin'){
+            societyAdminFieldError(overlay,'editMemberRole','editMemberRoleError','Only Super Admin can assign the Admin role.');
             valid=false;
         }
         if(!valid)return;
@@ -3116,20 +3094,57 @@ else if(p==='maintenance'){
       </div>`).join('')}</div>
       </div></div>`;
     }).join('')}</div>${folders.length?'':`<div class="panel"><div class="muted">No gallery folders or photos saved yet.</div></div>`}`;
-}else if(p==='members'){
-   // const {data:rows,error}=await sb.from('profiles').select('*').order('created_at',{ascending:false});
-     const { data: rows, error } = await sb
-      .from('profiles')
-      .select('*')
-      .eq('role', 'member')
-      .order('created_at', { ascending: false });
-    if(error){ console.error('Members load error:',error); return toast('Unable to load Members: '+error.message); }
-    window.__memberRows=rows||[];
-    console.log('Members list refreshed. Member count:', window.__memberRows.length);
-    c.innerHTML=`<div class="hero"><div><h2>Members</h2><div class="muted">Showing only member profiles saved in the database.</div></div><button class="primary-btn" onclick="adminAddMember()">+ Add Member</button></div>
-    <div class="panel"><div class="table-wrap"><table class="table"><thead><tr><th>Member</th><th>House</th><th>Phone</th><th>Role</th><th>Action</th></tr></thead><tbody>
-    ${(rows||[]).map((x,i)=>`<tr><td><strong>${x.full_name||x.name||x.email||''}</strong><br><span class="muted">${x.email||''}</span></td><td>${x.house_number||x.house_no||''}</td><td>${x.phone||''}</td><td>${x.role||'member'}</td><td><button class="outline-btn" onclick="adminEditMember(${i})">Edit</button> <button class="outline-btn" onclick="adminDeleteMember(${i})">Delete</button></td></tr>`).join('')}
-    </tbody></table></div>${rows?.length?'':`<div class="muted" style="padding:18px">No member profiles saved yet.</div>`}</div>`;
+ }else if(p==='members'){
+   const currentRole=String(user?.role||window.__adminUser?.role||'admin').trim().toLowerCase().replace(/[\s-]+/g,'_');
+   const isSuperAdmin=currentRole==='superadmin';
+
+   const query=isSuperAdmin
+      ? sb.from('profiles').select('*').in('role',['member','admin']).order('role',{ascending:true}).order('created_at',{ascending:false})
+      : sb.from('profiles').select('*').eq('role','member').order('created_at',{ascending:false});
+
+   const { data: rows, error } = await query;
+   if(error){ console.error('Members load error:',error); return toast('Unable to load Members: '+error.message); }
+
+   const allRows=rows||[];
+   const adminRows=isSuperAdmin ? allRows.filter(x=>String(x.role||'').toLowerCase()==='admin') : [];
+   const memberRows=allRows.filter(x=>String(x.role||'').toLowerCase()==='member');
+
+   window.__memberRows=allRows;
+   window.__memberRowsByRole={admins:adminRows,members:memberRows};
+
+   const rowHtml=(x,i)=>`<tr>
+      <td><strong>${x.full_name||x.name||x.email||''}</strong><br><span class="muted">${x.email||''}</span></td>
+      <td>${x.house_number||x.house_no||''}</td>
+      <td>${x.phone||''}</td>
+      <td>${x.role||'member'}</td>
+      <td>
+        <button class="outline-btn" onclick="adminEditMember(${i})">Edit</button>
+        <button class="outline-btn" onclick="adminDeleteMember(${i})">Delete</button>
+      </td>
+   </tr>`;
+
+   const tableHtml=(title,list,emptyText)=>`
+      <div class="panel" style="margin-bottom:18px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <div><h3 style="margin:0;">${title}</h3><div class="muted">${list.length} profile(s)</div></div>
+        </div>
+        <div class="table-wrap"><table class="table"><thead><tr><th>Name</th><th>House</th><th>Phone</th><th>Role</th><th>Action</th></tr></thead><tbody>
+          ${list.map(x=>rowHtml(x,allRows.indexOf(x))).join('')}
+        </tbody></table></div>
+        ${list.length?'':`<div class="muted" style="padding:18px">${emptyText}</div>`}
+      </div>`;
+
+   if(isSuperAdmin){
+      c.innerHTML=`<div class="hero">
+        <div><div class="eyebrow">SUPER ADMINISTRATION</div><h2>User Management</h2><div class="muted">Manage administrator profiles and society members. Super Admin can update Admin profiles.</div></div>
+        <button class="primary-btn" onclick="adminAddMember()">+ Add Member</button>
+      </div>
+      ${tableHtml('Administrators',adminRows,'No administrator profiles found.')}
+      ${tableHtml('Members',memberRows,'No member profiles found.')}`;
+   }else{
+      c.innerHTML=`<div class="hero"><div><h2>Members</h2><div class="muted">Showing only member profiles saved in the database.</div></div><button class="primary-btn" onclick="adminAddMember()">+ Add Member</button></div>
+      ${tableHtml('Members',memberRows,'No member profiles saved yet.')}`;
+   }
 }else if(p==='complaints'){
   const {data:rows,error}=await sb.from('complaints').select('*').order('created_at',{ascending:false});
   if(error)return toast('Unable to load Complaints: '+error.message);
@@ -3598,7 +3613,7 @@ async function restoreLoginSession(){
         document.getElementById('authModal')?.classList.add('hidden');
         document.getElementById('authOverlay')?.classList.add('hidden');
 
-        if(user.role==='admin'){
+        if(isAdminRole(user.role)){
             await openAdminDashboard(user);
         }else{
             await openMemberDashboard(user);
