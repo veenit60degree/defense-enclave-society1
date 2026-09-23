@@ -81,6 +81,70 @@ img{max-width:100%;height:auto}
 }
 </style>
 
+
+<style id="admin-logout-mobile-fix">
+/* Keep Admin logout accessible on small screens */
+@media (max-width: 800px){
+  #adminLogout{
+    display:inline-flex !important;
+    width:40px !important;
+    height:40px !important;
+    min-width:40px !important;
+    padding:0 !important;
+    margin:0 !important;
+    align-items:center !important;
+    justify-content:center !important;
+    border-radius:50% !important;
+    font-size:0 !important;
+    line-height:1 !important;
+    white-space:nowrap !important;
+    flex:0 0 40px !important;
+  }
+  #adminLogout::before{
+    content:"⏻";
+    font-size:21px;
+    line-height:1;
+    font-weight:700;
+  }
+}
+@media (max-width:480px){
+  #adminLogout{
+    width:36px !important;
+    height:36px !important;
+    min-width:36px !important;
+    flex-basis:36px !important;
+  }
+  #adminLogout::before{font-size:19px;}
+}
+</style>
+
+
+<style id="admin-sidebar-mobile-fix">
+@media (max-width:800px){
+  .sidebar-bottom{
+    display:flex !important;
+    align-items:center !important;
+    gap:8px !important;
+    min-width:0 !important;
+  }
+  .sidebar-bottom .user-mini{
+    min-width:0 !important;
+    flex:1 1 auto !important;
+    overflow:hidden !important;
+  }
+  .sidebar-bottom .user-mini > div:last-child{
+    min-width:0 !important;
+    overflow:hidden !important;
+  }
+  .sidebar-bottom .user-mini strong,
+  .sidebar-bottom .user-mini span{
+    overflow:hidden !important;
+    text-overflow:ellipsis !important;
+    white-space:nowrap !important;
+  }
+}
+</style>
+
 </head><body>
 <div id="toast"></div>
 <header class="public-nav" id="login_btn_panel"><div class="inner"><div class="brand"><div class="brand-mark">DE</div><div><strong>Defense Enclave</strong><span>Society Portal</span></div></div><a href="#home">Home</a><a href="#members">Members</a><a href="#work">Work</a><a href="#events">Events</a><a href="#gallery">Gallery</a><a href="#map">Map</a><a href="#about">About</a><button class="login-pill" id="openLogin">Member Login</button></div></header>
