@@ -145,6 +145,84 @@ img{max-width:100%;height:auto}
 }
 </style>
 
+
+<style id="member-mobile-top-logout-fix">
+/* Member logout: move it visually to the top-right on small screens.
+   The existing #memberLogout click handler remains unchanged. */
+@media (max-width: 800px){
+  #memberLogout{
+    position:fixed !important;
+    top:14px !important;
+    right:14px !important;
+    z-index:10050 !important;
+
+    display:inline-flex !important;
+    width:auto !important;
+    min-width:42px !important;
+    height:40px !important;
+    padding:0 11px !important;
+    margin:0 !important;
+
+    align-items:center !important;
+    justify-content:center !important;
+    gap:0 !important;
+    border-radius:999px !important;
+
+    font-size:0 !important;
+    line-height:1 !important;
+    white-space:nowrap !important;
+    flex:0 0 auto !important;
+  }
+
+  #memberLogout::before{
+    content:"⏻";
+    display:block;
+    font-size:21px;
+    line-height:1;
+    font-weight:700;
+  }
+
+  /* The old member-name/logout row is no longer needed on small screens. */
+  #memberLogout{
+    /* fixed positioning takes the button out of the old row */
+  }
+
+  /* Prevent the old row from leaving an awkward empty area. */
+  .sidebar-bottom:has(#memberLogout){
+    min-height:0 !important;
+    margin-top:0 !important;
+    padding-top:8px !important;
+    padding-bottom:8px !important;
+  }
+
+  .sidebar-bottom:has(#memberLogout) .user-mini{
+    display:none !important;
+  }
+}
+
+@media (max-width:480px){
+  #memberLogout{
+    top:10px !important;
+    right:10px !important;
+    min-width:40px !important;
+    height:38px !important;
+    padding:0 10px !important;
+  }
+
+  #memberLogout::before{
+    font-size:20px;
+  }
+}
+
+/* Landscape phones/tablets: keep the button in the same top-right location. */
+@media (max-width:800px) and (orientation:landscape){
+  #memberLogout{
+    top:10px !important;
+    right:12px !important;
+  }
+}
+</style>
+
 </head><body>
 <div id="toast"></div>
 <header class="public-nav" id="login_btn_panel"><div class="inner"><div class="brand"><div class="brand-mark">DE</div><div><strong>Defense Enclave</strong><span>Society Portal</span></div></div><a href="#home">Home</a><a href="#members">Members</a><a href="#work">Work</a><a href="#events">Events</a><a href="#gallery">Gallery</a><a href="#map">Map</a><a href="#about">About</a><button class="login-pill" id="openLogin">Member Login</button></div></header>
