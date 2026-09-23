@@ -2361,16 +2361,26 @@ async function adminAddMember(){
             hasAccessToken:!!session.access_token
           });
 
+          const createMemberPayload={
+            full_name:String(full_name||'').trim(),
+            house_number:String(house_number||'').trim(),
+            phone:String(phone||'').trim(),
+            email:String(email||'').trim()||null,
+            password,
+            address:String(address||'').trim()||null,
+            role:'member'
+          };
+
+          console.log('Create Member payload:',{
+            full_name:createMemberPayload.full_name,
+            house_number:createMemberPayload.house_number,
+            phone:createMemberPayload.phone,
+            address:createMemberPayload.address,
+            hasEmail:!!createMemberPayload.email
+          });
+
           const {data:fnData,error:fnError}=await sb.functions.invoke('admin-create-member',{
-            body:{
-              full_name,
-              house_number,
-              phone,
-              email:email||null,
-              password,
-              address:address||null,
-              role:'member'
-            },
+            body:createMemberPayload,
             headers:{
               Authorization:`Bearer ${session.access_token}`
             }
