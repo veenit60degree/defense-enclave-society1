@@ -844,10 +844,10 @@ async function register(){
     if(!name||!email||!password||!house_no)return toast('Please fill name, email, house and password');
     if(password.length<6)return toast('Password must be at least 6 characters');
     if(!sb)return toast('Supabase is not configured yet');
-    const {data,error}=await sb.auth.signUp({email,password,options:{data:{full_name:name,phone:phone||null,house_number:house_no||null,address:address||null}}});
+    const {data,error}=await sb.auth.signUp({email,password,options:{data:{full_name:name}}});
     if(error)return toast(error.message);
     if(!data.user)return toast('Registration could not be completed');
-    const profileResult=await sb.from('profiles').update({full_name:name,email:data.user.email||email,phone:phone||null,house_number:house_no||null,address:address||null}).eq('id',data.user.id);
+    const profileResult=await sb.from('profiles').update({full_name:name,email:data.user.email||email,phone:phone||null,house_number:house_no,address:address||null}).eq('id',data.user.id);
     if(profileResult.error){console.error('Profile update error:',profileResult.error);return toast('Account created, but profile details could not be saved');}
     authModal.classList.add('hidden');
     if(!data.session){showLogin();return toast('Registration successful. Please verify your email before login.');}
@@ -3629,13 +3629,80 @@ async function restoreLoginSession(){
 setTimeout(()=>restoreLoginSession(),300);
 
 if(sb && sb.auth){
-    sb.auth.onAuthStateChange((event)=>{
+    sb.auth.onAuthStateChange((event, session)=>{
         console.log('Supabase auth event:',event);
+
+        if(event==='SIGNED_IN' || event==='INITIAL_SESSION' || event==='TOKEN_REFRESHED'){
+            // Always reload the profile from public.profiles so the
+            // current database role (including superadmin) is available
+            // to all Admin/Edit permission checks.
+            setTimeout(async()=>{
+                try{
+                    const authUser=session?.user || (await sb.auth.getUser()).data?.user;
+                    if(!authUser){
+                        console.warn('Auth event received without user:',event);
+                        return;
+                    }
+
+                    const {data:profile,error:profileError}=await sb
+                        .from('profiles')
+                        .select('*')
+                        .eq('id',authUser.id)
+                        .maybeSingle();
+
+                    if(profileError){
+                        console.error('Auth profile load error:',profileError);
+                        return;
+                    }
+
+                    if(!profile){
+                        console.error('Auth profile not found:',authUser.id);
+                        return;
+                    }
+
+                    const role=String(profile.role || 'member')
+                        .trim()
+                        .toLowerCase()
+                        .replace(/[\\s-]+/g,'_');
+
+                    window.__adminUser={
+                        ...authUser,
+                        id:authUser.id,
+                        name:profile.full_name ||
+                             authUser.user_metadata?.full_name ||
+                             authUser.email?.split('@')[0] ||
+                             'Member',
+                        email:authUser.email || profile.email || '',
+                        phone:profile.phone || '',
+                        house_no:profile.house_number || profile.house_no || '',
+                        address:profile.address || '',
+                        role
+                    };
+
+                    console.log(
+                        'Auth profile loaded:',
+                        window.__adminUser.email,
+                        window.__adminUser.role
+                    );
+
+                    // Refresh the currently visible dashboard with the
+                    // database role instead of a stale/undefined role.
+                    if(isAdminRole(role)){
+                        await openAdminDashboard(window.__adminUser);
+                    }else{
+                        await openMemberDashboard(window.__adminUser);
+                    }
+                }catch(e){
+                    console.error('Auth profile initialization failed:',e);
+                }
+            },0);
+        }
 
         if(event==='SIGNED_OUT'){
             window.__adminUser=null;
             document.getElementById('memberApp')?.classList.add('hidden');
-            document.getElementById('public')?.classList.remove('hidden');setPublicLoginButtonVisible(true);
+            document.getElementById('public')?.classList.remove('hidden');
+            setPublicLoginButtonVisible(true);
             renderPublic().catch(e=>console.error('Public refresh:',e));
         }
     });
