@@ -346,34 +346,45 @@ function escapeHtml(v){
 
     // About Us: reuse the EXISTING About Us content/card.
     // Do not append another dynamic block below the existing layout.
-    const aboutSection=publicSectionByHeading(['About Us']);
-    if(aboutSection){
-        // Remove any dynamic holder that an older version may have appended.
-        aboutSection.querySelectorAll('[data-public-dynamic-content]').forEach(el=>el.remove());
+   const aboutSection = publicSectionByHeading(['About Us']);
 
-        // Prefer the existing About content/card instead of creating a new one.
-        let aboutContainer=document.getElementById('aboutContent') ||
-            aboutSection.querySelector('.about-content,.about-card,.about-box,.panel,.card');
+if (aboutSection) {
+    // Remove any dynamic holder that an older version may have appended.
+    aboutSection.querySelectorAll('[data-public-dynamic-content]').forEach(el => el.remove());
 
-        // If the page does not use a known class, use the first direct DIV after
-        // the heading as the existing content container.
-        if(!aboutContainer){
-            const heading=aboutSection.querySelector('h1,h2,h3,h4,.section-title,.eyebrow');
-            aboutContainer=[...aboutSection.children].find(el=>
-                el!==heading && el.tagName==='DIV'
-            ) || null;
-        }
+    // Prefer the existing About content/card instead of creating a new one.
+    let aboutContainer = document.getElementById('aboutContent') ||
+        aboutSection.querySelector('.about-content,.about-card,.about-box,.panel,.card');
 
-        if(aboutContainer){
-            const description=about.data?.description||about.data?.about||about.data?.content||'';
-            aboutContainer.innerHTML=about.error
-                ? '<div class="muted">Unable to load About Us information.</div>'
-                : description
-                    ? `<div class="about-description">${escapePublic(description).replace(/\n/g,'<br>')}</div>`
-                    : '<div class="muted">About information is not available.</div>';
-        }
+    // If the page does not use a known class, use the first direct DIV after
+    // the heading as the existing content container.
+    if (!aboutContainer) {
+        const heading = aboutSection.querySelector('h1,h2,h3,h4,.section-title,.eyebrow');
+
+        aboutContainer = [...aboutSection.children].find(el =>
+            el !== heading && el.tagName === 'DIV'
+        ) || null;
     }
 
+    if (aboutContainer) {
+        const description =
+            about.data?.description ||
+            about.data?.about ||
+            about.data?.content ||
+            '';
+
+        aboutContainer.innerHTML = about.error
+            ? '<div class="muted">Unable to load About Us information.</div>'
+            : description
+                ? `<div class="about-description">
+                    ${escapePublic(description)
+                        .replace(/\n/g, '<br>')
+                        .replace(/(Phone:|Email:|Address:)/g, '<strong>$1</strong>')}
+                   </div>`
+                : '<div class="muted">About information is not available.</div>';
+    }
+}
+    
     // Reuse the existing .map div and put the map inside it.
     const mapDiv=document.getElementById('map') || document.querySelector('.map[data-map], .map');
     if(mapDiv){
