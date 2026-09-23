@@ -2499,6 +2499,34 @@ async function adminDeleteMember(i) {
 
 
 
+
+async function adminDeleteComplaint(i){
+  if(!(await requireAdminDeletePermission()))return;
+
+  const x=window.__complaintRows?.[i];
+  if(!x)return toast('Complaint not found.');
+
+  const complaintNo=x.complaint_number||'';
+  const member=window.__complaintProfileMap?.[x.user_id]?.full_name||'Member';
+
+  if(!confirm(`Delete complaint${complaintNo?` #${complaintNo}`:''} from ${member}?\n\nThis action cannot be undone.`))return;
+
+  try{
+    const {error}=await sb
+      .from('complaints')
+      .delete()
+      .eq('id',x.id);
+
+    if(error)throw error;
+
+    toast('Complaint deleted successfully.');
+    await adminPage('complaints',window.__adminUser);
+  }catch(error){
+    console.error('Complaint delete failed:',error);
+    toast('Complaint delete failed: '+(error?.message||error));
+  }
+}
+
 async function adminUpdateComplaint(i){
   const x=window.__complaintRows?.[i];
   if(!x)return;
@@ -2840,7 +2868,10 @@ else if(p==='maintenance'){
     <td>${x.subject||''}</td>
     <td><span class="status ${String(x.status||'submitted').toLowerCase()}">${statusText(x.status)}</span></td>
     <td>${x.created_at?new Date(x.created_at).toLocaleDateString('en-IN'):''}</td>
-    <td><button class="outline-btn" onclick="adminUpdateComplaint(${i})">Update</button></td>
+    <td>
+      <button class="outline-btn" onclick="adminUpdateComplaint(${i})">Update</button>
+      <button class="outline-btn" onclick="adminDeleteComplaint(${i})" style="margin-left:6px;color:#b42318;border-color:#f3b5b5;">Delete</button>
+    </td>
   </tr>`}).join('')}</tbody></table></div>
   ${complaintRows.length?'':'<div class="muted" style="padding:18px">No complaints saved yet.</div>'}</div>`;
 }else if(p==='map'){
