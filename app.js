@@ -2308,45 +2308,66 @@ async function adminEditMember(i){
         if(!valid)return;
 
         try{
-            const {data:{session},error:sessionError}=await sb.auth.getSession();
-            if(sessionError)throw sessionError;
-            if(!session?.access_token)throw new Error('Admin session is not available. Please login again.');
+            // Update the member profile directly so the selected role is
+            // persisted in the profiles table. The previous implementation
+            // relied entirely on the Edge Function for this, but the role
+            // could remain unchanged if the server-side update did not
+            // include/handle the role field.
+            const {error:profileError}=await sb
+                .from('profiles')
+                .update({
+                    full_name,
+                    house_number,
+                    phone:phone||null,
+                    address:address||null,
+                    role
+                })
+                .eq('id',x.id);
 
-            const {data:fnData,error:fnError}=await sb.functions.invoke(
-                'admin-create-member',
-                {
-                    body:{
-                        action:'update',
-                        user_id:x.id,
-                        full_name,
-                        house_number,
-                        phone:phone||null,
-                        email:email||null,
-                        password:password||null,
-                        address:address||null,
-                        role
-                    },
-                    headers:{
-                        Authorization:`Bearer ${session.access_token}`
-                    }
-                }
-            );
-
-            if(fnError){
-                console.error('admin-create-member update error:',fnError);
-                let message=fnError.message||'Failed to update member.';
-                try{
-                    const response=fnError.context;
-                    if(response && typeof response.clone==='function'){
-                        const payload=await response.clone().json();
-                        if(payload?.error)message=payload.error;
-                    }
-                }catch(_){}
-                throw new Error(message);
+            if(profileError){
+                console.error('Profile update error:',profileError);
+                throw new Error('Failed to update member profile: '+profileError.message);
             }
 
-            if(fnData?.error)throw new Error(fnData.error);
-            if(!fnData?.success)throw new Error('Member was not updated.');
+            // Email/password are Auth credentials and therefore continue to
+            // be handled by the secure Edge Function. Do not send passwords
+            // through a direct profiles-table update.
+            if(email || password){
+                const {data:{session},error:sessionError}=await sb.auth.getSession();
+                if(sessionError)throw sessionError;
+                if(!session?.access_token)throw new Error('Admin session is not available. Please login again.');
+
+                const {data:fnData,error:fnError}=await sb.functions.invoke(
+                    'admin-create-member',
+                    {
+                        body:{
+                            action:'update',
+                            user_id:x.id,
+                            email:email||null,
+                            password:password||null
+                        },
+                        headers:{
+                            Authorization:`Bearer ${session.access_token}`
+                        }
+                    }
+                );
+
+                if(fnError){
+                    console.error('admin-create-member update error:',fnError);
+                    let message=fnError.message||'Failed to update login credentials.';
+                    try{
+                        const response=fnError.context;
+                        if(response && typeof response.clone==='function'){
+                            const payload=await response.clone().json();
+                            if(payload?.error)message=payload.error;
+                        }
+                    }catch(_){}
+                    throw new Error(message);
+                }
+
+                if(fnData?.error)throw new Error(fnData.error);
+                if(!fnData?.success)throw new Error('Login credentials were not updated.');
+            }
 
             close();
             toast('Member updated');
