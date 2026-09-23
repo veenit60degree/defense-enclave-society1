@@ -3333,6 +3333,19 @@ if(sb && sb.auth){
 }
 
 
+
+/* Responsive UI safeguard: preserve existing functionality while keeping
+   navigation/logout controls usable on narrow screens. */
+function responsiveLogoutVisibility(){
+  const selectors=['#logoutBtn','.logout-btn','.logout-button','[data-action="logout"]'];
+  selectors.forEach(sel=>{
+    document.querySelectorAll(sel).forEach(el=>{
+      el.style.visibility='visible';
+      el.style.opacity='1';
+    });
+  });
+}
+
 document.addEventListener('DOMContentLoaded',()=>{
     setupPublicTopNavigation();
     setPublicLoginButtonVisible(true);
