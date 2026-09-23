@@ -1,3 +1,11 @@
+
+const complaintEscapedValue = value => String(value ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
 /* Defense Enclave Admin Buttons: 2026-09-19 */
 //const CONFIG={SUPABASE_URL:'https://gujtekpteezejmtaxtcj.supabase.co',SUPABASE_ANON_KEY:'sb_publishable_KvdsKcUr_vuvPrg7xU11Ww_q1H7vhg1'};
 
@@ -265,13 +273,13 @@ function openPublicMembersPage(members){
 }
 
 async function renderPublic(){
-      const safeComplaintHtml=value=>String(value??'')
+      const complaintEscapedValue=value=>String(value??'')
         .replace(/&/g,'&amp;')
         .replace(/</g,'&lt;')
         .replace(/>/g,'&gt;')
         .replace(/"/g,'&quot;')
         .replace(/'/g,'&#39;');
-      function escapeHtml(v){
+      function complaintEscapedValue(v){
   return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
     if(!sb){
@@ -474,7 +482,7 @@ async function renderPublic(){
     }else{
       const st=v=>String(v||'submitted').toLowerCase()==='in_progress'?'In Progress':String(v||'submitted').toLowerCase()==='resolved'?'Completed':String(v||'submitted').toLowerCase()==='rejected'?'Rejected':'Submitted';
       const rows=r.data||[];
-      publicWrap.innerHTML=rows.length?`<table class="table"><thead><tr><th>Complaint No.</th><th>Member Name</th><th>Category</th><th>Complaint</th><th>Status</th><th>Date</th></tr></thead><tbody>${rows.map(x=>`<tr><td><strong>${escapeHtml(String(x.complaint_number??''))}</strong></td><td>${escapeHtml(x.member_name||'Member')}</td><td>${escapeHtml(x.category||'')}</td><td>${escapeHtml(x.subject||'')}</td><td>${escapeHtml(st(x.status))}</td><td>${x.created_at?new Date(x.created_at).toLocaleDateString('en-IN'):''}</td></tr>`).join('')}</tbody></table>`:'<div class="muted" style="padding:18px">No complaints available.</div>';
+      publicWrap.innerHTML=rows.length?`<table class="table"><thead><tr><th>Complaint No.</th><th>Member Name</th><th>Category</th><th>Complaint</th><th>Status</th><th>Date</th></tr></thead><tbody>${rows.map(x=>`<tr><td><strong>${complaintEscapedValue(String(x.complaint_number??''))}</strong></td><td>${complaintEscapedValue(x.member_name||'Member')}</td><td>${complaintEscapedValue(x.category||'')}</td><td>${complaintEscapedValue(x.subject||'')}</td><td>${complaintEscapedValue(st(x.status))}</td><td>${x.created_at?new Date(x.created_at).toLocaleDateString('en-IN'):''}</td></tr>`).join('')}</tbody></table>`:'<div class="muted" style="padding:18px">No complaints available.</div>';
     }
   }
 }
@@ -3114,7 +3122,7 @@ async function memberPage(p,user){
               </select>
             </label>
             <label>Contact Phone
-              <input id="complaintPhone" type="tel" value="${safeComplaintHtml(phone)}" placeholder="Phone number">
+              <input id="complaintPhone" type="tel" value="${complaintEscapedValue(phone)}" placeholder="Phone number">
             </label>
           </div>
 
@@ -3127,7 +3135,7 @@ async function memberPage(p,user){
           </label>
 
           <label>Contact Email
-            <input id="complaintEmail" type="email" value="${safeComplaintHtml(email)}" placeholder="Email address">
+            <input id="complaintEmail" type="email" value="${complaintEscapedValue(email)}" placeholder="Email address">
           </label>
 
           <div id="memberComplaintError" style="display:none;margin:12px 0;padding:10px;border-radius:8px;background:#fff1f1;color:#b42318"></div>
