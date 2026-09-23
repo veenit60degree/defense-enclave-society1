@@ -3118,8 +3118,8 @@ function openMemberComplaintForm(user){
             <label>
               Category <span style="color:#d92d20;">*</span>
               <select id="complaintCategory" required>
-                <option value="">Select category</option>
-               <option value="Maintenance">Maintenance</option>
+                 <option value="">Select category</option>
+                <option value="Maintenance">Maintenance</option>
                 <option value="Electricity">Electricity</option>
                 <option value="Damaged_road">Damaged road</option>
                  <option value="Sewage">Sewage</option>
@@ -3205,7 +3205,7 @@ function openMemberComplaintForm(user){
                 description,
                 contact_phone:contactPhone||null,
                 contact_email:contactEmail||null,
-                status:'Submitted'
+                status:'submitted'
             }).select().single();
 
             if(error) throw error;
