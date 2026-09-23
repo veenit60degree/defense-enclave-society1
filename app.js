@@ -265,7 +265,13 @@ function openPublicMembersPage(members){
 }
 
 async function renderPublic(){
-function escapeHtml(v){
+      const safeComplaintHtml=value=>String(value??'')
+        .replace(/&/g,'&amp;')
+        .replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;')
+        .replace(/'/g,'&#39;');
+      function escapeHtml(v){
   return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
     if(!sb){
@@ -3108,7 +3114,7 @@ async function memberPage(p,user){
               </select>
             </label>
             <label>Contact Phone
-              <input id="complaintPhone" type="tel" value="${escapeHtml(phone)}" placeholder="Phone number">
+              <input id="complaintPhone" type="tel" value="${safeComplaintHtml(phone)}" placeholder="Phone number">
             </label>
           </div>
 
@@ -3121,7 +3127,7 @@ async function memberPage(p,user){
           </label>
 
           <label>Contact Email
-            <input id="complaintEmail" type="email" value="${escapeHtml(email)}" placeholder="Email address">
+            <input id="complaintEmail" type="email" value="${safeComplaintHtml(email)}" placeholder="Email address">
           </label>
 
           <div id="memberComplaintError" style="display:none;margin:12px 0;padding:10px;border-radius:8px;background:#fff1f1;color:#b42318"></div>
