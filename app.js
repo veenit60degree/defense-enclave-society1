@@ -380,8 +380,9 @@ function escapeHtml(v){
             }).join('') || '<div class="muted">No registered members found.</div>';
 
             // Public/logout page: keep the existing member section and make only its
-            // member list internally scrollable. Four rows fit before scrolling.
-            memberGrid.style.maxHeight='420px';
+            // Keep about three member cards visible; remaining members can be scrolled.
+            memberGrid.classList.add('public-members-scroll');
+            memberGrid.style.maxHeight='315px';
             memberGrid.style.overflowY='auto';
             memberGrid.style.overflowX='hidden';
             memberGrid.style.paddingRight='6px';
