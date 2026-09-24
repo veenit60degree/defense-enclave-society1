@@ -391,30 +391,31 @@ if (aboutSection) {
         mapDiv.innerHTML=`<h3 style="margin:0 0 12px 0">Society Map</h3><iframe title="Defense Enclave Society location" src="https://www.google.com/maps?q=30.777604,76.616637&z=17&output=embed" width="100%" height="420" style="border:0;border-radius:14px;display:block" loading="lazy" allowfullscreen referrerpolicy="no-referrer-when-downgrade"></iframe>`;
     }
 
-    // Public Photo Gallery: album-wise thumbnail grids with vertical scrolling and full-screen navigation.
+    // Existing Photo Gallery: albums -> thumbnails -> full-screen photo viewer.
     const gallerySection=publicSectionByHeading(['Photo Gallery','Gallery']);
-    const galleryGrid=document.getElementById('galleryGrid') ||
-        publicContentContainer(['Photo Gallery','Gallery'],['.gallery-grid','.photos-grid','.cards-grid']);
     if(gallerySection){
         const galleryHeading=gallerySection.querySelector('h1,h2,h3,h4,.section-title,.eyebrow');
         if(galleryHeading && !galleryHeading.querySelector('[data-public-gallery-link]')){
             const link=document.createElement('a');
-            link.href='#gallery';
+            link.href='#';
             link.textContent=' (View all photos)';
             link.setAttribute('data-public-gallery-link','1');
             link.style.cssText='font-size:.82em;font-weight:500;text-decoration:none;cursor:pointer;margin-left:4px;';
             link.addEventListener('click',e=>{
                 e.preventDefault();
-                gallerySection.scrollIntoView({behavior:'smooth',block:'start'});
+                const target=document.getElementById('galleryGrid');
+                if(target)target.scrollIntoView({behavior:'smooth',block:'center'});
             });
             galleryHeading.appendChild(link);
         }
     }
+    const galleryGrid=document.getElementById('galleryGrid') ||
+        publicContentContainer(['Photo Gallery','Gallery'],['.gallery-grid','.photos-grid','.cards-grid']);
     if(galleryGrid){
         if(gallery.error){
             galleryGrid.innerHTML='<div class="muted">Unable to load photo gallery.</div>';
         }else{
-            const rows=(gallery.data||[]).filter(x=>x.file_name!=='.folder' && x.public_url);
+            const rows=(gallery.data||[]).filter(x=>x.file_name!=='.folder');
             const grouped={};
             rows.forEach(x=>{
                 const path=String(x.storage_path||'').replace(/^\/+/, '');
@@ -426,26 +427,79 @@ if (aboutSection) {
             window.__publicGalleryAlbums=grouped;
             window.__publicGalleryOpenAlbum=function(album){
                 const photos=window.__publicGalleryAlbums?.[album]||[];
-                if(!photos.length)return toast('No photos available in this album.');
-                openGalleryPhotoViewer(photos,0,album);
-            };
+                const overlay=document.createElement('div');
+                overlay.id='publicGalleryAlbumOverlay';
+                overlay.className='gallery-album-overlay';
+                overlay.innerHTML=`<div class="gallery-album-modal">
+                    <div class="gallery-album-modal-head">
+                        <div><h2>${escapePublic(album)}</h2><div class="muted">${photos.length} photo${photos.length===1?'':'s'}</div></div>
+                        <button type="button" id="publicGalleryAlbumClose" class="gallery-close-btn" aria-label="Close album" title="Close">×</button>
+                    </div>
+                    <div class="gallery-album-photo-grid">
+                        ${photos.map((x,i)=>`<button type="button" class="public-gallery-thumb" data-photo-index="${i}" aria-label="Open ${escapePublic(x.file_name||'Photo')}" title="Open photo">
+                            <img src="${escapePublic(x.public_url||'')}" alt="${escapePublic(x.file_name||'Photo')}">
+                        </button>`).join('') || '<div class="muted">No photos available.</div>'}
+                    </div>
+                </div>`;
+                document.body.appendChild(overlay);
+                overlay.querySelector('#publicGalleryAlbumClose').onclick=()=>overlay.remove();
+                overlay.addEventListener('click',e=>{
+                    if(e.target===overlay)overlay.remove();
+                    const b=e.target.closest('.public-gallery-thumb');
+                    if(!b)return;
+                    openPublicGalleryPhoto(Number(b.dataset.photoIndex));
+                });
 
+                function openPublicGalleryPhoto(startIndex){
+                    let index=Math.max(0,Math.min(startIndex,photos.length-1));
+                    const viewer=document.createElement('div');
+                    viewer.className='gallery-photo-viewer';
+                    viewer.innerHTML=`
+                        <button type="button" class="gallery-viewer-close" aria-label="Close photo" title="Close">×</button>
+                        <button type="button" class="gallery-viewer-nav gallery-viewer-prev" aria-label="Previous photo" title="Previous">‹</button>
+                        <div class="gallery-viewer-content">
+                            <img class="gallery-viewer-image" alt="Photo">
+                            <div class="gallery-viewer-caption"></div>
+                        </div>
+                        <button type="button" class="gallery-viewer-nav gallery-viewer-next" aria-label="Next photo" title="Next">›</button>`;
+                    document.body.appendChild(viewer);
+                    const img=viewer.querySelector('.gallery-viewer-image');
+                    const caption=viewer.querySelector('.gallery-viewer-caption');
+                    const prev=viewer.querySelector('.gallery-viewer-prev');
+                    const next=viewer.querySelector('.gallery-viewer-next');
+                    const render=()=>{
+                        const photo=photos[index];
+                        if(!photo?.public_url)return;
+                        img.src=photo.public_url;
+                        img.alt=photo.file_name||'Photo';
+                        caption.textContent=`${index+1} / ${photos.length}${photo.file_name?' · '+photo.file_name:''}`;
+                        prev.disabled=photos.length<2;
+                        next.disabled=photos.length<2;
+                    };
+                    prev.onclick=()=>{if(photos.length>1){index=(index-1+photos.length)%photos.length;render();}};
+                    next.onclick=()=>{if(photos.length>1){index=(index+1)%photos.length;render();}};
+                    viewer.querySelector('.gallery-viewer-close').onclick=()=>viewer.remove();
+                    viewer.onclick=e=>{if(e.target===viewer)viewer.remove();};
+                    const keyHandler=e=>{
+                        if(e.key==='Escape'){viewer.remove();document.removeEventListener('keydown',keyHandler);}
+                        if(e.key==='ArrowLeft'&&photos.length>1){index=(index-1+photos.length)%photos.length;render();}
+                        if(e.key==='ArrowRight'&&photos.length>1){index=(index+1)%photos.length;render();}
+                    };
+                    document.addEventListener('keydown',keyHandler);
+                    viewer.addEventListener('remove',()=>document.removeEventListener('keydown',keyHandler));
+                    render();
+                }
+            };
+            galleryGrid.classList.add('public-gallery-albums');
             galleryGrid.innerHTML=albums.map(album=>{
                 const photos=grouped[album];
-                return `<div class="gallery-album" data-public-album="${escapePublic(album)}">
-                    <div class="gallery-album-title"><h3 style="margin:0">${escapePublic(album)}</h3><span class="muted">${photos.length} photo${photos.length===1?'':'s'}</span></div>
-                    <div class="gallery-photo-grid">${photos.map((x,i)=>`<button type="button" class="gallery-photo-tile" data-public-photo="1" data-gallery-album="${escapePublic(album)}" data-gallery-index="${i}" aria-label="Open ${escapePublic(x.file_name||'photo')}">
-                        <img src="${escapePublic(x.public_url)}" alt="${escapePublic(x.file_name||'Photo')}">
-                        <div class="gallery-photo-name" title="${escapePublic(x.file_name||'Photo')}">${escapePublic(x.file_name||'Photo')}</div>
-                    </button>`).join('')}</div>
-                </div>`;
+                const cover=photos.find(x=>x.public_url)?.public_url||'';
+                return `<button type="button" class="card public-gallery-album-card" data-public-album="${escapePublic(album)}" aria-label="Open ${escapePublic(album)} album">
+                    <span class="photo">${cover?`<img src="${escapePublic(cover)}" alt="${escapePublic(album)}">`:'<span class="gallery-empty-cover">📷</span>'}</span>
+                    <span class="card-body"><strong class="public-gallery-album-title">${escapePublic(album)}</strong><span class="muted">${photos.length} photo${photos.length===1?'':'s'}</span></span>
+                </button>`;
             }).join('') || '<div class="muted">No photo albums available.</div>';
-
-            galleryGrid.querySelectorAll('[data-public-photo]').forEach(btn=>btn.addEventListener('click',()=>{
-                const album=btn.getAttribute('data-gallery-album')||'General';
-                const photos=window.__publicGalleryAlbums?.[album]||[];
-                openGalleryPhotoViewer(photos,Number(btn.getAttribute('data-gallery-index')||0),album);
-            }));
+            galleryGrid.querySelectorAll('[data-public-album]').forEach(card=>card.addEventListener('click',()=>window.__publicGalleryOpenAlbum(card.getAttribute('data-public-album'))));
         }
     }
 
@@ -2004,6 +2058,53 @@ async function adminDeleteEvent(i){
     await adminPage('events',window.__adminUser);
 }
 
+function adminOpenGalleryViewer(folderName,startIndex){
+    const photos=(window.__galleryRows||[]).filter(x=>x._folder===folderName && x.file_name!=='.folder');
+    if(!photos.length)return;
+
+    let index=Math.max(0,Math.min(Number(startIndex)||0,photos.length-1));
+    const viewer=document.createElement('div');
+    viewer.className='gallery-photo-viewer';
+    viewer.innerHTML=`
+        <button type="button" class="gallery-viewer-close" aria-label="Close photo" title="Close">×</button>
+        <button type="button" class="gallery-viewer-nav gallery-viewer-prev" aria-label="Previous photo" title="Previous">‹</button>
+        <div class="gallery-viewer-content">
+            <img class="gallery-viewer-image" alt="Photo">
+            <div class="gallery-viewer-caption"></div>
+        </div>
+        <button type="button" class="gallery-viewer-nav gallery-viewer-next" aria-label="Next photo" title="Next">›</button>`;
+    document.body.appendChild(viewer);
+
+    const img=viewer.querySelector('.gallery-viewer-image');
+    const caption=viewer.querySelector('.gallery-viewer-caption');
+    const prev=viewer.querySelector('.gallery-viewer-prev');
+    const next=viewer.querySelector('.gallery-viewer-next');
+    const close=()=>{
+        document.removeEventListener('keydown',keyHandler);
+        viewer.remove();
+    };
+    const render=()=>{
+        const photo=photos[index];
+        if(!photo?.public_url)return;
+        img.src=photo.public_url;
+        img.alt=photo.file_name||'Photo';
+        caption.textContent=`${index+1} / ${photos.length}${photo.file_name?' · '+photo.file_name:''}`;
+        prev.disabled=photos.length<2;
+        next.disabled=photos.length<2;
+    };
+    const keyHandler=e=>{
+        if(e.key==='Escape')return close();
+        if(e.key==='ArrowLeft'&&photos.length>1){index=(index-1+photos.length)%photos.length;render();}
+        if(e.key==='ArrowRight'&&photos.length>1){index=(index+1)%photos.length;render();}
+    };
+    prev.onclick=()=>{if(photos.length>1){index=(index-1+photos.length)%photos.length;render();}};
+    next.onclick=()=>{if(photos.length>1){index=(index+1)%photos.length;render();}};
+    viewer.querySelector('.gallery-viewer-close').onclick=close;
+    viewer.onclick=e=>{if(e.target===viewer)close();};
+    document.addEventListener('keydown',keyHandler);
+    render();
+}
+
 async function adminDeleteGalleryPhoto(photoId){
     if(!(await requireAdminDeletePermission()))return;
 
@@ -2127,60 +2228,6 @@ async function adminAddGalleryFolder(){
  }
 }
 
-function openGalleryPhotoViewer(photos,index,title='Photo Gallery'){
-  const list=(photos||[]).filter(x=>x?.public_url);
-  if(!list.length)return;
-  let current=Math.max(0,Math.min(Number(index)||0,list.length-1));
-
-  const old=document.getElementById('galleryLightbox');
-  if(old)old.remove();
-
-  const viewer=document.createElement('div');
-  viewer.id='galleryLightbox';
-  viewer.className='gallery-lightbox';
-  viewer.setAttribute('role','dialog');
-  viewer.setAttribute('aria-modal','true');
-  viewer.setAttribute('aria-label',title||'Photo Gallery');
-  viewer.innerHTML=`
-    <button type="button" class="gallery-lightbox-close" id="galleryLightboxClose" aria-label="Close">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
-    </button>
-    <button type="button" class="gallery-lightbox-nav gallery-lightbox-prev" id="galleryLightboxPrev" aria-label="Previous photo">&#10094;</button>
-    <img class="gallery-lightbox-image" id="galleryLightboxImage" alt="">
-    <button type="button" class="gallery-lightbox-nav gallery-lightbox-next" id="galleryLightboxNext" aria-label="Next photo">&#10095;</button>
-    <div class="gallery-lightbox-caption" id="galleryLightboxCaption"></div>`;
-  document.body.appendChild(viewer);
-
-  const image=viewer.querySelector('#galleryLightboxImage');
-  const caption=viewer.querySelector('#galleryLightboxCaption');
-  const prev=viewer.querySelector('#galleryLightboxPrev');
-  const next=viewer.querySelector('#galleryLightboxNext');
-
-  const render=()=>{
-    const photo=list[current];
-    image.src=photo.public_url;
-    image.alt=photo.file_name||'Photo';
-    caption.textContent=`${photo.file_name||'Photo'}  •  ${current+1} / ${list.length}`;
-    prev.style.display=list.length>1?'grid':'none';
-    next.style.display=list.length>1?'grid':'none';
-  };
-  const close=()=>{
-    document.removeEventListener('keydown',onKey);
-    viewer.remove();
-  };
-  const onKey=e=>{
-    if(e.key==='Escape')close();
-    else if(e.key==='ArrowLeft' && list.length>1){current=(current-1+list.length)%list.length;render();}
-    else if(e.key==='ArrowRight' && list.length>1){current=(current+1)%list.length;render();}
-  };
-  viewer.querySelector('#galleryLightboxClose').onclick=close;
-  prev.onclick=()=>{current=(current-1+list.length)%list.length;render();};
-  next.onclick=()=>{current=(current+1)%list.length;render();};
-  viewer.addEventListener('click',e=>{if(e.target===viewer)close();});
-  document.addEventListener('keydown',onKey);
-  render();
-}
-
 async function adminUploadGallery(folderName){
  if(!sb)return toast('Supabase is not configured.');
  if(typeof folderName!=='string' || !folderName.trim())return toast('Gallery folder not found.');
@@ -2201,11 +2248,11 @@ async function adminUploadGallery(folderName){
    try{
     const folder=folderName.trim().replace(/[\/\\]+/g,'-').replace(/[^a-zA-Z0-9 _-]+/g,'_');
     const ext=(file.name.split('.').pop()||'jpg').toLowerCase();
-    // Save photos using the requested IMG-MMDDYYYYHHMMSS naming format.
-    const d=new Date(Date.now()+files.indexOf(file)*1000);
+    const base=(file.name.replace(/\.[^/.]+$/,'').replace(/[^a-zA-Z0-9 _-]+/g,'_')||'photo');
+    const now=new Date();
     const pad=n=>String(n).padStart(2,'0');
-    const stamp=`${pad(d.getMonth()+1)}${pad(d.getDate())}${d.getFullYear()}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
-    const storageName=`IMG-${stamp}.${ext}`;
+    const stamp=`${pad(now.getMonth()+1)}${pad(now.getDate())}${now.getFullYear()}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+    const storageName=`IMG-${stamp}-${base}.${ext}`;
     storagePath=`${folder}/${storageName}`;
 
     const upload=await sb.storage
@@ -3122,17 +3169,19 @@ else if(p==='maintenance'){
     window.__eventRows=rows||[];
     c.innerHTML=`<div class="hero"><div><h2>Events</h2><div class="muted">Showing only events saved in the database.</div></div><button class="primary-btn" onclick="adminAddEvent()">+ Add Event</button></div>
     <div class="event-grid">${(rows||[]).map((x,i)=>`<div class="card"><div class="photo">📅</div><div class="card-body"><div class="event-date">${x.event_date||x.date||''}</div><h3>${x.title||x.name||''}</h3><div class="muted">${x.location||x.place||x.description||''}</div><br><button class="outline-btn" onclick="adminEditEvent(${i})">Edit</button> <button class="outline-btn" onclick="adminDeleteEvent(${i})">Delete</button></div></div>`).join('')}</div>${rows?.length?'':`<div class="panel"><div class="muted">No events saved yet.</div></div>`}`;
-  }else if(p==='gallery'){
+ }else if(p==='gallery'){
     const {data:rows,error}=await sb.from('gallery_photos').select('*');
     if(error){ console.error('Gallery load error:',error); return toast('Unable to load Gallery: '+error.message); }
 
+    // The current gallery_photos table does not contain folder_name.
     // Folder is derived from the first segment of storage_path.
     const normalizedRows=(rows||[]).map(x=>{
-      const path=String(x.storage_path||'').replace(/^\/+/, '');
+      const path=String(x.storage_path||'').replace(/^\/+/,'');
       const parts=path.split('/');
       return {...x,_folder:parts.length>1?parts[0]:'General'};
     });
 
+    // Also include empty folders created through Storage (.folder marker).
     const storageFolders=await adminListGalleryFolders();
     const folders=[...new Set([
       ...storageFolders,
@@ -3141,27 +3190,38 @@ else if(p==='maintenance'){
 
     window.__galleryRows=normalizedRows;
 
-    c.innerHTML=`<div class="hero"><div><h2>Photo Gallery</h2><div class="muted">Photos are grouped by folder and can be opened in full screen.</div></div></div>
-    <div class="panel"><button class="primary-btn" onclick="adminAddGalleryFolder()">+ Add Folder</button></div>
-    <div class="gallery-grid">${folders.map(folder=>{
+    c.innerHTML=`<div class="hero"><div><h2>Photo Gallery</h2><div class="muted">Only saved Supabase Gallery photos are shown.</div></div></div>
+    <div class="panel gallery-folder-toolbar"><button class="primary-btn" onclick="adminAddGalleryFolder()">+ Add Folder</button></div>
+    <div class="gallery-admin-albums">${folders.map(folder=>{
       const photos=normalizedRows.filter(x=>x._folder===folder && x.file_name!=='.folder');
-      return `<div class="card"><div class="card-body"><h3>${escapePublic(folder)}</h3><div class="muted">${photos.length} saved photo(s)</div>
-      <button class="outline-btn" onclick='adminUploadGallery(${JSON.stringify(folder)})'>Add Photos</button>
-      <button class="outline-btn" onclick='adminDeleteGalleryFolder(${JSON.stringify(folder)})'>Delete Folder</button>
-      <div class="admin-gallery-scroll" style="margin-top:12px"><div class="admin-gallery-grid">${photos.map((x,i)=>`<div class="admin-gallery-photo">
-        <img src="${escapePublic(x.public_url||'')}" alt="${escapePublic(x.file_name||'Photo')}" data-admin-gallery-photo="1" data-gallery-album="${escapePublic(folder)}" data-gallery-index="${i}">
-        <div class="gallery-photo-name" title="${escapePublic(x.file_name||'Photo')}">${escapePublic(x.file_name||'Photo')}</div>
-        <div class="photo-actions"><button class="outline-btn" type="button" onclick='adminDeleteGalleryPhoto(${JSON.stringify(x.id)})'>Delete Photo</button></div>
-      </div>`).join('')}</div></div>
-      </div></div>`;
+      return `<div class="card gallery-admin-album-card">
+        <div class="card-body">
+          <div class="gallery-admin-album-head">
+            <div><h3>${folder}</h3><div class="muted">${photos.length} saved photo${photos.length===1?'':'s'}</div></div>
+            <div class="gallery-admin-album-actions">
+              <button type="button" class="gallery-icon-btn" title="Add Photos" aria-label="Add Photos" onclick='adminUploadGallery(${JSON.stringify(folder)})'>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+              </button>
+              <button type="button" class="gallery-icon-btn gallery-icon-danger" title="Delete Folder" aria-label="Delete Folder" onclick='adminDeleteGalleryFolder(${JSON.stringify(folder)})'>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v6M14 11v6"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="gallery-admin-photo-grid">
+            ${photos.map((x,i)=>`<div class="gallery-admin-photo" data-gallery-photo-index="${i}">
+              <button type="button" class="gallery-admin-photo-open" onclick='adminOpenGalleryViewer(${JSON.stringify(folder)},${i})' aria-label="Open ${String(x.file_name||'Photo').replace(/"/g,'&quot;')}" title="Open photo">
+                <img src="${x.public_url||''}" alt="${x.file_name||'Photo'}">
+              </button>
+              <button type="button" class="gallery-photo-delete-btn" title="Delete Photo" aria-label="Delete Photo" onclick='adminDeleteGalleryPhoto(${JSON.stringify(x.id)})'>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v6M14 11v6"/></svg>
+              </button>
+              <div class="muted gallery-photo-name" title="${String(x.file_name||'Photo').replace(/"/g,'&quot;')}">${x.file_name||''}</div>
+            </div>`).join('') || '<div class="muted gallery-empty-state">No photos in this folder.</div>'}
+          </div>
+        </div>
+      </div>`;
     }).join('')}</div>${folders.length?'':`<div class="panel"><div class="muted">No gallery folders or photos saved yet.</div></div>`}`;
-
-    c.querySelectorAll('[data-admin-gallery-photo]').forEach(img=>img.addEventListener('click',()=>{
-      const folder=img.getAttribute('data-gallery-album')||'General';
-      const photos=window.__galleryRows.filter(x=>x._folder===folder && x.file_name!=='.folder');
-      openGalleryPhotoViewer(photos,Number(img.getAttribute('data-gallery-index')||0),folder);
-    }));
-}else if(p==='members'){
+ }else if(p==='members'){
    const currentRole=String(user?.role||window.__adminUser?.role||'admin').trim().toLowerCase().replace(/[\s-]+/g,'_');
    const isSuperAdmin=currentRole==='superadmin';
 
