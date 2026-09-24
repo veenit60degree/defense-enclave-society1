@@ -264,6 +264,82 @@ function openPublicMembersPage(members){
     overlay.querySelector('#publicMembersAllClose').onclick=()=>overlay.remove();
 }
 
+
+function addPublicComplaintsViewAll(section, rows){
+    if(!section)return;
+    const heading=section.querySelector('h1,h2,h3,h4');
+    if(!heading)return;
+    let link=heading.querySelector('[data-public-complaints-view-all]');
+    if(!link){
+        link=document.createElement('button');
+        link.type='button';
+        link.setAttribute('data-public-complaints-view-all','1');
+        link.textContent='(View all)';
+        link.className='public-view-all-btn';
+        heading.appendChild(link);
+    }
+    link.onclick=()=>openPublicComplaintsPage(rows);
+}
+
+function openPublicComplaintsPage(rows){
+    const old=document.getElementById('publicComplaintsAllOverlay');
+    if(old)old.remove();
+    const data=Array.isArray(rows)?rows:[];
+    const st=v=>String(v||'submitted').toLowerCase()==='in_progress'?'In Progress':String(v||'submitted').toLowerCase()==='resolved'?'Completed':String(v||'submitted').toLowerCase()==='rejected'?'Rejected':'Submitted';
+    const overlay=document.createElement('div');
+    overlay.id='publicComplaintsAllOverlay';
+    overlay.className='public-all-overlay';
+    overlay.innerHTML=`<div class="public-all-modal">
+        <div class="public-all-modal-head">
+            <div><h2>Complaints</h2><div class="muted">All society complaints and their current status.</div></div>
+            <button type="button" class="public-all-close" aria-label="Close">×</button>
+        </div>
+        <div class="public-all-table-scroll"><table class="table"><thead><tr><th>Complaint No.</th><th>Member Name</th><th>Category</th><th>Complaint</th><th>Status</th><th>Date</th></tr></thead><tbody>
+        ${data.map(x=>`<tr><td><strong>${escapePublic(String(x.complaint_number??''))}</strong></td><td>${escapePublic(x.member_name||'Member')}</td><td>${escapePublic(x.category||'')}</td><td>${escapePublic(x.subject||'')}</td><td>${escapePublic(st(x.status))}</td><td>${x.created_at?new Date(x.created_at).toLocaleDateString('en-IN'):''}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">No complaints available.</td></tr>'}
+        </tbody></table></div>
+    </div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector('.public-all-close').onclick=()=>overlay.remove();
+    overlay.onclick=e=>{if(e.target===overlay)overlay.remove();};
+}
+
+function addPublicEventsViewAll(section, rows){
+    if(!section)return;
+    const heading=section.querySelector('h1,h2,h3,h4');
+    if(!heading)return;
+    let link=heading.querySelector('[data-public-events-view-all]');
+    if(!link){
+        link=document.createElement('button');
+        link.type='button';
+        link.setAttribute('data-public-events-view-all','1');
+        link.textContent='(View all)';
+        link.className='public-view-all-btn';
+        heading.appendChild(link);
+    }
+    link.onclick=()=>openPublicEventsPage(rows);
+}
+
+function openPublicEventsPage(rows){
+    const old=document.getElementById('publicEventsAllOverlay');
+    if(old)old.remove();
+    const data=Array.isArray(rows)?rows:[];
+    const overlay=document.createElement('div');
+    overlay.id='publicEventsAllOverlay';
+    overlay.className='public-all-overlay';
+    overlay.innerHTML=`<div class="public-all-modal public-events-all-modal">
+        <div class="public-all-modal-head">
+            <div><h2>Events</h2><div class="muted">All upcoming society events.</div></div>
+            <button type="button" class="public-all-close" aria-label="Close">×</button>
+        </div>
+        <div class="public-all-events-grid">
+        ${data.map(e=>`<div class="card public-event-card-all"><div class="photo">📅</div><div class="card-body"><div class="event-date">${escapePublic(e.event_date||e.date||'')}</div><h3>${escapePublic(e.title||e.name||'')}</h3><div class="muted">${escapePublic(e.location||e.place||e.description||'')}</div></div></div>`).join('') || '<div class="muted">No events available.</div>'}
+        </div>
+    </div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector('.public-all-close').onclick=()=>overlay.remove();
+    overlay.onclick=e=>{if(e.target===overlay)overlay.remove();};
+}
+
 async function renderPublic(){
 function escapeHtml(v){
   return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
@@ -326,13 +402,17 @@ function escapeHtml(v){
         }
     }
 
+    const eventSection=publicSectionByHeading(['Events']);
     const eventGrid=document.getElementById('eventGrid') ||
         publicContentContainer(['Events'],['.event-grid','.events-grid','.cards-grid']);
     if(eventGrid){
         if(events.error){
             eventGrid.innerHTML='<div class="muted">Unable to load events.</div>';
         }else{
-            eventGrid.innerHTML=(events.data||[]).map(e=>`<div class="card"><div class="photo">📅</div><div class="card-body"><div class="event-date">${escapePublic(e.event_date||e.date||'')}</div><h3>${escapePublic(e.title||e.name||'')}</h3><div class="muted">${escapePublic(e.location||e.place||e.description||'')}</div></div></div>`).join('') || '<div class="muted">No events available.</div>';
+            const eventRows=events.data||[];
+            eventGrid.classList.add('public-events-scroll');
+            eventGrid.innerHTML=eventRows.map(e=>`<div class="card public-event-card"><div class="photo">📅</div><div class="card-body"><div class="event-date">${escapePublic(e.event_date||e.date||'')}</div><h3>${escapePublic(e.title||e.name||'')}</h3><div class="muted">${escapePublic(e.location||e.place||e.description||'')}</div></div></div>`).join('') || '<div class="muted">No events available.</div>';
+            addPublicEventsViewAll(eventSection,eventRows);
         }
     }
 
@@ -514,7 +594,7 @@ if (aboutSection) {
     const parent=societyWork?.closest('section')||document.getElementById('public');
     parent?.insertAdjacentElement('afterend',publicComplaintSection);
   }
-  publicComplaintSection.innerHTML=`<div class="section-head"><div><h2>Complaints</h2><div class="muted">Complaint status visible to all visitors.</div></div></div><div id="publicComplaintsTableWrap" class="table-wrap"><div class="muted" style="padding:18px">Loading complaints...</div></div>`;
+  publicComplaintSection.innerHTML=`<div class="section-head"><div><h2>Complaints</h2><div class="muted">Complaint status visible to all visitors.</div></div></div><div id="publicComplaintsTableWrap" class="table-wrap public-complaints-table-wrap"><div class="muted" style="padding:18px">Loading complaints...</div></div>`;
 
   const publicWrap=document.getElementById('publicComplaintsTableWrap');
   if(publicWrap){
@@ -525,7 +605,9 @@ if (aboutSection) {
     }else{
       const st=v=>String(v||'submitted').toLowerCase()==='in_progress'?'In Progress':String(v||'submitted').toLowerCase()==='resolved'?'Completed':String(v||'submitted').toLowerCase()==='rejected'?'Rejected':'Submitted';
       const rows=r.data||[];
-      publicWrap.innerHTML=rows.length?`<table class="table"><thead><tr><th>Complaint No.</th><th>Member Name</th><th>Category</th><th>Complaint</th><th>Status</th><th>Date</th></tr></thead><tbody>${rows.map(x=>`<tr><td><strong>${escapeHtml(String(x.complaint_number??''))}</strong></td><td>${escapeHtml(x.member_name||'Member')}</td><td>${escapeHtml(x.category||'')}</td><td>${escapeHtml(x.subject||'')}</td><td>${escapeHtml(st(x.status))}</td><td>${x.created_at?new Date(x.created_at).toLocaleDateString('en-IN'):''}</td></tr>`).join('')}</tbody></table>`:'<div class="muted" style="padding:18px">No complaints available.</div>';
+      publicWrap.innerHTML=rows.length?`<table class="table public-complaints-table"><thead><tr><th>Complaint No.</th><th>Member Name</th><th>Category</th><th>Complaint</th><th>Status</th><th>Date</th></tr></thead><tbody>${rows.map(x=>`<tr><td><strong>${escapeHtml(String(x.complaint_number??''))}</strong></td><td>${escapeHtml(x.member_name||'Member')}</td><td>${escapeHtml(x.category||'')}</td><td>${escapeHtml(x.subject||'')}</td><td>${escapeHtml(st(x.status))}</td><td>${x.created_at?new Date(x.created_at).toLocaleDateString('en-IN'):''}</td></tr>`).join('')}</tbody></table>`:'<div class="muted" style="padding:18px">No complaints available.</div>';
+      publicWrap.classList.add('public-complaints-scroll');
+      addPublicComplaintsViewAll(publicComplaintSection,rows);
     }
   }
 }
