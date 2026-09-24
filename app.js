@@ -632,11 +632,23 @@ const authModal=document.getElementById('authModal');const showLogin=()=>{docume
 
             try{
                 /*
-                 * Supabase sends the recovery email. The Supabase email template
-                 * must expose {{ .Token }} for the user to receive an OTP.
-                 * The OTP is verified below with type: 'recovery'.
+                 * Send a Supabase authentication OTP instead of a password
+                 * recovery link. This prevents the old "Reset password" link
+                 * flow and allows the user to enter the OTP directly in this
+                 * website.
+                 *
+                 * IMPORTANT:
+                 * Supabase's Magic Link email template should contain
+                 * {{ .Token }} so the actual OTP is included in the email.
+                 * shouldCreateUser:false prevents this flow from creating
+                 * a new account when the email is not registered.
                  */
-                const {error}=await sb.auth.resetPasswordForEmail(email);
+                const {error}=await sb.auth.signInWithOtp({
+                    email,
+                    options:{
+                        shouldCreateUser:false
+                    }
+                });
 
                 if(error)throw error;
 
@@ -697,7 +709,7 @@ const authModal=document.getElementById('authModal');const showLogin=()=>{docume
                 const {data,error}=await sb.auth.verifyOtp({
                     email:recoveryEmail,
                     token,
-                    type:'recovery'
+                    type:'email'
                 });
 
                 if(error)throw error;
