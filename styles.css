@@ -80,3 +80,15 @@
   .public-gallery-albums{grid-template-columns:1fr;max-height:560px}
   .gallery-album-photo-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+
+/* Public Society Work: keep the full table accessible on narrow/mobile screens. */
+.public-work-table-panel{overflow:hidden}
+.public-work-table-scroll{width:100%;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:thin}
+.public-work-table-scroll .table{min-width:760px}
+.public-work-table-scroll::-webkit-scrollbar{height:7px}
+.public-work-table-scroll::-webkit-scrollbar-thumb{background:#b8c9c7;border-radius:10px}
+@media(max-width:720px){
+  .public-work-table-panel{padding:12px}
+  .public-work-table-scroll{margin:0;width:100%;padding-bottom:4px}
+  .public-work-table-scroll .table{min-width:760px}
+}
