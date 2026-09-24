@@ -3295,7 +3295,7 @@ else if(p==='maintenance'){
     return s==='in_progress'?'In Progress':s==='resolved'?'Completed':s==='rejected'?'Rejected':'Submitted';
   };
 
-  c.innerHTML=`<div class="hero"><div><div class="eyebrow">ADMINISTRATION</div><h2>Complaints</h2><div class="muted">Manage member complaints and update status and remarks.</div></div></div>
+  c.innerHTML=`<div class="hero"><div><div class="eyebrow">ADMINISTRATION</div><h2>Complaints</h2><div class="muted">Manage member complaints and update status and remarks.</div></div><button class="primary-btn" id="adminNewComplaint">+ Add Complaint</button></div>
   <div class="panel"><div class="table-wrap"><table class="table">
   <thead><tr><th>Complaint No.</th><th>Member Name</th><th>Category</th><th>Subject</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
   <tbody>${complaintRows.map((x,i)=>{const p=profiles[x.user_id]||{};return `<tr>
@@ -3311,6 +3311,7 @@ else if(p==='maintenance'){
     </td>
   </tr>`}).join('')}</tbody></table></div>
   ${complaintRows.length?'':'<div class="muted" style="padding:18px">No complaints saved yet.</div>'}</div>`;
+  document.getElementById('adminNewComplaint')?.addEventListener('click',()=>openAdminComplaintForm(user));
 }else if(p==='map'){
     c.innerHTML=`<div class="hero"><div><h2>Society Map</h2><div class="muted">Defense Enclave Society location</div></div></div>
     <div class="panel">
@@ -3549,6 +3550,115 @@ async function memberPage(p,user){
 }
 
 
+
+async function openAdminComplaintForm(adminUser){
+    if(!sb) return toast('Supabase is not configured.');
+
+    const old=document.getElementById('adminComplaintCreateModal');
+    if(old) old.remove();
+
+    const esc=(v)=>String(v??'')
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+
+    const {data:members,error}=await sb.from('profiles')
+        .select('id,full_name,email,phone,house_number,role,is_active')
+        .in('role',['member','admin'])
+        .order('full_name',{ascending:true});
+
+    if(error){
+        console.error('Complaint member load:',error);
+        return toast('Unable to load members for complaint.');
+    }
+
+    const rows=(members||[]).filter(x=>x.is_active!==false);
+    if(!rows.length) return toast('No active member accounts found.');
+
+    const overlay=document.createElement('div');
+    overlay.id='adminComplaintCreateModal';
+    overlay.style.cssText='position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;background:rgba(15,23,42,.58);backdrop-filter:blur(3px);overflow:auto;';
+    overlay.innerHTML=`
+      <div role="dialog" aria-modal="true" style="width:min(650px,100%);max-height:calc(100vh - 40px);overflow:auto;background:#fff;border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.30);padding:24px;box-sizing:border-box;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+          <div><h2 style="margin:0 0 4px;font-size:22px;">Add Complaint</h2><div style="font-size:13px;color:#667085;">Create a complaint on behalf of a society member.</div></div>
+          <button type="button" id="adminComplaintCreateClose" style="width:36px;height:36px;border:0;border-radius:50%;background:#f2f4f7;font-size:24px;line-height:1;cursor:pointer;">&times;</button>
+        </div>
+        <form id="adminComplaintCreateForm" novalidate>
+          <div id="adminComplaintCreateError" style="display:none;margin-bottom:14px;padding:11px 12px;border-radius:9px;background:#fff1f1;color:#b42318;font-size:13px;"></div>
+          <label>Member <span style="color:#d92d20;">*</span>
+            <select id="adminComplaintMember" required>
+              <option value="">Select member</option>
+              ${rows.map(x=>`<option value="${esc(x.id)}">${esc(x.full_name||x.email||'Member')}${x.house_number?` — ${esc(x.house_number)}`:''}</option>`).join('')}
+            </select>
+          </label>
+          <div class="form-grid">
+            <label>Category <span style="color:#d92d20;">*</span>
+              <select id="adminComplaintCategory" required>
+                <option value="">Select category</option><option value="Maintenance">Maintenance</option><option value="Electricity">Electricity</option><option value="Damaged_road">Damaged road</option><option value="Sewage">Sewage</option><option value="Security">Security</option><option value="Other">Other</option>
+              </select>
+            </label>
+            <label>Contact Phone<input id="adminComplaintPhone" placeholder="Phone number"></label>
+          </div>
+          <label>Subject <span style="color:#d92d20;">*</span><input id="adminComplaintSubject" maxlength="150" required placeholder="Briefly describe the complaint"></label>
+          <label>Description <span style="color:#d92d20;">*</span><textarea id="adminComplaintDescription" rows="6" maxlength="3000" required placeholder="Provide complete details of the issue..."></textarea></label>
+          <label>Contact Email<input id="adminComplaintEmail" type="email" placeholder="Email address"></label>
+          <div style="font-size:12px;color:#667085;margin:4px 0 18px;">The complaint will be saved against the selected member account.</div>
+          <div style="display:flex;justify-content:flex-end;gap:10px;padding-top:15px;border-top:1px solid #eaecf0;"><button type="button" id="adminComplaintCreateCancel" class="outline-btn">Cancel</button><button type="submit" id="adminComplaintCreateSubmit" class="primary-btn">Add Complaint</button></div>
+        </form>
+      </div>`;
+    document.body.appendChild(overlay);
+
+    const close=()=>overlay.remove();
+    overlay.querySelector('#adminComplaintCreateClose').onclick=close;
+    overlay.querySelector('#adminComplaintCreateCancel').onclick=close;
+    overlay.addEventListener('click',e=>{if(e.target===overlay)close();});
+
+    const memberMap=new Map(rows.map(x=>[x.id,x]));
+    overlay.querySelector('#adminComplaintMember').addEventListener('change',e=>{
+        const m=memberMap.get(e.target.value)||{};
+        overlay.querySelector('#adminComplaintPhone').value=m.phone||'';
+        overlay.querySelector('#adminComplaintEmail').value=m.email||'';
+    });
+
+    overlay.querySelector('#adminComplaintCreateForm').onsubmit=async e=>{
+        e.preventDefault();
+        const errorBox=overlay.querySelector('#adminComplaintCreateError');
+        errorBox.style.display='none';
+        const memberId=overlay.querySelector('#adminComplaintMember').value;
+        const category=overlay.querySelector('#adminComplaintCategory').value.trim();
+        const subject=overlay.querySelector('#adminComplaintSubject').value.trim();
+        const description=overlay.querySelector('#adminComplaintDescription').value.trim();
+        const contactPhone=overlay.querySelector('#adminComplaintPhone').value.trim();
+        const contactEmail=overlay.querySelector('#adminComplaintEmail').value.trim();
+        if(!memberId||!category||!subject||!description){
+            errorBox.textContent='Please select a member and fill Category, Subject and Description.';
+            errorBox.style.display='block'; return;
+        }
+        if(contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail)){
+            errorBox.textContent='Please enter a valid email address.';
+            errorBox.style.display='block'; return;
+        }
+        const btn=overlay.querySelector('#adminComplaintCreateSubmit');
+        btn.disabled=true; btn.textContent='Adding...';
+        try{
+            const {error}=await sb.from('complaints').insert({
+                user_id:memberId, category, subject, description,
+                contact_phone:contactPhone||null,
+                contact_email:contactEmail||null,
+                status:'submitted'
+            });
+            if(error) throw error;
+            close();
+            toast('Complaint added successfully.');
+            await adminPage('complaints',adminUser);
+        }catch(err){
+            console.error('Admin complaint creation failed:',err);
+            errorBox.textContent=err?.message||'Unable to add complaint. Please try again.';
+            errorBox.style.display='block';
+            btn.disabled=false; btn.textContent='Add Complaint';
+        }
+    };
+}
 
 function openMemberComplaintForm(user){
     if(!sb) return toast('Supabase is not configured.');
