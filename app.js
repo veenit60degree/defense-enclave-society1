@@ -398,7 +398,7 @@ if (aboutSection) {
         if(galleryHeading && !galleryHeading.querySelector('[data-public-gallery-link]')){
             const link=document.createElement('a');
             link.href='#';
-            link.textContent=' (View all photos)';
+            link.textContent='';    //(View all photos)
             link.setAttribute('data-public-gallery-link','1');
             link.style.cssText='font-size:.82em;font-weight:500;text-decoration:none;cursor:pointer;margin-left:4px;';
             link.addEventListener('click',e=>{
