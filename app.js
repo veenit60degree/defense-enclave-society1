@@ -2251,8 +2251,10 @@ async function adminUploadGallery(folderName){
     const base=(file.name.replace(/\.[^/.]+$/,'').replace(/[^a-zA-Z0-9 _-]+/g,'_')||'photo');
     const now=new Date();
     const pad=n=>String(n).padStart(2,'0');
-    const stamp=`${pad(now.getMonth()+1)}${pad(now.getDate())}${now.getFullYear()}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-    const storageName=`IMG-${stamp}-${base}.${ext}`;
+//    const stamp=`${pad(now.getMonth()+1)}${pad(now.getDate())}${now.getFullYear()}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+//    const storageName=`IMG-${stamp}-${base}.${ext}`; 
+    const stamp = `${String(now.getFullYear()).slice(-2)}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+    const storageName = `IMG-${stamp}.${ext}`;    //IMG-YYMMDDHHMMSS.ext
     storagePath=`${folder}/${storageName}`;
 
     const upload=await sb.storage
