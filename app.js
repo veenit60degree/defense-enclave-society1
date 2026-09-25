@@ -3268,18 +3268,24 @@ async function adminAboutPage(c){
     c.innerHTML=`<div class="hero"><div><div class="eyebrow">SOCIETY INFORMATION</div><h2>About Society</h2><div class="muted">Update the information displayed on the public About page.</div></div></div>
     <div class="panel admin-about-panel">
       <div class="admin-about-grid">
-        <label for="adminAboutDescription">Description <span class="required">*</span>
-          <textarea id="adminAboutDescription" rows="8" maxlength="5000" placeholder="Enter society description...">${adminAboutEscape(row?.description||'')}</textarea>
-        </label>
+      
         <label for="adminAboutPhone">Phone
           <input id="adminAboutPhone" type="tel" maxlength="40" placeholder="e.g. +91 98765 43210" value="${adminAboutEscape(row?.phone||'')}">
         </label>
+
         <label for="adminAboutEmail">Email
           <input id="adminAboutEmail" type="email" maxlength="160" placeholder="e.g. contact@defenseenclave.com" value="${adminAboutEscape(row?.email||'')}">
         </label>
+
         <label for="adminAboutAddress">Address
           <textarea id="adminAboutAddress" rows="4" maxlength="500" placeholder="Enter society address...">${adminAboutEscape(row?.address||'')}</textarea>
         </label>
+
+          <label for="adminAboutDescription">Description <span class="required">*</span>
+          <textarea id="adminAboutDescription" rows="8" maxlength="5000" placeholder="Enter society description...">${adminAboutEscape(row?.description||'')}</textarea>
+        </label>
+
+        
       </div>
       <div id="adminAboutError" class="admin-about-error" style="display:none"></div>
       <div class="admin-about-actions"><button id="adminAboutSave" class="primary-btn" onclick="adminSaveAbout()">Save Changes</button></div>
