@@ -620,3 +620,32 @@
 @media (max-width:800px) and (orientation:landscape) {
   #adminLogout { top: 10px !important; right: 12px !important; }
 }
+
+
+
+/* =========================================================
+   WEBVIEW / ANDROID SWIPE-REFRESH SCROLL FIX
+   Prevent nested vertical scroll areas from passing their
+   overscroll gesture to the parent WebView/SwipeRefreshLayout.
+   ========================================================= */
+.gallery-admin-photo-grid,
+.public-gallery-albums,
+.gallery-album-photo-grid,
+.gallery-album-overlay,
+.gallery-album-modal,
+[role="dialog"][style*="overflow-y:auto"],
+[role="dialog"][style*="overflow-y: auto"] {
+    overscroll-behavior-y: contain !important;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+}
+
+/* Keep normal page scrolling independent from nested containers. */
+.gallery-admin-photo-grid,
+.public-gallery-albums,
+.gallery-album-photo-grid,
+.gallery-album-overlay,
+[role="dialog"][style*="overflow-y:auto"],
+[role="dialog"][style*="overflow-y: auto"] {
+    overscroll-behavior: contain !important;
+}
