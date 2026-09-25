@@ -94,127 +94,176 @@
 }
 
 
-/* Public complaints and events compact scroll views */
-.public-view-all-btn{
-  margin-left:8px;
-  border:0;
-  background:none;
-  padding:0;
-  color:#079c79;
-  font:inherit;
-  font-size:.82em;
-  font-weight:600;
-  cursor:pointer;
-  vertical-align:baseline;
-}
-.public-view-all-btn:hover{text-decoration:underline}
-.public-complaints-scroll{
-  width:100%;
-  max-height:292px;
-  overflow-x:auto;
-  overflow-y:auto;
-  -webkit-overflow-scrolling:touch;
-  scrollbar-width:thin;
-}
-.public-complaints-table{min-width:760px}
-.public-complaints-table th,.public-complaints-table td{white-space:nowrap}
-.public-events-scroll{
-  max-height:430px;
-  overflow-y:auto;
-  overflow-x:hidden;
-  align-content:start;
-  -webkit-overflow-scrolling:touch;
-  scrollbar-width:thin;
-  padding:2px 5px 8px 2px;
-}
-.public-event-card{min-height:0}
-.public-event-card .photo{height:115px;font-size:28px}
-.public-event-card .card-body{padding:11px 13px}
-.public-event-card .card-body h3{font-size:14px;margin:5px 0 6px}
-.public-event-card .card-body .muted{font-size:11px;line-height:1.45}
-.public-all-overlay{
-  position:fixed;
-  inset:0;
-  z-index:100000;
-  background:rgba(238,243,245,.98);
-  overflow:auto;
-  padding:24px;
-  box-sizing:border-box;
-}
-.public-all-modal{
-  width:min(1150px,100%);
-  min-height:calc(100vh - 48px);
-  margin:0 auto;
-  background:#fff;
-  border:1px solid #dde7e7;
-  border-radius:18px;
-  padding:24px;
-  box-sizing:border-box;
-  box-shadow:0 18px 60px rgba(15,35,40,.14);
-}
-.public-all-modal-head{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:15px;
-  margin-bottom:18px;
-}
-.public-all-modal-head h2{margin:0 0 4px}
-.public-all-close{
-  width:42px;
-  height:42px;
-  border:1px solid #d9e2e2;
-  border-radius:50%;
-  background:#f6f9f9;
-  color:#344548;
-  font-size:28px;
-  line-height:1;
-  display:grid;
-  place-items:center;
-}
-.public-all-table-scroll{width:100%;overflow:auto;-webkit-overflow-scrolling:touch}
-.public-all-table-scroll .table{min-width:760px}
-.public-all-events-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
-.public-event-card-all .photo{height:150px}
-.public-event-card-all .card-body{padding:14px}
-.public-event-card-all .card-body h3{margin:5px 0 7px;font-size:16px}
-@media(max-width:900px){
-  .public-events-scroll{max-height:400px}
-  .public-all-events-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
-}
+/* =========================================================
+   Responsive navigation + horizontal table scrolling
+   ========================================================= */
+.table-wrap{width:100%;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:thin}
+.table-wrap .table{min-width:720px}
+.admin-members-table-scroll .table{min-width:760px}
+
+.logout-action-btn{display:flex;align-items:center;justify-content:center;gap:8px}
+.logout-action-icon{font-size:18px;line-height:1;font-weight:800;color:#0a9270}
+
+.admin-about-panel{max-width:900px}
+.admin-about-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px}
+.admin-about-grid label:first-child{grid-column:1/-1}
+.admin-about-grid label{margin:8px 0}
+.admin-about-grid textarea,.admin-about-grid input{font-size:14px}
+.admin-about-grid textarea{min-height:100px}
+.required{color:#d92d20}
+.admin-about-error{margin-top:12px;padding:10px 12px;border-radius:8px;background:#fff1f1;color:#b42318;font-size:12px}
+.admin-about-actions{display:flex;justify-content:flex-end;margin-top:14px}
+
 @media(max-width:720px){
-  .public-complaints-scroll{max-height:300px}
-  .public-events-scroll{max-height:390px}
-  .public-event-card .photo{height:100px}
-  .public-event-card .card-body{padding:9px 11px}
-  .public-event-card .card-body h3{font-size:13px}
-  .public-all-overlay{padding:10px}
-  .public-all-modal{min-height:calc(100vh - 20px);padding:16px;border-radius:14px}
-  .public-all-events-grid{grid-template-columns:1fr 1fr;gap:10px}
-  .public-event-card-all .photo{height:105px}
-}
-@media(max-width:480px){
-  .public-all-events-grid{grid-template-columns:1fr}
-  .public-event-card-all .photo{height:125px}
+  .app-shell{width:100%;min-width:0}
+  .sidebar{width:100%;max-width:100%;padding:12px 10px 10px;position:static;overflow:hidden}
+  .brand{padding:4px 8px 12px}
+  .sidebar nav{display:flex;flex-direction:row;align-items:stretch;gap:4px;width:100%;min-width:0;overflow-x:auto;overflow-y:hidden;white-space:nowrap;flex-wrap:nowrap;padding:2px 2px 8px;-webkit-overflow-scrolling:touch;scrollbar-width:thin;touch-action:pan-x}
+  .sidebar nav::-webkit-scrollbar{height:5px}
+  .sidebar nav::-webkit-scrollbar-thumb{background:#c4d3d1;border-radius:10px}
+  .sidebar .nav-item{flex:0 0 auto;width:auto;min-width:max-content;margin:0;padding:10px 12px;white-space:nowrap}
+  .sidebar-bottom{display:none}
+  .main{width:100%;margin:0;min-width:0}
+  .content{min-width:0}
+  .admin-about-grid{grid-template-columns:1fr}
+  .admin-about-grid label:first-child{grid-column:auto}
+  .admin-about-actions .primary-btn{width:100%}
 }
 
-/* Public Society Members: show about 3 cards, then scroll */
-.public-members-scroll{max-height:315px;overflow-y:auto;overflow-x:hidden;padding-right:6px;-webkit-overflow-scrolling:touch;scrollbar-width:thin;}
-.public-members-scroll::-webkit-scrollbar{width:7px;}
-.public-members-scroll::-webkit-scrollbar-track{background:transparent;}
-.public-members-scroll::-webkit-scrollbar-thumb{background:#c8d8d5;border-radius:10px;}
-@media(max-width:720px){.public-members-scroll{max-height:300px;}}
-
-/* Member gallery: photos are interactive and open in the same full-screen viewer as Admin. */
-.member-gallery-grid .member-gallery-card{
-  width:100%;
-  padding:0;
-  text-align:left;
-  cursor:zoom-in;
-  border:1px solid #dce6e5;
-  color:inherit;
-  font:inherit;
+/* Phone landscape: keep the complete left menu visible and vertically scrollable.
+   The logout area remains outside the scrollable navigation. */
+@media(max-width:900px) and (orientation:landscape){
+  .app-shell{display:flex;min-height:100vh}
+  .sidebar{position:fixed;left:0;top:0;bottom:0;width:220px;height:100vh;padding:14px 10px;display:flex;flex-direction:column;overflow:hidden;z-index:30}
+  .brand{flex:0 0 auto;padding:4px 8px 14px}
+  .sidebar nav{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;overflow-x:hidden;overflow-y:auto;padding:2px 2px 8px;scrollbar-width:thin;-webkit-overflow-scrolling:touch}
+  .sidebar nav::-webkit-scrollbar{width:5px}
+  .sidebar nav::-webkit-scrollbar-thumb{background:#c4d3d1;border-radius:10px}
+  .sidebar .nav-item{flex:0 0 auto;width:100%;min-width:0}
+  .sidebar-bottom{display:block;flex:0 0 auto;margin-top:8px;padding-top:10px}
+  .sidebar-bottom .user-mini{margin-bottom:8px}
+  .sidebar-bottom .outline-btn{height:38px;padding:7px 10px}
+  .main{margin-left:220px;width:calc(100% - 220px);min-width:0}
+  .topbar{min-height:72px;padding:10px 18px}
+  .content{padding:16px 18px 30px;min-width:0}
 }
-.member-gallery-grid .member-gallery-card:hover .photo img{transform:scale(1.03)}
-.member-gallery-grid .member-gallery-card .photo{overflow:hidden}
-.member-gallery-grid .member-gallery-card .photo img{transition:transform .2s ease}
+
+/* Narrow public/member data tables: all columns remain available by horizontal swipe. */
+#memberContent .table-wrap,
+#adminContent .table-wrap,
+#memberContent .panel .table-wrap{max-width:100%}
+#memberContent .table-wrap .table{min-width:720px}
+#memberContent .complaints-table-wrap .table{min-width:760px}
+
+
+/* =========================================================
+   FINAL RESPONSIVE NAVIGATION FIX
+   - Portrait phones: horizontal navigation scrolling
+   - Landscape phones/tablets: vertical sidebar scrolling
+   - Sidebar bottom actions remain outside the scroll area
+   ========================================================= */
+
+@media (max-width: 900px) and (orientation: portrait) {
+    .sidebar nav,
+    .admin-sidebar nav,
+    .member-sidebar nav,
+    .nav-menu,
+    .navigation-menu {
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        white-space: nowrap !important;
+        flex-wrap: nowrap !important;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        touch-action: pan-x;
+    }
+
+    .sidebar nav > *,
+    .admin-sidebar nav > *,
+    .member-sidebar nav > *,
+    .nav-menu > *,
+    .navigation-menu > * {
+        flex: 0 0 auto !important;
+    }
+}
+
+@media (max-width: 900px) and (orientation: landscape) {
+    .sidebar,
+    .admin-sidebar,
+    .member-sidebar {
+        display: flex !important;
+        flex-direction: column !important;
+        overflow: hidden !important;
+        max-height: 100vh !important;
+        height: 100vh !important;
+    }
+
+    .sidebar nav,
+    .admin-sidebar nav,
+    .member-sidebar nav,
+    .nav-menu,
+    .navigation-menu {
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        touch-action: pan-y;
+    }
+
+    .sidebar-bottom,
+    .admin-sidebar .sidebar-bottom,
+    .member-sidebar .sidebar-bottom,
+    .sidebar-footer {
+        flex: 0 0 auto !important;
+        position: relative !important;
+        display: flex !important;
+        visibility: visible !important;
+        z-index: 20 !important;
+    }
+}
+
+/* Generic horizontal content scrolling for narrow screens. */
+@media (max-width: 900px) {
+    .table-responsive,
+    .horizontal-scroll,
+    .society-items,
+    .complaints-list,
+    .members-list,
+    .members-table-wrapper,
+    .complaints-table-wrapper {
+        max-width: 100%;
+        overflow-x: auto !important;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        touch-action: pan-x;
+    }
+
+    table {
+        min-width: 680px;
+    }
+}
+
+
+/* Admin/SuperAdmin logout icon */
+.admin-logout-icon,
+.superadmin-logout-icon,
+[data-action="logout"] .logout-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    flex: 0 0 34px;
+}
+
+.admin-logout-btn,
+.superadmin-logout-btn,
+.sidebar-bottom button[data-action="logout"] {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
