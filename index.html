@@ -1883,6 +1883,7 @@ function openAdminDashboard(user){
  <button class="nav-item" data-a="members">♙ <span>Members</span></button>
  <button class="nav-item" data-a="complaints">⚑ <span>Complaints</span></button>
  <button class="nav-item" data-a="map">⌖ <span>Society Map</span></button>
+  <button class="nav-item" data-a="profile">♙ <span>My Profile</span></button>
   <button class="nav-item" data-a="about">ℹ <span>About</span></button>
  </nav><div class="sidebar-bottom"><div class="user-mini"><div class="avatar">${initials(user.name)}</div><div><strong>${user.name}</strong><span>${String(user.role||'admin').toLowerCase()==='superadmin' ? 'Super Administrator' : 'Administrator'}</span></div></div><button type="button" class="outline-btn logout-action-btn" id="adminLogout" aria-label="Log out" title="Log out"><span class="logout-action-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M10 17l5-5-5-5M15 12H3M21 19V5a2 2 0 0 0-2-2h-6"/></svg></span><span class="logout-action-label">Log out</span></button></div></aside>
  <main class="main"><header class="topbar"><div><div class="eyebrow">DEFENSE ENCLAVE SOCIETY</div><h1 id="adminTitle">Admin Dashboard</h1></div><div class="top-actions"><span class="status ongoing">${String(user.role||'admin').toLowerCase()==='superadmin' ? 'SUPER ADMIN' : 'ADMIN'}</span><div class="avatar">${initials(user.name)}</div></div></header><section id="adminContent" class="content"></section></main>`;
