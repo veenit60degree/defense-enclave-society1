@@ -595,7 +595,11 @@ if (aboutSection) {
     const parent=societyWork?.closest('section')||document.getElementById('public');
     parent?.insertAdjacentElement('afterend',publicComplaintSection);
   }
-  publicComplaintSection.innerHTML=`<div class="section-head"><div><h2>Complaints</h2><div class="muted">Complaint status visible to all visitors.</div></div></div><div id="publicComplaintsTableWrap" class="table-wrap public-complaints-table-wrap"><div class="muted" style="padding:18px">Loading complaints...</div></div>`;
+     //<div class="muted">Complaint status visible to all visitors.</div>
+
+  publicComplaintSection.innerHTML=`<div class="section-head"><div><h2>Complaints</h2>
+ 
+  </div></div><div id="publicComplaintsTableWrap" class="table-wrap public-complaints-table-wrap"><div class="muted" style="padding:18px">Loading complaints...</div></div>`;
 
   const publicWrap=document.getElementById('publicComplaintsTableWrap');
   if(publicWrap){
@@ -3560,7 +3564,7 @@ async function memberPage(p,user){
         <div>
           <div class="eyebrow">MEMBER VIEW</div>
           <h2>Society Finance</h2>
-          <div class="muted">Current society finance information. This page is read-only for members.</div>
+          <div class="muted">Current society finance information.</div>
         </div>
       </div>
 
@@ -3620,13 +3624,13 @@ async function memberPage(p,user){
       c.innerHTML=`<div class="hero"><div><h2>My Complaints</h2><div class="muted">Submit and track your complaints.</div></div><button class="primary-btn" id="newComplaint">+ New Complaint</button></div><div class="panel"><table class="table"><thead><tr><th>ID</th><th>Category</th><th>Complaint</th><th>Status</th><th>Date</th></tr></thead><tbody>${(rows||[]).map(x=>`<tr><td>${x.complaint_no||x.ticket_no||x.id||''}</td><td>${x.category||''}</td><td>${x.subject||x.title||x.description||x.message||''}</td><td>${x.status||'Submitted'}</td><td>${x.created_at?new Date(x.created_at).toLocaleDateString('en-IN'):''}</td></tr>`).join('')}</tbody></table>${rows?.length?'':'<div class="muted" style="padding:18px">No complaints saved yet.</div>'}</div>`;
     }else if(p==='work'){
       const {data:rows,error}=await sb.from('society_work').select('*').order('created_at',{ascending:false}); if(error)throw error;
-      c.innerHTML=`<div class="hero"><div><h2>Society Work</h2><div class="muted">Current projects from the database.</div></div></div><div class="panel"><table class="table"><thead><tr><th>Project</th><th>Status</th><th>Progress</th><th>Target</th></tr></thead><tbody>${(rows||[]).map(w=>`<tr><td><strong>${w.name||w.title||w.work_name||w.project_name||w.work_title||w.project||w.work||w.activity||w.task||w.subject||''}</strong><br><span class="muted">${w.description||w.details||''}</span></td><td>${w.status||''}</td><td><div class="progress"><i style="width:${Number(w.progress||0)}%"></i></div>${Number(w.progress||0)}%</td><td>${w.target_date||w.target||w.due_date||''}</td></tr>`).join('')}</tbody></table></div>`;
+      c.innerHTML=`<div class="hero"><div><h2>Society Work</h2><div class="muted">Current projects.</div></div></div><div class="panel"><table class="table"><thead><tr><th>Project</th><th>Status</th><th>Progress</th><th>Target</th></tr></thead><tbody>${(rows||[]).map(w=>`<tr><td><strong>${w.name||w.title||w.work_name||w.project_name||w.work_title||w.project||w.work||w.activity||w.task||w.subject||''}</strong><br><span class="muted">${w.description||w.details||''}</span></td><td>${w.status||''}</td><td><div class="progress"><i style="width:${Number(w.progress||0)}%"></i></div>${Number(w.progress||0)}%</td><td>${w.target_date||w.target||w.due_date||''}</td></tr>`).join('')}</tbody></table></div>`;
     }else if(p==='events'){
       const {data:rows,error}=await sb.from('events').select('*').order('event_date',{ascending:false}); if(error)throw error;
-      c.innerHTML=`<div class="hero"><div><h2>Events</h2><div class="muted">Upcoming society events from the database.</div></div></div><div class="event-grid">${(rows||[]).map(e=>`<div class="card"><div class="photo">📅</div><div class="card-body"><div class="event-date">${e.event_date||e.date||''}</div><h3>${e.title||e.name||''}</h3><div class="muted">${e.location||e.place||e.description||''}</div></div></div>`).join('')}</div>`;
+      c.innerHTML=`<div class="hero"><div><h2>Events</h2></div></div><div class="event-grid">${(rows||[]).map(e=>`<div class="card"><div class="photo">📅</div><div class="card-body"><div class="event-date">${e.event_date||e.date||''}</div><h3>${e.title||e.name||''}</h3><div class="muted">${e.location||e.place||e.description||''}</div></div></div>`).join('')}</div>`;
     }else if(p==='gallery'){
       const {data:rows,error}=await sb.from('gallery_photos').select('*').order('created_at',{ascending:false}); if(error)throw error;
-      c.innerHTML=`<div class="hero"><div><h2>Photo Gallery</h2><div class="muted">Community photos from the database.</div></div></div><div class="gallery-grid">${(rows||[]).map((g,i)=>`<div class="card"><div class="photo">${g.public_url?`<img src="${g.public_url}" alt="${g.file_name||'Gallery photo'}" style="width:100%;height:100%;object-fit:cover">`:['◉','★','♧','✦','✓','◎'][i%6]}</div><div class="card-body"><strong>${g.file_name||'Gallery Photo'}</strong></div></div>`).join('')}</div>`;
+      c.innerHTML=`<div class="hero"><div><h2>Photo Gallery</h2></div></div><div class="gallery-grid">${(rows||[]).map((g,i)=>`<div class="card"><div class="photo">${g.public_url?`<img src="${g.public_url}" alt="${g.file_name||'Gallery photo'}" style="width:100%;height:100%;object-fit:cover">`:['◉','★','♧','✦','✓','◎'][i%6]}</div><div class="card-body"><strong>${g.file_name||'Gallery Photo'}</strong></div></div>`).join('')}</div>`;
     }
     document.getElementById('newComplaint')?.addEventListener('click',()=>openMemberComplaintForm(user));
   }catch(e){console.error('Member page load failed:',e);c.innerHTML=`<div class="panel"><div class="muted">Unable to load this page: ${e?.message||e}</div></div>`;}
