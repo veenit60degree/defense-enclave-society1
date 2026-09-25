@@ -3417,8 +3417,14 @@ async function adminProfilePage(user){
         const saveBtn=document.getElementById('adminProfileEditSave'); saveBtn.disabled=true; saveBtn.textContent='Saving...';
         try{
           const profileUpdate={full_name:name,phone,house_number:house,address:address||null,updated_at:new Date().toISOString()};
-          const {error:profileUpdateError}=await sb.from('profiles').update(profileUpdate).eq('id',user.id);
+          const {data:savedProfile,error:profileUpdateError}=await sb
+            .from('profiles')
+            .update(profileUpdate)
+            .eq('id',user.id)
+            .select('id,full_name,phone,house_number,address,email,role')
+            .maybeSingle();
           if(profileUpdateError) throw profileUpdateError;
+          if(!savedProfile) throw new Error('Profile details were not saved. Please check the profiles table UPDATE policy for this account.');
           if(password){
             const {error:passwordError}=await sb.auth.updateUser({password});
             if(passwordError) throw passwordError;
@@ -3835,8 +3841,14 @@ async function memberPage(p,user){
           saveBtn.disabled=true; saveBtn.textContent='Saving...';
           try{
             const profileUpdate={full_name:name,phone,house_number:house,address:address||null,updated_at:new Date().toISOString()};
-            const {error:profileUpdateError}=await sb.from('profiles').update(profileUpdate).eq('id',user.id);
+            const {data:savedProfile,error:profileUpdateError}=await sb
+              .from('profiles')
+              .update(profileUpdate)
+              .eq('id',user.id)
+              .select('id,full_name,phone,house_number,address,email,role')
+              .maybeSingle();
             if(profileUpdateError) throw profileUpdateError;
+            if(!savedProfile) throw new Error('Profile details were not saved. Please check the profiles table UPDATE policy for this account.');
             if(password){
               const {error:passwordError}=await sb.auth.updateUser({password});
               if(passwordError) throw passwordError;
