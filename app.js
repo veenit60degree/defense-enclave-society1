@@ -1038,7 +1038,7 @@ function openAdminDashboard(user){
  <button class="nav-item" data-a="complaints">⚑ <span>Complaints</span></button>
  <button class="nav-item" data-a="map">⌖ <span>Society Map</span></button>
   <button class="nav-item" data-a="about">ℹ <span>About</span></button>
- </nav><div class="sidebar-bottom"><div class="user-mini"><div class="avatar">${initials(user.name)}</div><div><strong>${user.name}</strong><span>${String(user.role||'admin').toLowerCase()==='superadmin' ? 'Super Administrator' : 'Administrator'}</span></div></div><button type="button" class="outline-btn logout-action-btn" id="adminLogout" aria-label="Log out" title="Log out"><span class="logout-action-icon" aria-hidden="true">↪</span><span class="logout-action-label">Log out</span></button></div></aside>
+ </nav><div class="sidebar-bottom"><div class="user-mini"><div class="avatar">${initials(user.name)}</div><div><strong>${user.name}</strong><span>${String(user.role||'admin').toLowerCase()==='superadmin' ? 'Super Administrator' : 'Administrator'}</span></div></div><button type="button" class="outline-btn logout-action-btn" id="adminLogout" aria-label="Log out" title="Log out"><span class="logout-action-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M10 17l5-5-5-5M15 12H3M21 19V5a2 2 0 0 0-2-2h-6"/></svg></span><span class="logout-action-label">Log out</span></button></div></aside>
  <main class="main"><header class="topbar"><div><div class="eyebrow">DEFENSE ENCLAVE SOCIETY</div><h1 id="adminTitle">Admin Dashboard</h1></div><div class="top-actions"><span class="status ongoing">${String(user.role||'admin').toLowerCase()==='superadmin' ? 'SUPER ADMIN' : 'ADMIN'}</span><div class="avatar">${initials(user.name)}</div></div></header><section id="adminContent" class="content"></section></main>`;
  const nav=app.querySelector('nav');
  nav.onclick=e=>{
@@ -3375,7 +3375,7 @@ else if(p==='maintenance'){
     c.innerHTML=`<div class="hero"><div><h2>Active Maintenance</h2><div class="muted">Showing only records saved in the database.</div></div><button class="primary-btn" onclick="adminAddMaintenance()">+ Add Maintenance</button></div>
     <div class="panel"><div class="table-wrap admin-maintenance-table-scroll"><table class="table"><thead><tr><th>Item</th><th>Amount</th><th>Status</th><th>Action</th></tr></thead><tbody>
     ${(rows||[]).map((x,i)=>`<tr><td><strong>${x.item||x.title||x.name||''}</strong>${x.description?`<br><span class="muted">${x.description}</span>`:''}</td><td>₹${Number(x.amount||0).toLocaleString('en-IN')}</td><td>${x.status||''}</td><td><button type="button" class="action-icon-btn action-edit" onclick="adminEditMaintenance(${i})" aria-label="Edit maintenance" title="Edit">✎</button>
-      <button type="button" class="action-icon-btn action-delete" onclick="adminDeleteMaintenance(${i})" aria-label="Delete maintenance" title="Delete">⌫</button></td></tr>`).join('')}
+      <button type="button" class="gallery-icon-btn gallery-icon-danger" onclick="adminDeleteMaintenance(${i})" aria-label="Delete maintenance" title="Delete"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v6M14 11v6"/></svg></button></td></tr>`).join('')}
     </tbody></table></div>${rows?.length?'':`<div class="muted" style="padding:18px">No maintenance records saved yet.</div>`}</div>`;
 }else if(p==='work'){
     const {data:rows,error}=await sb.from('society_work').select('*').order('created_at',{ascending:false});
@@ -3384,7 +3384,7 @@ else if(p==='maintenance'){
     c.innerHTML=`<div class="hero"><div><h2>Society Work</h2><div class="muted">Showing only records saved in the database.</div></div><button class="primary-btn" onclick="adminAddWork()">+ Add Work</button></div>
     <div class="panel"><div class="table-wrap admin-work-table-scroll"><table class="table"><thead><tr><th>Project</th><th>Description</th><th>Status</th><th>Progress</th><th>Target</th><th>Action</th></tr></thead><tbody>
     ${(rows||[]).map((x,i)=>`<tr><td><strong>${x.name||x.title||x.work_name||x.project_name||x.work_title||x.project||x.work||x.activity||x.task||x.subject||''}</strong></td><td>${x.description||''}</td><td>${x.status||''}</td><td>${Number(x.progress||0)}%</td><td>${x.target_date||x.target||''}</td><td><button type="button" class="action-icon-btn action-edit" onclick="adminEditWork(${i})" aria-label="Edit society work" title="Edit">✎</button>
-      <button type="button" class="action-icon-btn action-delete" onclick="adminDeleteWork(${i})" aria-label="Delete society work" title="Delete">⌫</button></td></tr>`).join('')}
+      <button type="button" class="gallery-icon-btn gallery-icon-danger" onclick="adminDeleteWork(${i})" aria-label="Delete society work" title="Delete"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v6M14 11v6"/></svg></button></td></tr>`).join('')}
     </tbody></table></div>${rows?.length?'':`<div class="muted" style="padding:18px">No society work records saved yet.</div>`}</div>`;
 }else if(p==='events'){
     const {data:rows,error}=await sb.from('events').select('*').order('event_date',{ascending:false});
@@ -3469,7 +3469,7 @@ else if(p==='maintenance'){
       <td>${x.role||'member'}</td>
       <td>
         <button type="button" class="action-icon-btn action-edit" onclick="adminEditMember(${i})" aria-label="Edit member" title="Edit">✎</button>
-        <button type="button" class="action-icon-btn action-delete" onclick="adminDeleteMember(${i})" aria-label="Delete member" title="Delete">⌫</button>
+        <button type="button" class="gallery-icon-btn gallery-icon-danger" onclick="adminDeleteMember(${i})" aria-label="Delete member" title="Delete"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v6M14 11v6"/></svg></button>
       </td>
    </tr>`;
 
@@ -3528,7 +3528,7 @@ else if(p==='maintenance'){
     <td>${x.created_at?new Date(x.created_at).toLocaleDateString('en-IN'):''}</td>
     <td>
       <button type="button" class="action-icon-btn action-update" onclick="adminUpdateComplaint(${i})" aria-label="Update complaint" title="Update">↻</button>
-      <button type="button" class="action-icon-btn action-delete" onclick="adminDeleteComplaint(${i})" aria-label="Delete complaint" title="Delete">⌫</button>
+      <button type="button" class="gallery-icon-btn gallery-icon-danger" onclick="adminDeleteComplaint(${i})" aria-label="Delete complaint" title="Delete"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v6M14 11v6"/></svg></button>
     </td>
   </tr>`}).join('')}</tbody></table></div>
   ${complaintRows.length?'':'<div class="muted" style="padding:18px">No complaints saved yet.</div>'}</div>`;
