@@ -269,38 +269,28 @@
 }
 
 /* =========================================================
-   FINAL ADMIN / MEMBER DATA TABLE + ABOUT LAYOUT FIX
+   FINAL UI / RESPONSIVE FIXES - 2026-09-25
    ========================================================= */
+
+/* About Society: phone + email / address / full-width description */
+.admin-about-panel{width:100%;max-width:900px}
 .admin-about-grid{
   display:grid;
   grid-template-columns:minmax(0,1fr) minmax(0,1fr);
-  gap:16px;
-  align-items:start;
-}
-.admin-about-grid > label{
-  min-width:0;
-  margin:0;
-}
-.admin-about-grid > .admin-about-full{
-  grid-column:1 / -1;
-}
-.admin-about-grid input,
-.admin-about-grid textarea{
+  gap:8px 16px;
   width:100%;
-  max-width:100%;
-  box-sizing:border-box;
 }
-.admin-about-grid textarea{
-  resize:vertical;
-}
+.admin-about-grid label{min-width:0;margin:8px 0}
+.admin-about-grid .about-address-field,
+.admin-about-grid .about-description-field{grid-column:1 / -1}
+.admin-about-grid .about-address-field textarea,
+.admin-about-grid .about-description-field textarea{width:100%;box-sizing:border-box}
+.admin-about-grid .about-description-field textarea{min-height:150px}
 
-/* All requested admin/member tables remain horizontally scrollable. */
-.admin-maintenance-table-scroll,
-.admin-work-table-scroll,
-.admin-members-table-scroll,
-.admin-complaints-table-scroll,
-.member-work-table-scroll,
-.member-complaints-table-scroll{
+/* Admin/SuperAdmin tables: keep all columns available by horizontal swipe. */
+#adminContent .table-wrap,
+#adminContent .admin-members-table-scroll,
+#adminContent .table-wrap.admin-members-table-scroll{
   width:100%;
   max-width:100%;
   overflow-x:auto !important;
@@ -309,31 +299,146 @@
   scrollbar-width:thin;
   touch-action:pan-x;
 }
-.admin-maintenance-table-scroll .table{min-width:700px}
-.admin-work-table-scroll .table{min-width:860px}
-.admin-members-table-scroll .table{min-width:760px}
-.admin-complaints-table-scroll .table{min-width:900px}
-.member-work-table-scroll .table{min-width:760px}
-.member-complaints-table-scroll .table{min-width:760px}
+#adminContent .admin-members-table,
+#adminContent .table-wrap .table{min-width:760px}
 
-.admin-maintenance-table-scroll::-webkit-scrollbar,
-.admin-work-table-scroll::-webkit-scrollbar,
-.admin-members-table-scroll::-webkit-scrollbar,
-.admin-complaints-table-scroll::-webkit-scrollbar,
-.member-work-table-scroll::-webkit-scrollbar,
-.member-complaints-table-scroll::-webkit-scrollbar{height:7px}
+/* Member Society Work + Complaints tables. */
+#memberContent .member-work-table-scroll,
+#memberContent .member-complaints-table-scroll{
+  width:100%;
+  max-width:100%;
+  overflow-x:auto !important;
+  overflow-y:hidden;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:thin;
+  touch-action:pan-x;
+}
+#memberContent .member-work-table-scroll .table{min-width:700px}
+#memberContent .member-complaints-table-scroll .table{min-width:760px}
 
-@media(max-width:720px){
-  .admin-about-grid{
-    grid-template-columns:1fr;
-    gap:14px;
+/* Portrait phones: navigation is a real horizontal swipe area. */
+@media (max-width: 900px) and (orientation: portrait){
+  .app-shell{width:100%;min-width:0;display:block}
+  .sidebar{
+    position:static !important;
+    width:100% !important;
+    max-width:100% !important;
+    height:auto !important;
+    max-height:none !important;
+    padding:10px 10px 8px !important;
+    overflow:hidden !important;
   }
-  .admin-about-grid > .admin-about-full{
-    grid-column:auto;
+  .sidebar nav{
+    display:flex !important;
+    flex-direction:row !important;
+    align-items:stretch !important;
+    width:100% !important;
+    min-width:0 !important;
+    max-width:100% !important;
+    flex:0 0 auto !important;
+    overflow-x:auto !important;
+    overflow-y:hidden !important;
+    flex-wrap:nowrap !important;
+    white-space:nowrap !important;
+    -webkit-overflow-scrolling:touch;
+    overscroll-behavior-x:contain;
+    touch-action:pan-x !important;
+    scrollbar-width:thin;
+    padding:2px 2px 8px !important;
   }
-  .admin-about-panel{
-    width:100%;
-    max-width:100%;
-    box-sizing:border-box;
+  .sidebar nav .nav-item{
+    flex:0 0 auto !important;
+    width:auto !important;
+    min-width:max-content !important;
+    white-space:nowrap !important;
   }
+  .sidebar-bottom{display:none !important}
+  .main{width:100% !important;margin:0 !important;min-width:0 !important}
+  .content{min-width:0 !important;overflow:visible}
+}
+
+/* Landscape phones: fixed left menu with independently scrollable nav.
+   User/logout area is deliberately outside the scroll area. */
+@media (max-width: 1100px) and (orientation: landscape){
+  .app-shell{display:flex !important;min-height:100vh !important}
+  .sidebar{
+    position:fixed !important;
+    left:0 !important;
+    top:0 !important;
+    bottom:0 !important;
+    width:220px !important;
+    height:100vh !important;
+    max-height:100vh !important;
+    padding:12px 10px !important;
+    display:flex !important;
+    flex-direction:column !important;
+    overflow:hidden !important;
+    z-index:100 !important;
+  }
+  .sidebar .brand{flex:0 0 auto !important}
+  .sidebar nav{
+    display:flex !important;
+    flex-direction:column !important;
+    flex:1 1 auto !important;
+    min-height:0 !important;
+    height:auto !important;
+    overflow-x:hidden !important;
+    overflow-y:auto !important;
+    -webkit-overflow-scrolling:touch;
+    overscroll-behavior-y:contain;
+    touch-action:pan-y !important;
+    scrollbar-width:thin;
+    padding:2px 2px 8px !important;
+  }
+  .sidebar nav .nav-item{
+    flex:0 0 auto !important;
+    width:100% !important;
+    min-width:0 !important;
+  }
+  .sidebar-bottom{
+    display:block !important;
+    flex:0 0 auto !important;
+    position:relative !important;
+    visibility:visible !important;
+    opacity:1 !important;
+    margin-top:8px !important;
+    padding-top:10px !important;
+    z-index:101 !important;
+    background:#fff;
+  }
+  .sidebar-bottom .outline-btn{display:flex !important;visibility:visible !important;opacity:1 !important}
+  .main{margin-left:220px !important;width:calc(100% - 220px) !important;min-width:0 !important}
+}
+
+/* Logout icon on Admin/SuperAdmin, matching the compact member action. */
+@media (max-width:900px){
+  #adminLogout{
+    display:inline-flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    min-width:40px !important;
+    width:40px !important;
+    height:40px !important;
+    padding:0 !important;
+    border-radius:50% !important;
+    flex:0 0 40px !important;
+    font-size:0 !important;
+    gap:0 !important;
+  }
+  #adminLogout .logout-action-icon{display:block !important;font-size:0 !important}
+  #adminLogout .logout-action-icon::before{
+    content:"⏻";
+    display:block;
+    color:#0a9270;
+    font-size:20px;
+    line-height:1;
+  }
+  #adminLogout > span:last-child{display:none !important}
+}
+
+@media (max-width:480px){
+  .admin-about-grid{grid-template-columns:1fr}
+  .admin-about-grid .about-address-field,
+  .admin-about-grid .about-description-field{grid-column:1}
+  #adminLogout{width:38px !important;height:38px !important;min-width:38px !important;flex-basis:38px !important}
 }
