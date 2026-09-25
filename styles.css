@@ -649,3 +649,18 @@
 [role="dialog"][style*="overflow-y: auto"] {
     overscroll-behavior: contain !important;
 }
+
+
+/* =========================================================
+   ADMIN / SUPER ADMIN PROFILE
+   ========================================================= */
+.admin-profile-panel{max-width:920px;}
+.admin-profile-panel .form-grid{margin-bottom:14px;}
+.admin-profile-panel>label{display:block;margin-top:14px;}
+.admin-profile-panel input[readonly],
+.admin-profile-panel textarea[readonly]{background:#f8fbfb;color:#334155;}
+.admin-profile-error{padding:12px 14px;border-radius:10px;background:#fff1f1;color:#b42318;border:1px solid #fecdca;}
+@media(max-width:800px){
+  .admin-profile-panel{width:100%;box-sizing:border-box;}
+  .admin-profile-hero{gap:12px;}
+}
