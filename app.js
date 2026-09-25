@@ -231,8 +231,8 @@ function addPublicMembersViewAll(section,members){
         link=document.createElement('button');
         link.type='button';
         link.setAttribute('data-public-members-view-all','1');
-        link.textContent='View all';
-        link.className='public-view-all-btn';
+        link.textContent='(View all)';
+        link.style.cssText='margin-left:8px;border:0;background:none;padding:0;color:#079c79;font:inherit;font-size:.82em;font-weight:600;cursor:pointer;text-decoration:none;vertical-align:baseline;';
         heading.appendChild(link);
     }
 
@@ -274,7 +274,7 @@ function addPublicComplaintsViewAll(section, rows){
         link=document.createElement('button');
         link.type='button';
         link.setAttribute('data-public-complaints-view-all','1');
-        link.textContent='View all';
+        link.textContent='(View all)';
         link.className='public-view-all-btn';
         heading.appendChild(link);
     }
@@ -312,7 +312,7 @@ function addPublicEventsViewAll(section, rows){
         link=document.createElement('button');
         link.type='button';
         link.setAttribute('data-public-events-view-all','1');
-        link.textContent='View all';
+        link.textContent='(View all)';
         link.className='public-view-all-btn';
         heading.appendChild(link);
     }
@@ -975,11 +975,10 @@ async function login(){
         phone:data.user.phone||profile?.phone||'',
         house_no:profile?.house_number||profile?.house_no||'',
         address:profile?.address||'',
-        role:normalizeUserRole(profile?.role||'member')
+        role:String(profile?.role||'member').trim().toLowerCase()
     };
 
-    window.__adminUser=user;
-    if(isAdminRole(user.role)) openAdminDashboard(user);
+    if(user.role==='admin' || user.role==='superadmin') openAdminDashboard(user);
     else openMemberDashboard(user);
     toast('Login successful');
 }
@@ -1008,7 +1007,7 @@ document.getElementById('registerBtn').onclick=register;
 function openAdminDashboard(user){
  document.getElementById('public').classList.add('hidden');
  const app=document.getElementById('memberApp'); app.className='app-shell';
- app.innerHTML=`<aside class="sidebar"><div class="brand"><div class="brand-mark">DE</div><div><strong>Defense Enclave</strong><span>${normalizeUserRole(user.role)==='superadmin' ? 'Super Admin Portal' : 'Admin Portal'}</span></div></div><nav>
+ app.innerHTML=`<aside class="sidebar"><div class="brand"><div class="brand-mark">DE</div><div><strong>Defense Enclave</strong><span>Admin Portal</span></div></div><nav>
  <button class="nav-item active" data-a="dashboard">⌂ <span>Dashboard</span></button>
  <button class="nav-item" data-a="finance">₹ <span>Society Finance</span></button>
  <button class="nav-item" data-a="maintenance">▣ <span>Maintenance</span></button>
@@ -1019,11 +1018,27 @@ function openAdminDashboard(user){
  <button class="nav-item" data-a="complaints">⚑ <span>Complaints</span></button>
  <button class="nav-item" data-a="map">⌖ <span>Society Map</span></button>
   <button class="nav-item" data-a="about">ℹ <span>About</span></button>
- </nav><div class="sidebar-bottom"><div class="user-mini"><div class="avatar">${initials(user.name)}</div><div><strong>${user.name}</strong><span>${normalizeUserRole(user.role)==='superadmin' ? 'Super Administrator' : 'Administrator'}</span></div></div><button class="outline-btn logout-action-btn" id="adminLogout" aria-label="Log out" title="Log out"><span class="logout-action-icon" aria-hidden="true">↪</span><span>Log out</span></button></div></aside>
- <main class="main"><header class="topbar"><div><div class="eyebrow">DEFENSE ENCLAVE SOCIETY</div><h1 id="adminTitle">Admin Dashboard</h1></div><div class="top-actions"><span class="status ongoing">${normalizeUserRole(user.role)==='superadmin' ? 'SUPER ADMIN' : 'ADMIN'}</span><div class="avatar">${initials(user.name)}</div></div></header><section id="adminContent" class="content"></section></main>`;
- const nav=app.querySelector('nav'); nav.onclick=e=>{const b=e.target.closest('.nav-item');if(!b)return;adminPage(b.dataset.a,user)};
- document.getElementById('adminLogout').onclick=async()=>{if(sb) await sb.auth.signOut();app.classList.add('hidden');document.getElementById('public').classList.remove('hidden');setPublicLoginButtonVisible(true);toast('Logged out')};
- adminPage('dashboard',user);
+ </nav><div class="sidebar-bottom"><div class="user-mini"><div class="avatar">${initials(user.name)}</div><div><strong>${user.name}</strong><span>${String(user.role||'admin').toLowerCase()==='superadmin' ? 'Super Administrator' : 'Administrator'}</span></div></div><button class="outline-btn logout-action-btn" id="adminLogout" aria-label="Log out" title="Log out"><span class="logout-action-icon" aria-hidden="true">↪</span><span>Log out</span></button></div></aside>
+ <main class="main"><header class="topbar"><div><div class="eyebrow">DEFENSE ENCLAVE SOCIETY</div><h1 id="adminTitle">Admin Dashboard</h1></div><div class="top-actions"><span class="status ongoing">${String(user.role||'admin').toLowerCase()==='superadmin' ? 'SUPER ADMIN' : 'ADMIN'}</span><div class="avatar">${initials(user.name)}</div></div></header><section id="adminContent" class="content"></section></main>`;
+ const nav=app.querySelector('nav');
+ nav.onclick=e=>{
+   const b=e.target.closest('.nav-item');
+   if(!b)return;
+   adminPage(b.dataset.a,user);
+ };
+ document.getElementById('adminLogout').onclick=async()=>{
+   if(sb) await sb.auth.signOut();
+   try{sessionStorage.removeItem('defenseEnclaveAdminPage');}catch(_){}
+   app.classList.add('hidden');
+   document.getElementById('public').classList.remove('hidden');
+   setPublicLoginButtonVisible(true);
+   toast('Logged out');
+ };
+ let savedAdminPage='dashboard';
+ try{savedAdminPage=sessionStorage.getItem('defenseEnclaveAdminPage')||'dashboard';}catch(_){}
+ const validAdminPages=['dashboard','finance','maintenance','work','events','gallery','members','complaints','map','about'];
+ if(!validAdminPages.includes(savedAdminPage))savedAdminPage='dashboard';
+ adminPage(savedAdminPage,user);
 }
 function initials(n){return (n||'Admin').split(' ').map(x=>x[0]).slice(0,2).join('').toUpperCase()}
 
@@ -2076,17 +2091,9 @@ async function adminEditEvent(i){
    Accepts admin role values such as: admin / Admin / ADMIN /
    administrator / society_admin.
    ============================================================ */
-function normalizeUserRole(role){
-    const raw=String(role??'').trim().toLowerCase();
-    const compact=raw.replace(/[\s_-]+/g,'');
-    if(compact==='superadmin') return 'superadmin';
-    if(compact==='admin' || compact==='administrator' || compact==='societyadmin') return 'admin';
-    return raw || 'member';
-}
-
 function isAdminRole(role){
-    const r=normalizeUserRole(role);
-    return r==='admin' || r==='superadmin';
+    const r=String(role||'').trim().toLowerCase().replace(/[\s-]+/g,'_');
+    return r==='admin' || r==='administrator' || r==='society_admin' || r==='superadmin';
 }
 
 async function requireAdminDeletePermission(){
@@ -3252,7 +3259,7 @@ async function adminSaveAbout(){
     console.error('About save failed:',e);
     const message=String(e?.message||e);
     if(/column .* does not exist|schema cache|could not find the/i.test(message)){
-      err.innerHTML='The <strong>society_about</strong> table is missing one or more required columns. Run the supplied SQL migration, then refresh the page.';
+      err.textContent='The society_about table must contain description, phone, email and address columns.';
     }else{
       err.textContent='About save failed: '+message;
     }
@@ -3268,24 +3275,18 @@ async function adminAboutPage(c){
     c.innerHTML=`<div class="hero"><div><div class="eyebrow">SOCIETY INFORMATION</div><h2>About Society</h2><div class="muted">Update the information displayed on the public About page.</div></div></div>
     <div class="panel admin-about-panel">
       <div class="admin-about-grid">
-      
         <label for="adminAboutPhone">Phone
           <input id="adminAboutPhone" type="tel" maxlength="40" placeholder="e.g. +91 98765 43210" value="${adminAboutEscape(row?.phone||'')}">
         </label>
-
         <label for="adminAboutEmail">Email
           <input id="adminAboutEmail" type="email" maxlength="160" placeholder="e.g. contact@defenseenclave.com" value="${adminAboutEscape(row?.email||'')}">
         </label>
-
-        <label for="adminAboutAddress">Address
+        <label class="admin-about-full" for="adminAboutAddress">Address
           <textarea id="adminAboutAddress" rows="4" maxlength="500" placeholder="Enter society address...">${adminAboutEscape(row?.address||'')}</textarea>
         </label>
-
-          <label for="adminAboutDescription">Description <span class="required">*</span>
+        <label class="admin-about-full" for="adminAboutDescription">Description <span class="required">*</span>
           <textarea id="adminAboutDescription" rows="8" maxlength="5000" placeholder="Enter society description...">${adminAboutEscape(row?.description||'')}</textarea>
         </label>
-
-        
       </div>
       <div id="adminAboutError" class="admin-about-error" style="display:none"></div>
       <div class="admin-about-actions"><button id="adminAboutSave" class="primary-btn" onclick="adminSaveAbout()">Save Changes</button></div>
@@ -3306,6 +3307,10 @@ async function adminAboutPage(c){
 
 async function adminPage(p,user){
  const c=document.getElementById('adminContent'),t=document.getElementById('adminTitle');
+ const allowedAdminPages=['dashboard','finance','maintenance','work','events','gallery','members','complaints','map','about'];
+ if(!allowedAdminPages.includes(p))p='dashboard';
+ window.__adminCurrentPage=p;
+ try{sessionStorage.setItem('defenseEnclaveAdminPage',p);}catch(_){}
  document.querySelectorAll('#memberApp .nav-item').forEach(b=>b.classList.toggle('active',b.dataset.a===p));
  const titles={dashboard:'Admin Dashboard',finance:'Society Finance',maintenance:'Active Maintenance',work:'Society Work',events:'Events',gallery:'Photo Gallery',members:'Members',complaints:'Complaints',map:'Society Map',about:'About Society'}; t.textContent=titles[p]||'Admin Dashboard';
  if(p==='dashboard'){
@@ -3348,7 +3353,7 @@ else if(p==='maintenance'){
     if(error){ console.error('Maintenance load error:',error); return toast('Unable to load Maintenance: '+error.message); }
     window.__maintenanceRows=rows||[];
     c.innerHTML=`<div class="hero"><div><h2>Active Maintenance</h2><div class="muted">Showing only records saved in the database.</div></div><button class="primary-btn" onclick="adminAddMaintenance()">+ Add Maintenance</button></div>
-    <div class="panel"><div class="table-wrap"><table class="table"><thead><tr><th>Item</th><th>Amount</th><th>Status</th><th>Action</th></tr></thead><tbody>
+    <div class="panel"><div class="table-wrap admin-maintenance-table-scroll"><table class="table"><thead><tr><th>Item</th><th>Amount</th><th>Status</th><th>Action</th></tr></thead><tbody>
     ${(rows||[]).map((x,i)=>`<tr><td><strong>${x.item||x.title||x.name||''}</strong>${x.description?`<br><span class="muted">${x.description}</span>`:''}</td><td>₹${Number(x.amount||0).toLocaleString('en-IN')}</td><td>${x.status||''}</td><td><button class="outline-btn" onclick="adminEditMaintenance(${i})">Edit</button> <button class="outline-btn" onclick="adminDeleteMaintenance(${i})">Delete</button></td></tr>`).join('')}
     </tbody></table></div>${rows?.length?'':`<div class="muted" style="padding:18px">No maintenance records saved yet.</div>`}</div>`;
 }else if(p==='work'){
@@ -3356,7 +3361,7 @@ else if(p==='maintenance'){
     if(error){ console.error('Society Work load error:',error); return toast('Unable to load Society Work: '+error.message); }
     window.__workRows=rows||[];
     c.innerHTML=`<div class="hero"><div><h2>Society Work</h2><div class="muted">Showing only records saved in the database.</div></div><button class="primary-btn" onclick="adminAddWork()">+ Add Work</button></div>
-    <div class="panel"><div class="table-wrap"><table class="table"><thead><tr><th>Project</th><th>Description</th><th>Status</th><th>Progress</th><th>Target</th><th>Action</th></tr></thead><tbody>
+    <div class="panel"><div class="table-wrap admin-work-table-scroll"><table class="table"><thead><tr><th>Project</th><th>Description</th><th>Status</th><th>Progress</th><th>Target</th><th>Action</th></tr></thead><tbody>
     ${(rows||[]).map((x,i)=>`<tr><td><strong>${x.name||x.title||x.work_name||x.project_name||x.work_title||x.project||x.work||x.activity||x.task||x.subject||''}</strong></td><td>${x.description||''}</td><td>${x.status||''}</td><td>${Number(x.progress||0)}%</td><td>${x.target_date||x.target||''}</td><td><button class="outline-btn" onclick="adminEditWork(${i})">Edit</button> <button class="outline-btn" onclick="adminDeleteWork(${i})">Delete</button></td></tr>`).join('')}
     </tbody></table></div>${rows?.length?'':`<div class="muted" style="padding:18px">No society work records saved yet.</div>`}</div>`;
 }else if(p==='events'){
@@ -3490,7 +3495,7 @@ else if(p==='maintenance'){
   };
 
   c.innerHTML=`<div class="hero"><div><div class="eyebrow">ADMINISTRATION</div><h2>Complaints</h2><div class="muted">Manage member complaints and update status and remarks.</div></div><button class="primary-btn" id="adminNewComplaint">+ Add Complaint</button></div>
-  <div class="panel"><div class="table-wrap"><table class="table">
+  <div class="panel"><div class="table-wrap admin-complaints-table-scroll"><table class="table">
   <thead><tr><th>Complaint No.</th><th>Member Name</th><th>Category</th><th>Subject</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
   <tbody>${complaintRows.map((x,i)=>{const p=profiles[x.user_id]||{};return `<tr>
     <td><strong>${x.complaint_number??''}</strong></td>
@@ -3527,7 +3532,7 @@ else if(p==='maintenance'){
 }
 function openMemberDashboard(user){document.getElementById('public').classList.add('hidden');const app=document.getElementById('memberApp');app.className='app-shell';app.innerHTML=`<aside class="sidebar"><div class="brand"><div class="brand-mark">DE</div><div><strong>Defense Enclave</strong><span>Member Portal</span></div></div><nav><button class="nav-item active" data-p="dash">⌂ <span>Dashboard</span></button>
 <button class="nav-item" data-p="finance">₹ <span>Society Finance</span></button><button class="nav-item" data-p="profile">♙ <span>My Profile</span></button><button class="nav-item" data-p="complaints">⚑ <span>Complaints</span></button><button class="nav-item" data-p="work">▣ <span>Society Work</span></button><button class="nav-item" data-p="events">◷ <span>Events</span></button><button class="nav-item" data-p="gallery">▧ <span>Gallery</span></button></nav><div class="sidebar-bottom"><div class="user-mini"><div class="avatar">${(user.name||'A J').split(' ').map(x=>x[0]).slice(0,2).join('')}</div><div><strong>${user.name||'Member'}</strong><span>${user.house_no||'Member'}</span></div></div><button class="outline-btn" id="memberLogout">Log out</button></div></aside><main class="main"><header class="topbar"><div><div class="eyebrow">DEFENSE ENCLAVE SOCIETY</div><h1 id="memberTitle">Member Dashboard</h1></div><div class="top-actions"><button class="icon-btn" id="memberTour">?</button>
-<div class="avatar">${(user.name||'A J').split(' ').map(x=>x[0]).slice(0,2).join('')}</div></div></header><section id="memberContent" class="content"></section></main>`;const nav=app.querySelector('nav');nav.onclick=e=>{const b=e.target.closest('.nav-item');if(!b)return;memberPage(b.dataset.p,user)};document.getElementById('memberLogout').onclick=async()=>{if(sb){const {error}=await sb.auth.signOut();if(error)return toast(error.message)}try{sessionStorage.removeItem('defenseEnclaveMemberPage');}catch(_){ }app.classList.add('hidden');document.getElementById('public').classList.remove('hidden');setPublicLoginButtonVisible(true);toast('Logged out')};document.getElementById('memberTour').onclick=()=>toast('Tour: Dashboard → Finance → Profile → Complaints → Work → Events → Gallery');
+<div class="avatar">${(user.name||'A J').split(' ').map(x=>x[0]).slice(0,2).join('')}</div></div></header><section id="memberContent" class="content"></section></main>`;const nav=app.querySelector('nav');nav.onclick=e=>{const b=e.target.closest('.nav-item');if(!b)return;memberPage(b.dataset.p,user)};document.getElementById('memberLogout').onclick=async()=>{if(sb){const {error}=await sb.auth.signOut();if(error)return toast(error.message)}try{sessionStorage.removeItem('defenseEnclaveMemberPage');sessionStorage.removeItem('defenseEnclaveAdminPage');}catch(_){ }app.classList.add('hidden');document.getElementById('public').classList.remove('hidden');setPublicLoginButtonVisible(true);toast('Logged out')};document.getElementById('memberTour').onclick=()=>toast('Tour: Dashboard → Finance → Profile → Complaints → Work → Events → Gallery');
 let savedMemberPage='dash';
 try{savedMemberPage=sessionStorage.getItem('defenseEnclaveMemberPage')||'dash';}catch(_){ }
 if(!['dash','finance','profile','complaints','work','events','gallery'].includes(savedMemberPage))savedMemberPage='dash';
@@ -3787,10 +3792,10 @@ async function memberPage(p,user){
     }else if(p==='complaints'){
       const {data:rows,error}=await sb.from('complaints').select('*').eq('user_id',user.id).order('created_at',{ascending:false});
       if(error)throw error;
-      c.innerHTML=`<div class="hero"><div><h2>My Complaints</h2><div class="muted">Submit and track your complaints.</div></div><button class="primary-btn" id="newComplaint">+ New Complaint</button></div><div class="panel"><table class="table"><thead><tr><th>ID</th><th>Category</th><th>Complaint</th><th>Status</th><th>Date</th></tr></thead><tbody>${(rows||[]).map(x=>`<tr><td>${x.complaint_no||x.ticket_no||x.id||''}</td><td>${x.category||''}</td><td>${x.subject||x.title||x.description||x.message||''}</td><td>${x.status||'Submitted'}</td><td>${x.created_at?new Date(x.created_at).toLocaleDateString('en-IN'):''}</td></tr>`).join('')}</tbody></table>${rows?.length?'':'<div class="muted" style="padding:18px">No complaints saved yet.</div>'}</div>`;
+      c.innerHTML=`<div class="hero"><div><h2>My Complaints</h2><div class="muted">Submit and track your complaints.</div></div><button class="primary-btn" id="newComplaint">+ New Complaint</button></div><div class="panel"><div class="table-wrap member-complaints-table-scroll"><table class="table member-complaints-table"><thead><tr><th>ID</th><th>Category</th><th>Complaint</th><th>Status</th><th>Date</th></tr></thead><tbody>${(rows||[]).map(x=>`<tr><td>${x.complaint_no||x.ticket_no||x.id||''}</td><td>${x.category||''}</td><td>${x.subject||x.title||x.description||x.message||''}</td><td>${x.status||'Submitted'}</td><td>${x.created_at?new Date(x.created_at).toLocaleDateString('en-IN'):''}</td></tr>`).join('')}</tbody></table>${rows?.length?'':'<div class="muted" style="padding:18px">No complaints saved yet.</div>'}</div></div>`;
     }else if(p==='work'){
       const {data:rows,error}=await sb.from('society_work').select('*').order('created_at',{ascending:false}); if(error)throw error;
-      c.innerHTML=`<div class="hero"><div><h2>Society Work</h2><div class="muted">Current projects.</div></div></div><div class="panel"><table class="table"><thead><tr><th>Project</th><th>Status</th><th>Progress</th><th>Target</th></tr></thead><tbody>${(rows||[]).map(w=>`<tr><td><strong>${w.name||w.title||w.work_name||w.project_name||w.work_title||w.project||w.work||w.activity||w.task||w.subject||''}</strong><br><span class="muted">${w.description||w.details||''}</span></td><td>${w.status||''}</td><td><div class="progress"><i style="width:${Number(w.progress||0)}%"></i></div>${Number(w.progress||0)}%</td><td>${w.target_date||w.target||w.due_date||''}</td></tr>`).join('')}</tbody></table></div>`;
+      c.innerHTML=`<div class="hero"><div><h2>Society Work</h2><div class="muted">Current projects.</div></div></div><div class="panel"><div class="table-wrap member-work-table-scroll"><table class="table member-work-table"><thead><tr><th>Project</th><th>Status</th><th>Progress</th><th>Target</th></tr></thead><tbody>${(rows||[]).map(w=>`<tr><td><strong>${w.name||w.title||w.work_name||w.project_name||w.work_title||w.project||w.work||w.activity||w.task||w.subject||''}</strong><br><span class="muted">${w.description||w.details||''}</span></td><td>${w.status||''}</td><td><div class="progress"><i style="width:${Number(w.progress||0)}%"></i></div>${Number(w.progress||0)}%</td><td>${w.target_date||w.target||w.due_date||''}</td></tr>`).join('')}</tbody></table></div>`;
     }else if(p==='events'){
       const {data:rows,error}=await sb.from('events').select('*').order('event_date',{ascending:false}); if(error)throw error;
       c.innerHTML=`<div class="hero"><div><h2>Events</h2></div></div><div class="event-grid">${(rows||[]).map(e=>`<div class="card"><div class="photo">📅</div><div class="card-body"><div class="event-date">${e.event_date||e.date||''}</div><h3>${e.title||e.name||''}</h3><div class="muted">${e.location||e.place||e.description||''}</div></div></div>`).join('')}</div>`;
@@ -4082,7 +4087,7 @@ async function restoreLoginSession(){
             phone:profile.phone||'',
             house_no:profile.house_number||profile.house_no||'',
             address:profile.address||'',
-            role:normalizeUserRole(profile.role||'member')
+            role:(profile.role||'member').toLowerCase()
         };
 
         window.__adminUser=user;
@@ -4137,7 +4142,10 @@ if(sb && sb.auth){
                         return;
                     }
 
-                    const role=normalizeUserRole(profile.role || 'member');
+                    const role=String(profile.role || 'member')
+                        .trim()
+                        .toLowerCase()
+                        .replace(/[\\s-]+/g,'_');
 
                     window.__adminUser={
                         ...authUser,
