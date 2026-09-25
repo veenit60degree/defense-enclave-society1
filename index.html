@@ -1,4 +1,4 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Defense Enclave Society</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"><link rel="stylesheet" href="styles.css?v=20260925-v2"><style>.public-nav{position:sticky;top:0;z-index:10;background:#fff;border-bottom:1px solid #dfe8e8}.public-nav .inner{max-width:1300px;margin:auto;padding:13px 22px;display:flex;align-items:center;gap:18px}.public-nav .brand{padding:0;margin-right:auto}.public-nav a{color:#405154;text-decoration:none;font-size:13px;font-weight:600}.public-nav a:hover{color:#07956e}.public-main{max-width:1300px;margin:auto;padding:25px 22px 70px}.public-hero{display:grid;grid-template-columns:1.35fr .8fr;gap:20px;align-items:stretch}.hero-card{background:linear-gradient(135deg,#e8f7f2,#fff);border:1px solid #d8e9e5;border-radius:20px;padding:34px}.hero-card h2{font-size:38px;line-height:1.08;margin:8px 0 12px}
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Defense Enclave Society</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"><link rel="stylesheet" href="style_v2.css?v=20260925-v2.1"><style>.public-nav{position:sticky;top:0;z-index:10;background:#fff;border-bottom:1px solid #dfe8e8}.public-nav .inner{max-width:1300px;margin:auto;padding:13px 22px;display:flex;align-items:center;gap:18px}.public-nav .brand{padding:0;margin-right:auto}.public-nav a{color:#405154;text-decoration:none;font-size:13px;font-weight:600}.public-nav a:hover{color:#07956e}.public-main{max-width:1300px;margin:auto;padding:25px 22px 70px}.public-hero{display:grid;grid-template-columns:1.35fr .8fr;gap:20px;align-items:stretch}.hero-card{background:linear-gradient(135deg,#e8f7f2,#fff);border:1px solid #d8e9e5;border-radius:20px;padding:34px}.hero-card h2{font-size:38px;line-height:1.08;margin:8px 0 12px}
 .hero-art img {width: 100%;border-radius: 20px;}.hero-art{border-radius:20px;width: 470px;height: 120px;min-height:280px;background:linear-gradient(145deg,#0b8669,#74cdb1);color:#fff;display:grid;place-items:center;font-size:100px;box-shadow:0 15px 35px #087d6130}.public-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:18px 0}.public-section{margin-top:26px}.public-section h2{font-size:21px}.login-pill{border:0;background:#0ba879;color:#fff;border-radius:9px;padding:10px 14px;font-weight:700}.back-public{display:none}@media(max-width:800px){.public-hero{grid-template-columns:1fr}.hero-art{min-height:180px}.public-stats{grid-template-columns:1fr 1fr}.public-nav .inner{overflow:auto}.public-nav a{white-space:nowrap}}@media(max-width:500px){.public-stats{grid-template-columns:1fr}.hero-card h2{font-size:30px}}</style>
 <style id="responsive-layout-fix">
 /* Responsive public layout */
@@ -82,57 +82,6 @@ img{max-width:100%;height:auto}
 </style>
 
 
-<style id="admin-logout-mobile-fix">
-/* Keep Admin logout accessible on small screens */
-@media (max-width:800px){
-  /* Match the member logout control on phones/tablets. */
-  #adminLogout{
-    position:fixed !important;
-    top:14px !important;
-    right:14px !important;
-    z-index:10050 !important;
-    display:inline-flex !important;
-    width:42px !important;
-    height:40px !important;
-    min-width:42px !important;
-    padding:0 !important;
-    margin:0 !important;
-    align-items:center !important;
-    justify-content:center !important;
-    border-radius:999px !important;
-    font-size:0 !important;
-    line-height:1 !important;
-    white-space:nowrap !important;
-    flex:0 0 auto !important;
-    background:#fff !important;
-    border:1px solid #d5dfe0 !important;
-    box-shadow:none !important;
-  }
-  #adminLogout::before{
-    content:"↪" !important;
-    display:block !important;
-    font-size:23px !important;
-    line-height:1 !important;
-    font-weight:800 !important;
-    color:#0a9270 !important;
-  }
-  #adminLogout .logout-action-icon,
-  #adminLogout > span:last-child{display:none !important;}
-}
-@media (max-width:480px){
-  #adminLogout{
-    top:10px !important;
-    right:10px !important;
-    width:40px !important;
-    height:38px !important;
-    min-width:40px !important;
-  }
-  #adminLogout::before{font-size:21px !important;}
-}
-@media (max-width:800px) and (orientation:landscape){
-  #adminLogout{top:10px !important;right:12px !important;}
-}
-</style>
 
 
 <style id="admin-sidebar-mobile-fix">
@@ -234,4 +183,4 @@ img{max-width:100%;height:auto}
 </main>
 <div id="memberApp" class="hidden"></div>
 <div class="modal hidden" id="authModal"><div class="modal-card"><div class="modal-head"><h3 id="authHeading">Member Login</h3><button class="close" id="authClose">×</button></div><div id="authLogin"><label>Email<input id="loginEmail" type="email"></label><label>Password<input id="loginPassword" type="password"></label><button class="primary-btn full" id="loginBtn">Login</button><p class="auth-switch">New member? <button id="switchRegister">Register</button></p></div><div id="authRegister" class="hidden"><div class="form-grid"><label>Name<input id="regName"></label><label>Phone<input id="regPhone"></label><label>Email<input id="regEmail" type="email"></label><label>House / Flat<input id="regHouse"></label></div><label>Address<textarea id="regAddress"></textarea></label><label>Password<input id="regPassword" type="password"></label><label>Profile photo<input id="regPhoto" type="file" accept="image/*"></label><button class="primary-btn full" id="registerBtn">Create Member Account</button><p class="auth-switch">Already registered? <button id="switchLogin">Login</button></p></div></div></div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="app.js?v=20260925-v2"></script></body></html>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="app_v2.js?v=20260925-v2.1"></script></body></html>
