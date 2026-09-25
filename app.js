@@ -1030,6 +1030,7 @@ function openAdminDashboard(user){
  app.innerHTML=`<aside class="sidebar"><div class="brand"><div class="brand-mark">DE</div><div><strong>Defense Enclave</strong><span>Admin Portal</span></div></div><nav>
  <button class="nav-item active" data-a="dashboard">⌂ <span>Dashboard</span></button>
  <button class="nav-item" data-a="finance">₹ <span>Society Finance</span></button>
+ <button class="nav-item" data-a="profile">♙ <span>My Profile</span></button>
  <button class="nav-item" data-a="maintenance">▣ <span>Maintenance</span></button>
  <button class="nav-item" data-a="work">⚙ <span>Society Work</span></button>
  <button class="nav-item" data-a="events">◷ <span>Events</span></button>
@@ -1056,7 +1057,7 @@ function openAdminDashboard(user){
  };
  let savedAdminPage='dashboard';
  savedAdminPage=loadCurrentSection('defenseEnclaveAdminPage','dashboard');
- const validAdminPages=['dashboard','finance','maintenance','work','events','gallery','members','complaints','map','about'];
+ const validAdminPages=['dashboard','finance','profile','maintenance','work','events','gallery','members','complaints','map','about'];
  if(!validAdminPages.includes(savedAdminPage))savedAdminPage='dashboard';
  adminPage(savedAdminPage,user);
 }
@@ -3325,14 +3326,133 @@ async function adminAboutPage(c){
   }
 }
 
+async function adminProfilePage(user){
+  const c=document.getElementById('adminContent');
+  if(!c || !sb)return;
+  try{
+    const {data:profile,error}=await sb.from('profiles').select('*').eq('id',user.id).maybeSingle();
+    if(error) throw error;
+    const u=profile||user;
+    const esc=(v)=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    const roleLabel=String(user.role||'admin').toLowerCase()==='superadmin'?'Super Administrator':'Administrator';
+
+    c.innerHTML=`
+      <div class="hero admin-profile-hero">
+        <div>
+          <div class="eyebrow">ACCOUNT INFORMATION</div>
+          <h2>My Profile</h2>
+          <div class="muted">Your registered society information.</div>
+        </div>
+        <button class="primary-btn" id="editAdminProfile">Edit</button>
+      </div>
+      <div class="panel admin-profile-panel">
+        <div class="form-grid">
+          <label>Name<input value="${esc(u.full_name||u.name||'')}" readonly></label>
+          <label>Email<input value="${esc(u.email||user.email||'')}" readonly></label>
+          <label>House / Flat<input value="${esc(u.house_number||u.house_no||'')}" readonly></label>
+          <label>Phone<input value="${esc(u.phone||user.phone||'')}" readonly></label>
+        </div>
+        <label>Role<input value="${esc(roleLabel)}" readonly></label>
+        <label>Address<textarea readonly>${esc(u.address||'')}</textarea></label>
+      </div>`;
+
+    document.getElementById('editAdminProfile').onclick=()=>{
+      document.getElementById('adminProfileEditModal')?.remove();
+      const overlay=document.createElement('div');
+      overlay.id='adminProfileEditModal';
+      overlay.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.58);display:flex;align-items:center;justify-content:center;padding:20px;z-index:100000;overflow:auto;box-sizing:border-box;';
+      overlay.innerHTML=`
+        <div role="dialog" aria-modal="true" style="width:min(720px,100%);max-height:calc(100vh - 40px);overflow-y:auto;background:#fff;border-radius:18px;padding:24px;box-shadow:0 24px 70px rgba(0,0,0,.25);box-sizing:border-box;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px;">
+            <div><h2 style="margin:0 0 4px;font-size:24px;">Edit Profile</h2><div style="color:#64748b;font-size:13px;">Update your registered society information.</div></div>
+            <button type="button" id="adminProfileEditClose" style="border:0;background:transparent;font-size:26px;cursor:pointer;line-height:1;">&times;</button>
+          </div>
+          <form id="adminProfileEditForm" novalidate>
+            <div id="adminProfileEditError" style="display:none;margin-bottom:14px;padding:11px 12px;border-radius:9px;background:#fff1f1;color:#b42318;font-size:13px;"></div>
+            <div class="form-grid">
+              <label>Name<input id="adminProfileEditName" value="${esc(u.full_name||u.name||'')}" required></label>
+              <label>Phone<input id="adminProfileEditPhone" value="${esc(u.phone||user.phone||'')}" required></label>
+              <label>Email<input id="adminProfileEditEmail" value="${esc(u.email||user.email||'')}" readonly disabled></label>
+              <label>House / Flat<input id="adminProfileEditHouse" value="${esc(u.house_number||u.house_no||'')}" required></label>
+            </div>
+            <div style="margin-top:14px;">
+              <label>Password <span style="color:#64748b;font-size:12px;">(leave blank to keep current password)</span></label>
+              <div style="position:relative;"><input id="adminProfileEditPassword" type="password" autocomplete="new-password" minlength="6" style="width:100%;padding-right:70px;box-sizing:border-box;"><button type="button" id="adminProfileEditPasswordToggle" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);border:0;background:transparent;color:#475569;font-weight:600;cursor:pointer;">Show</button></div>
+            </div>
+            <div style="margin-top:14px;">
+              <label>Confirm Password</label>
+              <div style="position:relative;"><input id="adminProfileEditConfirmPassword" type="password" autocomplete="new-password" minlength="6" style="width:100%;padding-right:70px;box-sizing:border-box;"><button type="button" id="adminProfileEditConfirmToggle" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);border:0;background:transparent;color:#475569;font-weight:600;cursor:pointer;">Show</button></div>
+            </div>
+            <div style="margin-top:14px;"><label>Address<textarea id="adminProfileEditAddress" rows="4">${esc(u.address||'')}</textarea></label></div>
+            <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;">
+              <button type="button" id="adminProfileEditCancel" class="outline-btn">Cancel</button>
+              <button type="submit" id="adminProfileEditSave" class="primary-btn">Save Changes</button>
+            </div>
+          </form>
+        </div>`;
+      document.body.appendChild(overlay);
+      const close=()=>overlay.remove();
+      document.getElementById('adminProfileEditClose').onclick=close;
+      document.getElementById('adminProfileEditCancel').onclick=close;
+      overlay.addEventListener('click',e=>{if(e.target===overlay)close();});
+      const toggle=(inputId,buttonId)=>{
+        const input=document.getElementById(inputId),button=document.getElementById(buttonId);
+        button.onclick=()=>{const show=input.type==='password';input.type=show?'text':'password';button.textContent=show?'Hide':'Show';};
+      };
+      toggle('adminProfileEditPassword','adminProfileEditPasswordToggle');
+      toggle('adminProfileEditConfirmPassword','adminProfileEditConfirmToggle');
+      document.getElementById('adminProfileEditForm').onsubmit=async e=>{
+        e.preventDefault();
+        const ge=document.getElementById('adminProfileEditError'); ge.style.display='none';
+        const name=document.getElementById('adminProfileEditName').value.trim();
+        const phone=document.getElementById('adminProfileEditPhone').value.trim();
+        const house=document.getElementById('adminProfileEditHouse').value.trim();
+        const address=document.getElementById('adminProfileEditAddress').value.trim();
+        const password=document.getElementById('adminProfileEditPassword').value;
+        const confirmPassword=document.getElementById('adminProfileEditConfirmPassword').value;
+        if(!name||!house||!phone){ge.textContent='Name, House / Flat and Phone are required.';ge.style.display='block';return;}
+        if(!/^[+0-9][0-9 ()-]{6,19}$/.test(phone)){ge.textContent='Please enter a valid phone number.';ge.style.display='block';return;}
+        if(password && password.length<6){ge.textContent='Password must be at least 6 characters.';ge.style.display='block';return;}
+        if(password!==confirmPassword){ge.textContent='Passwords do not match.';ge.style.display='block';return;}
+        const saveBtn=document.getElementById('adminProfileEditSave'); saveBtn.disabled=true; saveBtn.textContent='Saving...';
+        try{
+          const profileUpdate={full_name:name,phone,house_number:house,address:address||null,updated_at:new Date().toISOString()};
+          const {error:profileUpdateError}=await sb.from('profiles').update(profileUpdate).eq('id',user.id);
+          if(profileUpdateError) throw profileUpdateError;
+          if(password){
+            const {error:passwordError}=await sb.auth.updateUser({password});
+            if(passwordError) throw passwordError;
+          }
+          Object.assign(user,{name,phone,house_no:house,address});
+          close();
+          await adminPage('profile',user);
+          toast('Profile updated successfully');
+        }catch(err){
+          console.error('Admin profile update failed:',err);
+          ge.textContent=err?.message||'Unable to update profile.'; ge.style.display='block';
+        }finally{
+          saveBtn.disabled=false; saveBtn.textContent='Save Changes';
+        }
+      };
+    };
+  }catch(e){
+    console.error('Admin profile load failed:',e);
+    c.innerHTML=`<div class="panel"><h2>My Profile</h2><div class="admin-profile-error">Unable to load profile: ${String(e?.message||e).replace(/</g,'&lt;')}</div></div>`;
+  }
+}
+
 async function adminPage(p,user){
  const c=document.getElementById('adminContent'),t=document.getElementById('adminTitle');
- const allowedAdminPages=['dashboard','finance','maintenance','work','events','gallery','members','complaints','map','about'];
+ const allowedAdminPages=['dashboard','finance','profile','maintenance','work','events','gallery','members','complaints','map','about'];
  if(!allowedAdminPages.includes(p))p='dashboard';
  window.__adminCurrentPage=p;
  saveCurrentSection('defenseEnclaveAdminPage',p);
  document.querySelectorAll('#memberApp .nav-item').forEach(b=>b.classList.toggle('active',b.dataset.a===p));
- const titles={dashboard:'Admin Dashboard',finance:'Society Finance',maintenance:'Active Maintenance',work:'Society Work',events:'Events',gallery:'Photo Gallery',members:'Members',complaints:'Complaints',map:'Society Map',about:'About Society'}; t.textContent=titles[p]||'Admin Dashboard';
+ const titles={dashboard:'Admin Dashboard',finance:'Society Finance',profile:'My Profile',maintenance:'Active Maintenance',work:'Society Work',events:'Events',gallery:'Photo Gallery',members:'Members',complaints:'Complaints',map:'Society Map',about:'About Society'}; t.textContent=titles[p]||'Admin Dashboard';
+ if(p==='profile'){
+  await adminProfilePage(user);
+  return;
+ }
  if(p==='dashboard'){
   if(!sb)return toast('Supabase is not configured.');
   const {data:f,error}=await sb.from('society_finance').select('*').eq('id',1).maybeSingle();
