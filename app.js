@@ -559,6 +559,10 @@ if (aboutSection) {
                     };
                     prev.onclick=()=>{if(photos.length>1){index=(index-1+photos.length)%photos.length;render();}};
                     next.onclick=()=>{if(photos.length>1){index=(index+1)%photos.length;render();}};
+                    enableGallerySwipe(viewer,
+                        ()=>{if(photos.length>1){index=(index-1+photos.length)%photos.length;render();}},
+                        ()=>{if(photos.length>1){index=(index+1)%photos.length;render();}}
+                    );
                     viewer.querySelector('.gallery-viewer-close').onclick=()=>viewer.remove();
                     viewer.onclick=e=>{if(e.target===viewer)viewer.remove();};
                     const keyHandler=e=>{
@@ -598,7 +602,7 @@ if (aboutSection) {
      //
 
   publicComplaintSection.innerHTML=`<div class="section-head"><div><h2>Complaints</h2>
- <div class="muted">Yoy can check all complaint status here.</div>
+ <div class="muted">Yoy can check all complaint status here.</div>  </br>
   </div></div><div id="publicComplaintsTableWrap" class="table-wrap public-complaints-table-wrap"><div class="muted" style="padding:18px">Loading complaints...</div></div>`;
 
   const publicWrap=document.getElementById('publicComplaintsTableWrap');
@@ -2145,6 +2149,34 @@ async function adminDeleteEvent(i){
     await adminPage('events',window.__adminUser);
 }
 
+
+function enableGallerySwipe(viewer, onPrevious, onNext){
+    let startX=0, startY=0, tracking=false;
+    const surface=viewer.querySelector('.gallery-viewer-content') || viewer;
+    surface.style.touchAction='none';
+    surface.addEventListener('touchstart',e=>{
+        if(!e.touches || e.touches.length!==1)return;
+        startX=e.touches[0].clientX;
+        startY=e.touches[0].clientY;
+        tracking=true;
+    },{passive:true});
+    surface.addEventListener('touchend',e=>{
+        if(!tracking || !e.changedTouches || !e.changedTouches.length)return;
+        tracking=false;
+        const endX=e.changedTouches[0].clientX;
+        const endY=e.changedTouches[0].clientY;
+        const dx=endX-startX;
+        const dy=endY-startY;
+        const threshold=50;
+        // Only treat a predominantly horizontal gesture as a gallery swipe.
+        if(Math.abs(dx)>=threshold && Math.abs(dx)>Math.abs(dy)*1.2){
+            if(dx<0)onNext();
+            else onPrevious();
+        }
+    },{passive:true});
+    surface.addEventListener('touchcancel',()=>{tracking=false;},{passive:true});
+}
+
 function adminOpenGalleryViewer(folderName,startIndex){
     const photos=(window.__galleryRows||[]).filter(x=>x._folder===folderName && x.file_name!=='.folder');
     if(!photos.length)return;
@@ -2186,6 +2218,10 @@ function adminOpenGalleryViewer(folderName,startIndex){
     };
     prev.onclick=()=>{if(photos.length>1){index=(index-1+photos.length)%photos.length;render();}};
     next.onclick=()=>{if(photos.length>1){index=(index+1)%photos.length;render();}};
+    enableGallerySwipe(viewer,
+        ()=>{if(photos.length>1){index=(index-1+photos.length)%photos.length;render();}},
+        ()=>{if(photos.length>1){index=(index+1)%photos.length;render();}}
+    );
     viewer.querySelector('.gallery-viewer-close').onclick=close;
     viewer.onclick=e=>{if(e.target===viewer)close();};
     document.addEventListener('keydown',keyHandler);
@@ -3420,9 +3456,68 @@ else if(p==='maintenance'){
 }
 function openMemberDashboard(user){document.getElementById('public').classList.add('hidden');const app=document.getElementById('memberApp');app.className='app-shell';app.innerHTML=`<aside class="sidebar"><div class="brand"><div class="brand-mark">DE</div><div><strong>Defense Enclave</strong><span>Member Portal</span></div></div><nav><button class="nav-item active" data-p="dash">⌂ <span>Dashboard</span></button>
 <button class="nav-item" data-p="finance">₹ <span>Society Finance</span></button><button class="nav-item" data-p="profile">♙ <span>My Profile</span></button><button class="nav-item" data-p="complaints">⚑ <span>Complaints</span></button><button class="nav-item" data-p="work">▣ <span>Society Work</span></button><button class="nav-item" data-p="events">◷ <span>Events</span></button><button class="nav-item" data-p="gallery">▧ <span>Gallery</span></button></nav><div class="sidebar-bottom"><div class="user-mini"><div class="avatar">${(user.name||'A J').split(' ').map(x=>x[0]).slice(0,2).join('')}</div><div><strong>${user.name||'Member'}</strong><span>${user.house_no||'Member'}</span></div></div><button class="outline-btn" id="memberLogout">Log out</button></div></aside><main class="main"><header class="topbar"><div><div class="eyebrow">DEFENSE ENCLAVE SOCIETY</div><h1 id="memberTitle">Member Dashboard</h1></div><div class="top-actions"><button class="icon-btn" id="memberTour">?</button>
-<div class="avatar">${(user.name||'A J').split(' ').map(x=>x[0]).slice(0,2).join('')}</div></div></header><section id="memberContent" class="content"></section></main>`;const nav=app.querySelector('nav');nav.onclick=e=>{const b=e.target.closest('.nav-item');if(!b)return;memberPage(b.dataset.p,user)};document.getElementById('memberLogout').onclick=async()=>{if(sb){const {error}=await sb.auth.signOut();if(error)return toast(error.message)}app.classList.add('hidden');document.getElementById('public').classList.remove('hidden');setPublicLoginButtonVisible(true);toast('Logged out')};document.getElementById('memberTour').onclick=()=>toast('Tour: Dashboard → Finance → Profile → Complaints → Work → Events → Gallery');memberPage('dash',user)}
+<div class="avatar">${(user.name||'A J').split(' ').map(x=>x[0]).slice(0,2).join('')}</div></div></header><section id="memberContent" class="content"></section></main>`;const nav=app.querySelector('nav');nav.onclick=e=>{const b=e.target.closest('.nav-item');if(!b)return;memberPage(b.dataset.p,user)};document.getElementById('memberLogout').onclick=async()=>{if(sb){const {error}=await sb.auth.signOut();if(error)return toast(error.message)}try{sessionStorage.removeItem('defenseEnclaveMemberPage');}catch(_){ }app.classList.add('hidden');document.getElementById('public').classList.remove('hidden');setPublicLoginButtonVisible(true);toast('Logged out')};document.getElementById('memberTour').onclick=()=>toast('Tour: Dashboard → Finance → Profile → Complaints → Work → Events → Gallery');
+let savedMemberPage='dash';
+try{savedMemberPage=sessionStorage.getItem('defenseEnclaveMemberPage')||'dash';}catch(_){ }
+if(!['dash','finance','profile','complaints','work','events','gallery'].includes(savedMemberPage))savedMemberPage='dash';
+memberPage(savedMemberPage,user)}
+function memberOpenGalleryViewer(startIndex){
+    const photos=(window.__memberGalleryRows||[]).filter(x=>x.file_name!=='.folder');
+    if(!photos.length)return;
+
+    let index=Math.max(0,Math.min(Number(startIndex)||0,photos.length-1));
+    const viewer=document.createElement('div');
+    viewer.className='gallery-photo-viewer';
+    viewer.innerHTML=`
+        <button type="button" class="gallery-viewer-close" aria-label="Close photo" title="Close">×</button>
+        <button type="button" class="gallery-viewer-nav gallery-viewer-prev" aria-label="Previous photo" title="Previous">‹</button>
+        <div class="gallery-viewer-content">
+            <img class="gallery-viewer-image" alt="Photo">
+            <div class="gallery-viewer-caption"></div>
+        </div>
+        <button type="button" class="gallery-viewer-nav gallery-viewer-next" aria-label="Next photo" title="Next">›</button>`;
+    document.body.appendChild(viewer);
+
+    const img=viewer.querySelector('.gallery-viewer-image');
+    const caption=viewer.querySelector('.gallery-viewer-caption');
+    const prev=viewer.querySelector('.gallery-viewer-prev');
+    const next=viewer.querySelector('.gallery-viewer-next');
+    const close=()=>{
+        document.removeEventListener('keydown',keyHandler);
+        viewer.remove();
+    };
+    const render=()=>{
+        const photo=photos[index];
+        if(!photo?.public_url)return;
+        img.src=photo.public_url;
+        img.alt=photo.file_name||'Photo';
+        caption.textContent=`${index+1} / ${photos.length}${photo.file_name?' · '+photo.file_name:''}`;
+        prev.disabled=photos.length<2;
+        next.disabled=photos.length<2;
+    };
+    const keyHandler=e=>{
+        if(e.key==='Escape')return close();
+        if(e.key==='ArrowLeft'&&photos.length>1){index=(index-1+photos.length)%photos.length;render();}
+        if(e.key==='ArrowRight'&&photos.length>1){index=(index+1)%photos.length;render();}
+    };
+    prev.onclick=()=>{if(photos.length>1){index=(index-1+photos.length)%photos.length;render();}};
+    next.onclick=()=>{if(photos.length>1){index=(index+1)%photos.length;render();}};
+    enableGallerySwipe(viewer,
+        ()=>{if(photos.length>1){index=(index-1+photos.length)%photos.length;render();}},
+        ()=>{if(photos.length>1){index=(index+1)%photos.length;render();}}
+    );
+    viewer.querySelector('.gallery-viewer-close').onclick=close;
+    viewer.onclick=e=>{if(e.target===viewer)close();};
+    document.addEventListener('keydown',keyHandler);
+    render();
+}
+
 async function memberPage(p,user){
   const c=document.getElementById('memberContent'),t=document.getElementById('memberTitle');
+  const allowedPages=['dash','finance','profile','complaints','work','events','gallery'];
+  if(!allowedPages.includes(p))p='dash';
+  window.__memberCurrentPage=p;
+  try{sessionStorage.setItem('defenseEnclaveMemberPage',p);}catch(_){ }
   document.querySelectorAll('#memberApp .nav-item').forEach(b=>b.classList.toggle('active',b.dataset.p===p));
   t.textContent={dash:'Member Dashboard',finance:'Society Finance',profile:'My Profile',complaints:'Complaints',work:'Society Work',events:'Events',gallery:'Photo Gallery'}[p]||'Member Dashboard';
   if(!sb)return;
@@ -3630,7 +3725,10 @@ async function memberPage(p,user){
       c.innerHTML=`<div class="hero"><div><h2>Events</h2></div></div><div class="event-grid">${(rows||[]).map(e=>`<div class="card"><div class="photo">📅</div><div class="card-body"><div class="event-date">${e.event_date||e.date||''}</div><h3>${e.title||e.name||''}</h3><div class="muted">${e.location||e.place||e.description||''}</div></div></div>`).join('')}</div>`;
     }else if(p==='gallery'){
       const {data:rows,error}=await sb.from('gallery_photos').select('*').order('created_at',{ascending:false}); if(error)throw error;
-      c.innerHTML=`<div class="hero"><div><h2>Photo Gallery</h2></div></div><div class="gallery-grid">${(rows||[]).map((g,i)=>`<div class="card"><div class="photo">${g.public_url?`<img src="${g.public_url}" alt="${g.file_name||'Gallery photo'}" style="width:100%;height:100%;object-fit:cover">`:['◉','★','♧','✦','✓','◎'][i%6]}</div><div class="card-body"><strong>${g.file_name||'Gallery Photo'}</strong></div></div>`).join('')}</div>`;
+      const galleryRows=rows||[];
+      window.__memberGalleryRows=galleryRows.filter(x=>x.file_name!=='.folder');
+      c.innerHTML=`<div class="hero"><div><h2>Photo Gallery</h2></div></div><div class="gallery-grid member-gallery-grid">${galleryRows.map((g,i)=>`<button type="button" class="card member-gallery-card" data-member-gallery-index="${i}" aria-label="Open ${String(g.file_name||'Gallery photo').replace(/"/g,'&quot;')}" title="Open photo"><div class="photo">${g.public_url?`<img src="${g.public_url}" alt="${String(g.file_name||'Gallery photo').replace(/"/g,'&quot;')}" style="width:100%;height:100%;object-fit:cover">`:['◉','★','♧','✦','✓','◎'][i%6]}</div><div class="card-body"><strong>${g.file_name||'Gallery Photo'}</strong></div></button>`).join('')||'<div class="muted">No photos available.</div>'}</div>`;
+      c.querySelectorAll('[data-member-gallery-index]').forEach(card=>card.addEventListener('click',()=>memberOpenGalleryViewer(Number(card.dataset.memberGalleryIndex))));
     }
     document.getElementById('newComplaint')?.addEventListener('click',()=>openMemberComplaintForm(user));
   }catch(e){console.error('Member page load failed:',e);c.innerHTML=`<div class="panel"><div class="muted">Unable to load this page: ${e?.message||e}</div></div>`;}
