@@ -595,10 +595,10 @@ if (aboutSection) {
     const parent=societyWork?.closest('section')||document.getElementById('public');
     parent?.insertAdjacentElement('afterend',publicComplaintSection);
   }
-     //<div class="muted">Complaint status visible to all visitors.</div>
+     //
 
   publicComplaintSection.innerHTML=`<div class="section-head"><div><h2>Complaints</h2>
- 
+ <div class="muted">Yoy can check all complaint status here.</div>
   </div></div><div id="publicComplaintsTableWrap" class="table-wrap public-complaints-table-wrap"><div class="muted" style="padding:18px">Loading complaints...</div></div>`;
 
   const publicWrap=document.getElementById('publicComplaintsTableWrap');
