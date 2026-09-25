@@ -448,21 +448,20 @@ if (aboutSection) {
     }
 
     if (aboutContainer) {
-        const description =
-            about.data?.description ||
-            about.data?.about ||
-            about.data?.content ||
-            '';
+        const row=about.data||{};
+        const description=row.description || row.about || row.content || '';
+        const phone=row.phone || '';
+        const email=row.email || '';
+        const address=row.address || '';
 
         aboutContainer.innerHTML = about.error
             ? '<div class="muted">Unable to load About Us information.</div>'
-            : description
-                ? `<div class="about-description">
-                    ${escapePublic(description)
-                        .replace(/\n/g, '<br>')
-                        .replace(/(Phone:|Email:|Address:)/g, '<strong>$1</strong>')}
-                   </div>`
-                : '<div class="muted">About information is not available.</div>';
+            : `<div class="about-description" id="aboutText">${escapePublic(description).replace(/\n/g,'<br>')}</div>
+               <div class="about-contact-details">
+                 <p><strong>Phone:</strong> <span id="societyPhone">${escapePublic(phone||'—')}</span></p>
+                 <p><strong>Email:</strong> <span id="societyEmail">${escapePublic(email||'—')}</span></p>
+                 <p><strong>Address:</strong> <span id="societyAddress">${escapePublic(address||'—')}</span></p>
+               </div>`;
     }
 }
     
@@ -1019,7 +1018,7 @@ function openAdminDashboard(user){
  <button class="nav-item" data-a="complaints">⚑ <span>Complaints</span></button>
  <button class="nav-item" data-a="map">⌖ <span>Society Map</span></button>
   <button class="nav-item" data-a="about">ℹ <span>About</span></button>
- </nav><div class="sidebar-bottom"><div class="user-mini"><div class="avatar">${initials(user.name)}</div><div><strong>${user.name}</strong><span>${String(user.role||'admin').toLowerCase()==='superadmin' ? 'Super Administrator' : 'Administrator'}</span></div></div><button class="outline-btn" id="adminLogout">Log out</button></div></aside>
+ </nav><div class="sidebar-bottom"><div class="user-mini"><div class="avatar">${initials(user.name)}</div><div><strong>${user.name}</strong><span>${String(user.role||'admin').toLowerCase()==='superadmin' ? 'Super Administrator' : 'Administrator'}</span></div></div><button class="outline-btn logout-action-btn" id="adminLogout" aria-label="Log out" title="Log out"><span class="logout-action-icon" aria-hidden="true">↪</span><span>Log out</span></button></div></aside>
  <main class="main"><header class="topbar"><div><div class="eyebrow">DEFENSE ENCLAVE SOCIETY</div><h1 id="adminTitle">Admin Dashboard</h1></div><div class="top-actions"><span class="status ongoing">${String(user.role||'admin').toLowerCase()==='superadmin' ? 'SUPER ADMIN' : 'ADMIN'}</span><div class="avatar">${initials(user.name)}</div></div></header><section id="adminContent" class="content"></section></main>`;
  const nav=app.querySelector('nav'); nav.onclick=e=>{const b=e.target.closest('.nav-item');if(!b)return;adminPage(b.dataset.a,user)};
  document.getElementById('adminLogout').onclick=async()=>{if(sb) await sb.auth.signOut();app.classList.add('hidden');document.getElementById('public').classList.remove('hidden');setPublicLoginButtonVisible(true);toast('Logged out')};
@@ -3177,61 +3176,118 @@ async function adminUploadMap(){
 
 
 /* ===== ABOUT ADMIN MANAGEMENT ===== */
+function adminAboutEscape(v){
+  return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 async function adminLoadAbout(){
   if(!sb) throw new Error('Supabase is not configured.');
-  const {data,error}=await sb.from('society_about').select('id,description').eq('id',1).maybeSingle();
+  const {data,error}=await sb.from('society_about').select('*').eq('id',1).maybeSingle();
   if(error) throw error;
-  return data || {id:1,description:''};
+  return data || {id:1,description:'',phone:'',email:'',address:''};
 }
+
 async function adminSaveAbout(){
-  const input=document.getElementById('adminAboutDescription');
+  const description=document.getElementById('adminAboutDescription');
+  const phone=document.getElementById('adminAboutPhone');
+  const email=document.getElementById('adminAboutEmail');
+  const address=document.getElementById('adminAboutAddress');
   const err=document.getElementById('adminAboutError');
   const btn=document.getElementById('adminAboutSave');
-  if(!input||!err||!btn)return;
-  input.style.borderColor='#d0d5dd'; err.style.display='none';
-  const description=input.value.trim();
-  if(!description){
-    input.style.borderColor='#d92d20';
+  if(!description||!phone||!email||!address||!err||!btn)return;
+
+  [description,phone,email,address].forEach(x=>x.style.borderColor='#d0d5dd');
+  err.style.display='none';
+
+  if(!description.value.trim()){
+    description.style.borderColor='#d92d20';
     err.textContent='Please enter the About page description.';
-    err.style.display='block'; input.focus(); return;
+    err.style.display='block'; description.focus(); return;
   }
+
+  if(email.value.trim() && !/^\S+@\S+\.\S+$/.test(email.value.trim())){
+    email.style.borderColor='#d92d20';
+    err.textContent='Please enter a valid email address.';
+    err.style.display='block'; email.focus(); return;
+  }
+
   btn.disabled=true; btn.textContent='Saving...';
   try{
+    const payload={
+      description:description.value.trim(),
+      phone:phone.value.trim(),
+      email:email.value.trim(),
+      address:address.value.trim(),
+      updated_at:new Date().toISOString()
+    };
     const {data:existing,error:readError}=await sb.from('society_about').select('id').eq('id',1).maybeSingle();
     if(readError)throw readError;
     const result=existing
-      ? await sb.from('society_about').update({description,updated_at:new Date().toISOString()}).eq('id',1)
-      : await sb.from('society_about').insert({id:1,description,updated_at:new Date().toISOString()});
+      ? await sb.from('society_about').update(payload).eq('id',1)
+      : await sb.from('society_about').insert({id:1,...payload});
     if(result.error)throw result.error;
-    toast('About page description updated successfully.');
+
+    // Immediately update the public About section when it is present.
+    const aboutText=document.getElementById('aboutText');
+    const societyPhone=document.getElementById('societyPhone');
+    const societyEmail=document.getElementById('societyEmail');
+    const societyAddress=document.getElementById('societyAddress');
+    if(aboutText)aboutText.textContent=payload.description;
+    if(societyPhone)societyPhone.textContent=payload.phone||'—';
+    if(societyEmail)societyEmail.textContent=payload.email||'—';
+    if(societyAddress)societyAddress.textContent=payload.address||'—';
+
+    toast('About society information updated successfully.');
     await adminPage('about',window.__adminUser);
   }catch(e){
     console.error('About save failed:',e);
-    err.textContent='About save failed: '+(e?.message||e); err.style.display='block';
-  }finally{btn.disabled=false;btn.textContent='Save Description';}
-}
-async function adminAboutPage(c){
-  try{
-    const row=await adminLoadAbout();
-    const esc=String(row?.description||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    c.innerHTML=`<div class="hero"><div><div class="eyebrow">SOCIETY INFORMATION</div><h2>About Society</h2><div class="muted">Update the description shown on the public About page.</div></div></div>
-    <div class="panel">
-      <label for="adminAboutDescription" style="display:block;font-weight:600;margin-bottom:8px">About page description <span style="color:#d92d20">*</span></label>
-      <textarea id="adminAboutDescription" rows="12" maxlength="5000" placeholder="Enter About page description..." style="width:100%;box-sizing:border-box;padding:12px;border:1px solid #d0d5dd;border-radius:9px;line-height:1.5;resize:vertical">${esc}</textarea>
-      <div class="muted" style="font-size:12px;margin-top:6px">Maximum 5000 characters.</div>
-      <div id="adminAboutError" style="display:none;margin-top:10px;padding:10px;border-radius:8px;background:#fff1f1;color:#b42318"></div>
-      <div style="display:flex;justify-content:flex-end;margin-top:14px"><button id="adminAboutSave" class="primary-btn" onclick="adminSaveAbout()">Save Description</button></div>
-    </div>`;
-    document.getElementById('adminAboutDescription').addEventListener('input',function(){
-      this.style.borderColor='#d0d5dd'; document.getElementById('adminAboutError').style.display='none';
-    });
-  }catch(e){
-    c.innerHTML=`<div class="panel"><h2>About Society</h2><p class="muted">Update the description shown on the public About page.</p>
-    <div style="padding:12px;border-radius:8px;background:#fff1f1;color:#b42318">Unable to load About data: ${String(e?.message||e).replace(/</g,'&lt;')}</div>
-    <p class="muted">Required Supabase table: <strong>society_about</strong> with <strong>id</strong>, <strong>description</strong>, and <strong>updated_at</strong>.</p></div>`;
+    const message=String(e?.message||e);
+    if(/column .* does not exist|schema cache|could not find the/i.test(message)){
+      err.textContent='The society_about table must contain description, phone, email and address columns.';
+    }else{
+      err.textContent='About save failed: '+message;
+    }
+    err.style.display='block';
+  }finally{
+    btn.disabled=false; btn.textContent='Save Changes';
   }
 }
 
+async function adminAboutPage(c){
+  try{
+    const row=await adminLoadAbout();
+    c.innerHTML=`<div class="hero"><div><div class="eyebrow">SOCIETY INFORMATION</div><h2>About Society</h2><div class="muted">Update the information displayed on the public About page.</div></div></div>
+    <div class="panel admin-about-panel">
+      <div class="admin-about-grid">
+        <label for="adminAboutDescription">Description <span class="required">*</span>
+          <textarea id="adminAboutDescription" rows="8" maxlength="5000" placeholder="Enter society description...">${adminAboutEscape(row?.description||'')}</textarea>
+        </label>
+        <label for="adminAboutPhone">Phone
+          <input id="adminAboutPhone" type="tel" maxlength="40" placeholder="e.g. +91 98765 43210" value="${adminAboutEscape(row?.phone||'')}">
+        </label>
+        <label for="adminAboutEmail">Email
+          <input id="adminAboutEmail" type="email" maxlength="160" placeholder="e.g. contact@defenseenclave.com" value="${adminAboutEscape(row?.email||'')}">
+        </label>
+        <label for="adminAboutAddress">Address
+          <textarea id="adminAboutAddress" rows="4" maxlength="500" placeholder="Enter society address...">${adminAboutEscape(row?.address||'')}</textarea>
+        </label>
+      </div>
+      <div id="adminAboutError" class="admin-about-error" style="display:none"></div>
+      <div class="admin-about-actions"><button id="adminAboutSave" class="primary-btn" onclick="adminSaveAbout()">Save Changes</button></div>
+    </div>`;
+
+    ['adminAboutDescription','adminAboutPhone','adminAboutEmail','adminAboutAddress'].forEach(id=>{
+      document.getElementById(id)?.addEventListener('input',()=>{
+        document.getElementById(id).style.borderColor='#d0d5dd';
+        const e=document.getElementById('adminAboutError'); if(e)e.style.display='none';
+      });
+    });
+  }catch(e){
+    c.innerHTML=`<div class="panel"><h2>About Society</h2><p class="muted">Update the information shown on the public About page.</p>
+    <div class="admin-about-error">Unable to load About data: ${adminAboutEscape(e?.message||e)}</div>
+    <p class="muted">The <strong>society_about</strong> table should contain <strong>id, description, phone, email, address, updated_at</strong>.</p></div>`;
+  }
+}
 
 async function adminPage(p,user){
  const c=document.getElementById('adminContent'),t=document.getElementById('adminTitle');
@@ -3380,7 +3436,7 @@ else if(p==='maintenance'){
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
           <div><h3 style="margin:0;">${title}</h3><div class="muted">${list.length} profile(s)</div></div>
         </div>
-        <div class="table-wrap"><table class="table"><thead><tr><th>Name</th><th>House</th><th>Phone</th><th>Role</th><th>Action</th></tr></thead><tbody>
+        <div class="table-wrap admin-members-table-scroll"><table class="table admin-members-table"><thead><tr><th>Name</th><th>House</th><th>Phone</th><th>Role</th><th>Action</th></tr></thead><tbody>
           ${list.map(x=>rowHtml(x,allRows.indexOf(x))).join('')}
         </tbody></table></div>
         ${list.length?'':`<div class="muted" style="padding:18px">${emptyText}</div>`}
@@ -4182,3 +4238,38 @@ if(document.readyState==='loading'){
   else cleanAndSync();
   new MutationObserver(cleanAndSync).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class']});
 })();
+
+
+/* =========================================================
+   FINAL DYNAMIC ABOUT SOCIETY SUPPORT
+   Ensures Description / Phone / Email / Address are loaded
+   and saved for Admin/SuperAdmin.
+   ========================================================= */
+async function ensureDynamicAboutFields() {
+    try {
+        if (typeof sb === 'undefined' || !sb) return null;
+
+        const { data, error } = await sb
+            .from('society_about')
+            .select('description, phone, email, address')
+            .limit(1)
+            .maybeSingle();
+
+        if (error) {
+            console.warn('Unable to load society_about:', error);
+            return null;
+        }
+
+        return data || {
+            description: '',
+            phone: '',
+            email: '',
+            address: ''
+        };
+    } catch (e) {
+        console.warn('ensureDynamicAboutFields:', e);
+        return null;
+    }
+}
+
+
