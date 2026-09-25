@@ -793,6 +793,36 @@ img{max-width:100%;height:auto}
 }
 
 </style>
+<style id="webview-scroll-fix">
+
+/* =========================================================
+   WEBVIEW / ANDROID SWIPE-REFRESH SCROLL FIX
+   Prevent nested vertical scroll areas from passing their
+   overscroll gesture to the parent WebView/SwipeRefreshLayout.
+   ========================================================= */
+.gallery-admin-photo-grid,
+.public-gallery-albums,
+.gallery-album-photo-grid,
+.gallery-album-overlay,
+.gallery-album-modal,
+[role="dialog"][style*="overflow-y:auto"],
+[role="dialog"][style*="overflow-y: auto"] {
+    overscroll-behavior-y: contain !important;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+}
+
+/* Keep normal page scrolling independent from nested containers. */
+.gallery-admin-photo-grid,
+.public-gallery-albums,
+.gallery-album-photo-grid,
+.gallery-album-overlay,
+[role="dialog"][style*="overflow-y:auto"],
+[role="dialog"][style*="overflow-y: auto"] {
+    overscroll-behavior: contain !important;
+}
+
+</style>
 </head><body>
 <div id="toast"></div>
 <header class="public-nav" id="login_btn_panel"><div class="inner"><div class="brand"><div class="brand-mark">DE</div><div><strong>Defense Enclave</strong><span>Society Portal</span></div></div><a href="#home">Home</a><a href="#members">Members</a><a href="#work">Work</a><a href="#events">Events</a><a href="#gallery">Gallery</a><a href="#map">Map</a><a href="#about">About</a><button class="login-pill" id="openLogin">Member Login</button></div></header>
