@@ -4273,3 +4273,7 @@ async function ensureDynamicAboutFields() {
 }
 
 
+/* FINAL_APP_CACHE_SAFE
+   This build intentionally does not clear Supabase auth storage,
+   cookies, localStorage, or sessionStorage during page initialization.
+*/
