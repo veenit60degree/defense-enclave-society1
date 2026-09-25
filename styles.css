@@ -269,99 +269,71 @@
 }
 
 /* =========================================================
-   FINAL PUBLIC "VIEW ALL" BUTTON
+   FINAL ADMIN / MEMBER DATA TABLE + ABOUT LAYOUT FIX
    ========================================================= */
-.public-view-all-btn{
-  appearance:none;
-  -webkit-appearance:none;
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  gap:6px;
-  margin-left:10px;
-  padding:5px 10px;
-  min-height:30px;
-  border:1px solid #0aa37d;
-  border-radius:999px;
-  background:#ecfbf6;
-  color:#087a60;
-  font:inherit;
-  font-size:.72em;
-  font-weight:700;
-  line-height:1;
-  vertical-align:middle;
-  white-space:nowrap;
-  cursor:pointer;
-  transition:background .15s ease,border-color .15s ease,transform .15s ease,box-shadow .15s ease;
-}
-.public-view-all-btn::after{content:'→';font-size:1.05em;}
-.public-view-all-btn:hover{background:#d9f6ec;border-color:#078b6b;box-shadow:0 4px 12px rgba(8,122,96,.12);}
-.public-view-all-btn:active{transform:translateY(1px);}
-.public-view-all-btn:focus-visible{outline:3px solid rgba(8,139,107,.2);outline-offset:2px;}
-
-.public-all-overlay{
-  position:fixed;
-  inset:0;
-  z-index:100000;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  padding:20px;
-  box-sizing:border-box;
-  background:rgba(16,28,32,.62);
-  backdrop-filter:blur(3px);
-}
-.public-all-modal{
-  width:min(1100px,100%);
-  max-height:min(88vh,900px);
-  overflow:hidden;
-  box-sizing:border-box;
-  background:#fff;
-  border:1px solid #dce8e5;
-  border-radius:18px;
-  box-shadow:0 24px 70px rgba(0,0,0,.24);
-}
-.public-all-modal-head{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:16px;
-  padding:18px 20px;
-  border-bottom:1px solid #e7eeee;
-}
-.public-all-modal-head h2{margin:0 0 4px;}
-.public-all-close{
-  width:38px;
-  height:38px;
-  flex:0 0 38px;
-  border:1px solid #d7e2df;
-  border-radius:50%;
-  background:#f7faf9;
-  color:#253536;
-  font-size:24px;
-  line-height:1;
-  cursor:pointer;
-}
-.public-all-close:hover{background:#edf5f2;}
-.public-all-table-scroll{max-height:calc(88vh - 92px);overflow:auto;-webkit-overflow-scrolling:touch;}
-.public-all-table-scroll .table{min-width:760px;margin:0;}
-.public-all-events-grid{
+.admin-about-grid{
   display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(230px,1fr));
-  gap:14px;
-  padding:20px;
-  max-height:calc(88vh - 92px);
-  overflow:auto;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:16px;
+  align-items:start;
 }
-.public-event-card-all{overflow:hidden;}
-.public-event-card-all .photo{height:130px;display:flex;align-items:center;justify-content:center;background:#e9f7f3;}
-.public-event-card-all .card-body{padding:14px;}
+.admin-about-grid > label{
+  min-width:0;
+  margin:0;
+}
+.admin-about-grid > .admin-about-full{
+  grid-column:1 / -1;
+}
+.admin-about-grid input,
+.admin-about-grid textarea{
+  width:100%;
+  max-width:100%;
+  box-sizing:border-box;
+}
+.admin-about-grid textarea{
+  resize:vertical;
+}
 
-@media(max-width:600px){
-  .public-view-all-btn{font-size:.68em;padding:5px 9px;min-height:28px;margin-left:7px;}
-  .public-all-overlay{padding:10px;}
-  .public-all-modal{max-height:94vh;border-radius:14px;}
-  .public-all-modal-head{padding:14px;}
-  .public-all-events-grid{grid-template-columns:1fr;padding:12px;max-height:calc(94vh - 78px);}
-  .public-all-table-scroll{max-height:calc(94vh - 78px);}
+/* All requested admin/member tables remain horizontally scrollable. */
+.admin-maintenance-table-scroll,
+.admin-work-table-scroll,
+.admin-members-table-scroll,
+.admin-complaints-table-scroll,
+.member-work-table-scroll,
+.member-complaints-table-scroll{
+  width:100%;
+  max-width:100%;
+  overflow-x:auto !important;
+  overflow-y:hidden;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:thin;
+  touch-action:pan-x;
+}
+.admin-maintenance-table-scroll .table{min-width:700px}
+.admin-work-table-scroll .table{min-width:860px}
+.admin-members-table-scroll .table{min-width:760px}
+.admin-complaints-table-scroll .table{min-width:900px}
+.member-work-table-scroll .table{min-width:760px}
+.member-complaints-table-scroll .table{min-width:760px}
+
+.admin-maintenance-table-scroll::-webkit-scrollbar,
+.admin-work-table-scroll::-webkit-scrollbar,
+.admin-members-table-scroll::-webkit-scrollbar,
+.admin-complaints-table-scroll::-webkit-scrollbar,
+.member-work-table-scroll::-webkit-scrollbar,
+.member-complaints-table-scroll::-webkit-scrollbar{height:7px}
+
+@media(max-width:720px){
+  .admin-about-grid{
+    grid-template-columns:1fr;
+    gap:14px;
+  }
+  .admin-about-grid > .admin-about-full{
+    grid-column:auto;
+  }
+  .admin-about-panel{
+    width:100%;
+    max-width:100%;
+    box-sizing:border-box;
+  }
 }
