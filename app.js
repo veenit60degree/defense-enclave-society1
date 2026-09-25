@@ -2469,8 +2469,8 @@ async function adminAddMember(){
       </div>
 
       <div style="margin-bottom:15px;">
-        <label for="memberHouse" style="display:block;font-weight:600;margin-bottom:6px;">House / Flat number <span style="color:#d92d20;">*</span></label>
-        <input id="memberHouse" type="text" maxlength="50" placeholder="Enter house / flat number"
+        <label for="memberHouse" style="display:block;font-weight:600;margin-bottom:6px;">House number <span style="color:#d92d20;">*</span></label>
+        <input id="memberHouse" type="text" maxlength="50" placeholder="Enter house number"
           style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
         <div style="font-size:12px;color:#667085;margin-top:5px;">Example: A-101</div>
         <div id="memberHouseError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
@@ -2548,7 +2548,7 @@ async function adminAddMember(){
           valid=false;
         }
         if(!house_number){
-          societyAdminFieldError(overlay,'memberHouse','memberHouseError','Please enter the house / flat number.');
+          societyAdminFieldError(overlay,'memberHouse','memberHouseError','Please enter the house number.');
           valid=false;
         }
         if(!phone){
@@ -2724,8 +2724,8 @@ async function adminEditMember(i){
       </div>
 
       <div style="margin-bottom:15px;">
-        <label for="editMemberHouse" style="display:block;font-weight:600;margin-bottom:6px;">House / Flat number <span style="color:#d92d20;">*</span></label>
-        <input id="editMemberHouse" type="text" maxlength="50" value="${esc(x.house_number||x.house_no||'')}" placeholder="Enter house / flat number"
+        <label for="editMemberHouse" style="display:block;font-weight:600;margin-bottom:6px;">House number <span style="color:#d92d20;">*</span></label>
+        <input id="editMemberHouse" type="text" maxlength="50" value="${esc(x.house_number||x.house_no||'')}" placeholder="Enter house number"
           style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
         <div id="editMemberHouseError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
       </div>
@@ -2806,7 +2806,7 @@ async function adminEditMember(i){
             valid=false;
         }
         if(!house_number){
-            societyAdminFieldError(overlay,'editMemberHouse','editMemberHouseError','Please enter the house / flat number.');
+            societyAdminFieldError(overlay,'editMemberHouse','editMemberHouseError','Please enter the house number.');
             valid=false;
         }
         if(email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
@@ -3349,7 +3349,7 @@ async function adminProfilePage(user){
         <div class="form-grid">
           <label>Name<input value="${esc(u.full_name||u.name||'')}" readonly></label>
           <label>Email<input value="${esc(u.email||user.email||'')}" readonly></label>
-          <label>House / Flat<input value="${esc(u.house_number||u.house_no||'')}" readonly></label>
+          <label>House <input value="${esc(u.house_number||u.house_no||'')}" readonly></label>
           <label>Phone<input value="${esc(u.phone||user.phone||'')}" readonly></label>
         </div>
         <label>Role<input value="${esc(roleLabel)}" readonly></label>
@@ -3373,7 +3373,7 @@ async function adminProfilePage(user){
               <label>Name<input id="adminProfileEditName" value="${esc(u.full_name||u.name||'')}" required></label>
               <label>Phone<input id="adminProfileEditPhone" value="${esc(u.phone||user.phone||'')}" required></label>
               <label>Email<input id="adminProfileEditEmail" value="${esc(u.email||user.email||'')}" readonly disabled></label>
-              <label>House / Flat<input id="adminProfileEditHouse" value="${esc(u.house_number||u.house_no||'')}" required></label>
+              <label>House <input id="adminProfileEditHouse" value="${esc(u.house_number||u.house_no||'')}" required></label>
             </div>
             <div style="margin-top:14px;">
               <label>Password <span style="color:#64748b;font-size:12px;">(leave blank to keep current password)</span></label>
@@ -3410,7 +3410,7 @@ async function adminProfilePage(user){
         const address=document.getElementById('adminProfileEditAddress').value.trim();
         const password=document.getElementById('adminProfileEditPassword').value;
         const confirmPassword=document.getElementById('adminProfileEditConfirmPassword').value;
-        if(!name||!house||!phone){ge.textContent='Name, House / Flat and Phone are required.';ge.style.display='block';return;}
+        if(!name||!house||!phone){ge.textContent='Name, House and Phone are required.';ge.style.display='block';return;}
         if(!/^[+0-9][0-9 ()-]{6,19}$/.test(phone)){ge.textContent='Please enter a valid phone number.';ge.style.display='block';return;}
         if(password && password.length<6){ge.textContent='Password must be at least 6 characters.';ge.style.display='block';return;}
         if(password!==confirmPassword){ge.textContent='Passwords do not match.';ge.style.display='block';return;}
@@ -3763,7 +3763,7 @@ async function memberPage(p,user){
           <div class="form-grid">
             <label>Name<input value="${esc(u.full_name||u.name||'')}" readonly></label>
             <label>Email<input value="${esc(u.email||user.email||'')}" readonly></label>
-            <label>House / Flat<input value="${esc(u.house_number||u.house_no||'')}" readonly></label>
+            <label>House <input value="${esc(u.house_number||u.house_no||'')}" readonly></label>
             <label>Phone<input value="${esc(u.phone||user.phone||'')}" readonly></label>
           </div>
           <label>Address<textarea readonly>${esc(u.address||'')}</textarea></label>
@@ -3787,7 +3787,7 @@ async function memberPage(p,user){
                 <label>Name<input id="profileEditName" value="${esc(u.full_name||u.name||'')}" required></label>
                 <label>Phone<input id="profileEditPhone" value="${esc(u.phone||user.phone||'')}" required></label>
                 <label>Email<input id="profileEditEmail" value="${esc(u.email||user.email||'')}" readonly disabled></label>
-                <label>House / Flat<input id="profileEditHouse" value="${esc(u.house_number||u.house_no||'')}" required></label>
+                <label>House <input id="profileEditHouse" value="${esc(u.house_number||u.house_no||'')}" required></label>
               </div>
               <div style="margin-top:14px;">
                 <label>Password <span style="color:#64748b;font-size:12px;">(leave blank to keep current password)</span></label>
@@ -3833,7 +3833,7 @@ async function memberPage(p,user){
           const address=document.getElementById('profileEditAddress').value.trim();
           const password=document.getElementById('profileEditPassword').value;
           const confirmPassword=document.getElementById('profileEditConfirmPassword').value;
-          if(!name||!house||!phone){ge.textContent='Name, House / Flat and Phone are required.';ge.style.display='block';return;}
+          if(!name||!house||!phone){ge.textContent='Name, House and Phone are required.';ge.style.display='block';return;}
           if(phone && !/^[+0-9][0-9 ()-]{6,19}$/.test(phone)){ge.textContent='Please enter a valid phone number.';ge.style.display='block';return;}
           if(password && password.length<6){ge.textContent='Password must be at least 6 characters.';ge.style.display='block';return;}
           if(password!==confirmPassword){ge.textContent='Passwords do not match.';ge.style.display='block';return;}
