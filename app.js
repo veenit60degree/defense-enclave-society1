@@ -231,8 +231,8 @@ function addPublicMembersViewAll(section,members){
         link=document.createElement('button');
         link.type='button';
         link.setAttribute('data-public-members-view-all','1');
-        link.textContent='(View all)';
-        link.style.cssText='margin-left:8px;border:0;background:none;padding:0;color:#079c79;font:inherit;font-size:.82em;font-weight:600;cursor:pointer;text-decoration:none;vertical-align:baseline;';
+        link.textContent='View all';
+        link.className='public-view-all-btn';
         heading.appendChild(link);
     }
 
@@ -274,7 +274,7 @@ function addPublicComplaintsViewAll(section, rows){
         link=document.createElement('button');
         link.type='button';
         link.setAttribute('data-public-complaints-view-all','1');
-        link.textContent='(View all)';
+        link.textContent='View all';
         link.className='public-view-all-btn';
         heading.appendChild(link);
     }
@@ -312,7 +312,7 @@ function addPublicEventsViewAll(section, rows){
         link=document.createElement('button');
         link.type='button';
         link.setAttribute('data-public-events-view-all','1');
-        link.textContent='(View all)';
+        link.textContent='View all';
         link.className='public-view-all-btn';
         heading.appendChild(link);
     }
@@ -975,10 +975,11 @@ async function login(){
         phone:data.user.phone||profile?.phone||'',
         house_no:profile?.house_number||profile?.house_no||'',
         address:profile?.address||'',
-        role:String(profile?.role||'member').trim().toLowerCase()
+        role:normalizeUserRole(profile?.role||'member')
     };
 
-    if(user.role==='admin' || user.role==='superadmin') openAdminDashboard(user);
+    window.__adminUser=user;
+    if(isAdminRole(user.role)) openAdminDashboard(user);
     else openMemberDashboard(user);
     toast('Login successful');
 }
@@ -1007,7 +1008,7 @@ document.getElementById('registerBtn').onclick=register;
 function openAdminDashboard(user){
  document.getElementById('public').classList.add('hidden');
  const app=document.getElementById('memberApp'); app.className='app-shell';
- app.innerHTML=`<aside class="sidebar"><div class="brand"><div class="brand-mark">DE</div><div><strong>Defense Enclave</strong><span>Admin Portal</span></div></div><nav>
+ app.innerHTML=`<aside class="sidebar"><div class="brand"><div class="brand-mark">DE</div><div><strong>Defense Enclave</strong><span>${normalizeUserRole(user.role)==='superadmin' ? 'Super Admin Portal' : 'Admin Portal'}</span></div></div><nav>
  <button class="nav-item active" data-a="dashboard">⌂ <span>Dashboard</span></button>
  <button class="nav-item" data-a="finance">₹ <span>Society Finance</span></button>
  <button class="nav-item" data-a="maintenance">▣ <span>Maintenance</span></button>
@@ -1018,8 +1019,8 @@ function openAdminDashboard(user){
  <button class="nav-item" data-a="complaints">⚑ <span>Complaints</span></button>
  <button class="nav-item" data-a="map">⌖ <span>Society Map</span></button>
   <button class="nav-item" data-a="about">ℹ <span>About</span></button>
- </nav><div class="sidebar-bottom"><div class="user-mini"><div class="avatar">${initials(user.name)}</div><div><strong>${user.name}</strong><span>${String(user.role||'admin').toLowerCase()==='superadmin' ? 'Super Administrator' : 'Administrator'}</span></div></div><button class="outline-btn logout-action-btn" id="adminLogout" aria-label="Log out" title="Log out"><span class="logout-action-icon" aria-hidden="true">↪</span><span>Log out</span></button></div></aside>
- <main class="main"><header class="topbar"><div><div class="eyebrow">DEFENSE ENCLAVE SOCIETY</div><h1 id="adminTitle">Admin Dashboard</h1></div><div class="top-actions"><span class="status ongoing">${String(user.role||'admin').toLowerCase()==='superadmin' ? 'SUPER ADMIN' : 'ADMIN'}</span><div class="avatar">${initials(user.name)}</div></div></header><section id="adminContent" class="content"></section></main>`;
+ </nav><div class="sidebar-bottom"><div class="user-mini"><div class="avatar">${initials(user.name)}</div><div><strong>${user.name}</strong><span>${normalizeUserRole(user.role)==='superadmin' ? 'Super Administrator' : 'Administrator'}</span></div></div><button class="outline-btn logout-action-btn" id="adminLogout" aria-label="Log out" title="Log out"><span class="logout-action-icon" aria-hidden="true">↪</span><span>Log out</span></button></div></aside>
+ <main class="main"><header class="topbar"><div><div class="eyebrow">DEFENSE ENCLAVE SOCIETY</div><h1 id="adminTitle">Admin Dashboard</h1></div><div class="top-actions"><span class="status ongoing">${normalizeUserRole(user.role)==='superadmin' ? 'SUPER ADMIN' : 'ADMIN'}</span><div class="avatar">${initials(user.name)}</div></div></header><section id="adminContent" class="content"></section></main>`;
  const nav=app.querySelector('nav'); nav.onclick=e=>{const b=e.target.closest('.nav-item');if(!b)return;adminPage(b.dataset.a,user)};
  document.getElementById('adminLogout').onclick=async()=>{if(sb) await sb.auth.signOut();app.classList.add('hidden');document.getElementById('public').classList.remove('hidden');setPublicLoginButtonVisible(true);toast('Logged out')};
  adminPage('dashboard',user);
@@ -2075,9 +2076,17 @@ async function adminEditEvent(i){
    Accepts admin role values such as: admin / Admin / ADMIN /
    administrator / society_admin.
    ============================================================ */
+function normalizeUserRole(role){
+    const raw=String(role??'').trim().toLowerCase();
+    const compact=raw.replace(/[\s_-]+/g,'');
+    if(compact==='superadmin') return 'superadmin';
+    if(compact==='admin' || compact==='administrator' || compact==='societyadmin') return 'admin';
+    return raw || 'member';
+}
+
 function isAdminRole(role){
-    const r=String(role||'').trim().toLowerCase().replace(/[\s-]+/g,'_');
-    return r==='admin' || r==='administrator' || r==='society_admin' || r==='superadmin';
+    const r=normalizeUserRole(role);
+    return r==='admin' || r==='superadmin';
 }
 
 async function requireAdminDeletePermission(){
@@ -3243,7 +3252,7 @@ async function adminSaveAbout(){
     console.error('About save failed:',e);
     const message=String(e?.message||e);
     if(/column .* does not exist|schema cache|could not find the/i.test(message)){
-      err.textContent='The society_about table must contain description, phone, email and address columns.';
+      err.innerHTML='The <strong>society_about</strong> table is missing one or more required columns. Run the supplied SQL migration, then refresh the page.';
     }else{
       err.textContent='About save failed: '+message;
     }
@@ -4067,7 +4076,7 @@ async function restoreLoginSession(){
             phone:profile.phone||'',
             house_no:profile.house_number||profile.house_no||'',
             address:profile.address||'',
-            role:(profile.role||'member').toLowerCase()
+            role:normalizeUserRole(profile.role||'member')
         };
 
         window.__adminUser=user;
@@ -4122,10 +4131,7 @@ if(sb && sb.auth){
                         return;
                     }
 
-                    const role=String(profile.role || 'member')
-                        .trim()
-                        .toLowerCase()
-                        .replace(/[\\s-]+/g,'_');
+                    const role=normalizeUserRole(profile.role || 'member');
 
                     window.__adminUser={
                         ...authUser,
