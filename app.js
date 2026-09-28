@@ -3603,7 +3603,7 @@ async function adminMonthlySecurityPage(user){
         const q=String(document.getElementById('monthlySecuritySearch').value||'').trim().toLowerCase();
         const all=adminMonthlySecurityRows(state,sel.value);
         const rows=all.filter(x=>[x.name,x.email,x.address,x.phone].some(v=>String(v||'').toLowerCase().includes(q)));
-        const total=all.filter(x=>x.status==='Completed').reduce((sum,x)=>sum+x.amount,0);
+        const total=all.filter(x=>x.status==='Completed').reduce((sum,x)=>sum+x.amount,500);
         document.getElementById('monthlySecurityTotal').textContent='₹'+total.toLocaleString('en-IN');
         document.getElementById('monthlySecurityPaid').textContent=String(all.filter(x=>x.status==='Completed').length);
         document.getElementById('monthlySecurityPending').textContent=String(all.filter(x=>x.status!=='Completed').length);
