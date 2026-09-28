@@ -828,7 +828,7 @@ img{max-width:100%;height:auto}
 .admin-profile-panel{max-width:920px}.admin-profile-panel .form-grid{margin-bottom:14px}.admin-profile-panel>label{display:block;margin-top:14px}.admin-profile-panel input[readonly],.admin-profile-panel textarea[readonly]{background:#f8fbfb;color:#334155}.admin-profile-error{padding:12px 14px;border-radius:10px;background:#fff1f1;color:#b42318;border:1px solid #fecdca}@media(max-width:800px){.admin-profile-panel{width:100%;box-sizing:border-box}.admin-profile-hero{gap:12px}}
 </style>
 <style id="monthly-security-admin-inline">
-.monthly-security-hero{align-items:center}.monthly-security-actions{display:flex;gap:10px;align-items:center}.monthly-security-toolbar{margin-top:16px}.monthly-security-toolbar-grid{display:grid;grid-template-columns:minmax(180px,.35fr) minmax(260px,1fr);gap:14px;align-items:end}.monthly-security-toolbar-grid label{min-width:0}.monthly-security-toolbar-grid input,.monthly-security-toolbar-grid select{width:100%;box-sizing:border-box}.monthly-security-search-label{min-width:0}.monthly-security-stats{margin-top:16px}.admin-monthly-security-table-scroll{width:100%;max-width:100%;overflow-x:auto!important;overflow-y:hidden;-webkit-overflow-scrolling:touch}.admin-monthly-security-table-scroll .table{min-width:900px}.admin-monthly-security-table-scroll tr.monthly-security-paid td{background:#ecfdf3!important}.admin-monthly-security-table-scroll tr.monthly-security-pending td{background:#fff1f1!important}.monthly-security-status{display:inline-flex;align-items:center;padding:5px 9px;border-radius:999px;font-size:12px;font-weight:700}.monthly-security-status.is-paid{background:#d1fadf;color:#027a48}.monthly-security-status.is-pending{background:#fee4e2;color:#b42318}@media(max-width:720px){.monthly-security-hero{display:flex;flex-direction:column;align-items:stretch;gap:12px}.monthly-security-actions{justify-content:flex-start}.monthly-security-toolbar-grid{grid-template-columns:1fr}.monthly-security-stats{grid-template-columns:1fr}}
+.monthly-security-hero{align-items:center}.monthly-security-actions{display:flex;gap:10px;align-items:center}.monthly-security-toolbar{margin-top:16px}.monthly-security-toolbar-grid{display:grid;grid-template-columns:minmax(180px,.35fr) minmax(260px,1fr);gap:14px;align-items:end}.monthly-security-toolbar-grid label{min-width:0}.monthly-security-toolbar-grid input,.monthly-security-toolbar-grid select{width:100%;box-sizing:border-box}.monthly-security-search-label{min-width:0}.monthly-security-stats{margin-top:16px}.admin-monthly-security-table-scroll{width:100%;max-width:100%;overflow-x:auto!important;overflow-y:hidden;-webkit-overflow-scrolling:touch}.admin-monthly-security-table-scroll .table{min-width:900px}.admin-monthly-security-table-scroll tr.monthly-security-paid td{background:#ecfdf3!important}.admin-monthly-security-table-scroll tr.monthly-security-pending td{background:#fff1f1!important}.monthly-security-status{display:inline-flex;align-items:center;padding:5px 9px;border-radius:999px;font-size:12px;font-weight:700}.monthly-security-status.is-paid{background:#d1fadf;color:#027a48}.monthly-security-status.is-pending{background:#fee4e2;color:#b42318}.monthly-security-amount-input{width:105px;max-width:100%;box-sizing:border-box;padding:8px 9px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;font:inherit}.monthly-security-status-select{min-width:118px;padding:8px 9px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;font:inherit}.monthly-security-update-btn{margin-left:8px;padding:8px 12px;border:0;border-radius:8px;background:#0f9f7a;color:#fff;font-weight:700;cursor:pointer;white-space:nowrap}.monthly-security-update-btn:disabled{opacity:.6;cursor:not-allowed}@media(max-width:720px){.monthly-security-hero{display:flex;flex-direction:column;align-items:stretch;gap:12px}.monthly-security-actions{justify-content:flex-start}.monthly-security-toolbar-grid{grid-template-columns:1fr}.monthly-security-stats{grid-template-columns:1fr}}
 </style>
 </head><body>
 <div id="toast"></div>
@@ -4350,12 +4350,42 @@ async function adminMonthlySecurityPage(user){
     <div class="panel monthly-security-toolbar"><div class="monthly-security-toolbar-grid"><label>Month<select id="monthlySecurityMonth"><option value="${month}">${monthlySecurityMonthLabel(month)}</option></select></label><label class="monthly-security-search-label">Search members<input id="monthlySecuritySearch" type="search" placeholder="Search name, email, phone or address"></label></div></div>
     <div id="monthlySecurityMessage" class="muted" style="padding:12px 0"></div>
     <div class="stats monthly-security-stats"><div class="stat"><div class="stat-head">Total Collection<span>₹</span></div><div class="value" id="monthlySecurityTotal">₹0</div><div class="trend" id="monthlySecurityMonthLabel">${monthlySecurityMonthLabel(month)}</div></div><div class="stat"><div class="stat-head">Paid Members<span>✓</span></div><div class="value" id="monthlySecurityPaid">0</div><div class="trend">Payment completed</div></div><div class="stat"><div class="stat-head">Pending Members<span>!</span></div><div class="value" id="monthlySecurityPending">0</div><div class="trend">Payment pending</div></div></div>
-    <div class="panel"><div class="table-wrap admin-monthly-security-table-scroll"><table class="table" id="monthlySecurityTable"><thead><tr><th>Name</th><th>Email</th><th>Address</th><th>Phone</th><th>Amount</th><th>Payment Status</th></tr></thead><tbody></tbody></table></div><div id="monthlySecurityEmpty" class="muted" style="display:none;padding:18px">No members found.</div></div>`;
+    <div class="panel"><div class="table-wrap admin-monthly-security-table-scroll"><table class="table" id="monthlySecurityTable"><thead><tr><th>Name</th><th>Email</th><th>Address</th><th>Phone</th><th>Amount</th><th>Payment Status</th><th>Update</th></tr></thead><tbody></tbody></table></div><div id="monthlySecurityEmpty" class="muted" style="display:none;padding:18px">No members found.</div></div>`;
     const sel=document.getElementById('monthlySecurityMonth');
     const now=new Date();
     sel.innerHTML='';
     for(let i=0;i<24;i++){const d=new Date(now.getFullYear(),now.getMonth()-i,1);const v=monthlySecurityMonthValue(d);sel.insertAdjacentHTML('beforeend',`<option value="${v}" ${v===month?'selected':''}>${monthlySecurityMonthLabel(v)}</option>`);}
     let state={profiles:[],paidByUser:new Map(),table:''};
+
+    async function updateMonthlySecurityPayment(item,selectedMonth){
+        const amountInput=document.querySelector(`.monthly-security-amount-input[data-user-id="${monthlySecurityEsc(item.profile.id)}"]`);
+        const statusSelect=document.querySelector(`.monthly-security-status-select[data-user-id="${monthlySecurityEsc(item.profile.id)}"]`);
+        const updateBtn=document.querySelector(`.monthly-security-update-btn[data-user-id="${monthlySecurityEsc(item.profile.id)}"]`);
+        const amount=Number(amountInput?.value);
+        const uiStatus=String(statusSelect?.value||'Pending');
+        if(!Number.isFinite(amount)||amount<0){toast('Please enter a valid amount.');amountInput?.focus();return;}
+        if(!state.table){toast('Monthly Security payment table was not found.');return;}
+        if(updateBtn){updateBtn.disabled=true;updateBtn.textContent='Saving...';}
+        try{
+            const paymentMonth=`${selectedMonth}-01`;
+            const dbStatus=uiStatus==='Completed'?'paid':'pending';
+            const existing=item.row;
+            let result;
+            if(existing?.id){
+                result=await sb.from(state.table).update({amount,payment_status:dbStatus,payment_month:paymentMonth,updated_at:new Date().toISOString()}).eq('id',existing.id);
+            }else{
+                result=await sb.from(state.table).insert({user_id:item.profile.id,payment_month:paymentMonth,amount,payment_status:dbStatus});
+            }
+            if(result.error)throw result.error;
+            toast('Monthly Security payment updated successfully.');
+            await render();
+        }catch(e){
+            console.error('Monthly Security update error:',e);
+            toast(`Unable to update payment: ${e?.message||e}`);
+            if(updateBtn){updateBtn.disabled=false;updateBtn.textContent='Update';}
+        }
+    }
+
     async function render(){
         const selected=sel.value; window.__monthlySecurityMonth=selected;
         document.getElementById('monthlySecurityMonthLabel').textContent=monthlySecurityMonthLabel(selected);
@@ -4375,9 +4405,10 @@ async function adminMonthlySecurityPage(user){
             document.getElementById('monthlySecurityPaid').textContent=String(all.filter(x=>x.status==='Paid').length);
             document.getElementById('monthlySecurityPending').textContent=String(all.filter(x=>x.status!=='Paid').length);
             const tbody=document.querySelector('#monthlySecurityTable tbody');
-            tbody.innerHTML=rows.map(x=>`<tr class="${x.status==='Paid'?'monthly-security-paid':'monthly-security-pending'}"><td><strong>${monthlySecurityEsc(x.name||'—')}</strong></td><td>${monthlySecurityEsc(x.email||'—')}</td><td>${monthlySecurityEsc(x.address||'—')}</td><td>${monthlySecurityEsc(x.phone||'—')}</td><td>₹${x.amount.toLocaleString('en-IN')}</td><td><span class="monthly-security-status ${x.status==='Paid'?'is-paid':'is-pending'}">${x.status}</span></td></tr>`).join('');
+            tbody.innerHTML=rows.map(x=>`<tr class="${x.status==='Paid'?'monthly-security-paid':'monthly-security-pending'}"><td><strong>${monthlySecurityEsc(x.name||'—')}</strong></td><td>${monthlySecurityEsc(x.email||'—')}</td><td>${monthlySecurityEsc(x.address||'—')}</td><td>${monthlySecurityEsc(x.phone||'—')}</td><td><input class="monthly-security-amount-input" type="number" min="0" step="0.01" value="${Number(x.amount||0)}" data-user-id="${monthlySecurityEsc(x.profile.id)}" aria-label="Amount for ${monthlySecurityEsc(x.name||'member')}"></td><td><select class="monthly-security-status-select" data-user-id="${monthlySecurityEsc(x.profile.id)}" aria-label="Payment status for ${monthlySecurityEsc(x.name||'member')}"><option value="Pending" ${x.status==='Paid'?'':'selected'}>Pending</option><option value="Completed" ${x.status==='Paid'?'selected':''}>Completed</option></select></td><td><button type="button" class="monthly-security-update-btn" data-user-id="${monthlySecurityEsc(x.profile.id)}">Update</button></td></tr>`).join('');
             document.getElementById('monthlySecurityEmpty').style.display=rows.length?'none':'block';
             msg.textContent=`${rows.length} member${rows.length===1?'':'s'} shown · ${monthlySecurityMonthLabel(selected)} · Data source: ${state.table}`;
+            tbody.querySelectorAll('.monthly-security-update-btn').forEach(btn=>btn.addEventListener('click',()=>{const item=rows.find(x=>String(x.profile.id)===String(btn.dataset.userId));if(item)updateMonthlySecurityPayment(item,selected);}));
         }catch(e){
             console.error('Monthly Security load error:',e);
             document.getElementById('monthlySecurityTable').querySelector('tbody').innerHTML='';
