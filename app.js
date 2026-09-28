@@ -1056,8 +1056,7 @@ function openAdminDashboard(user){
    setPublicLoginButtonVisible(true);
    toast('Logged out');
  };
- let savedAdminPage='dashboard';
- savedAdminPage=loadCurrentSection('defenseEnclaveAdminPage','dashboard');
+ let savedAdminPage=window.__adminCurrentPage || loadCurrentSection('defenseEnclaveAdminPage','dashboard');
  const validAdminPages=['dashboard','finance','monthlySecurity','profile','maintenance','work','events','gallery','members','complaints','map','about'];
  if(!validAdminPages.includes(savedAdminPage))savedAdminPage='dashboard';
  adminPage(savedAdminPage,user);
@@ -3523,7 +3522,7 @@ function adminMonthlySecurityRows(state,month){
             email:profile.email||'',
             address:profile.address||'',
             phone:profile.phone||'',
-            amount:monthlySecurityMoney(payment?.amount),
+            amount:payment ? monthlySecurityMoney(payment.amount) : 500,
             status:monthlySecurityStatus(payment)
         };
     });
@@ -3603,7 +3602,7 @@ async function adminMonthlySecurityPage(user){
         const q=String(document.getElementById('monthlySecuritySearch').value||'').trim().toLowerCase();
         const all=adminMonthlySecurityRows(state,sel.value);
         const rows=all.filter(x=>[x.name,x.email,x.address,x.phone].some(v=>String(v||'').toLowerCase().includes(q)));
-        const total=all.filter(x=>x.status==='Completed').reduce((sum,x)=>sum+x.amount,500);
+        const total=all.filter(x=>x.status==='Completed').reduce((sum,x)=>sum+x.amount,0);
         document.getElementById('monthlySecurityTotal').textContent='₹'+total.toLocaleString('en-IN');
         document.getElementById('monthlySecurityPaid').textContent=String(all.filter(x=>x.status==='Completed').length);
         document.getElementById('monthlySecurityPending').textContent=String(all.filter(x=>x.status!=='Completed').length);
@@ -3662,7 +3661,7 @@ async function adminMonthlySecurityPage(user){
                         user_id:userId,
                         payment_month:sel.value+'-01',
                         amount,
-                        payment_status:status.toLowerCase(),
+                        payment_status:(status.toLowerCase()==='completed'?'completed':'pending'),
                         updated_at:new Date().toISOString()
                     };
         
@@ -3939,8 +3938,7 @@ else if(p==='maintenance'){
 function openMemberDashboard(user){document.getElementById('public').classList.add('hidden');const app=document.getElementById('memberApp');app.className='app-shell';app.innerHTML=`<aside class="sidebar"><div class="brand"><div class="brand-mark">DE</div><div><strong>Defense Enclave</strong><span>Member Portal</span></div></div><nav><button class="nav-item active" data-p="dash">⌂ <span>Dashboard</span></button>
 <button class="nav-item" data-p="finance">₹ <span>Society Finance</span></button><button class="nav-item" data-p="profile">♙ <span>My Profile</span></button><button class="nav-item" data-p="complaints">⚑ <span>Complaints</span></button><button class="nav-item" data-p="work">▣ <span>Society Work</span></button><button class="nav-item" data-p="events">◷ <span>Events</span></button><button class="nav-item" data-p="gallery">▧ <span>Gallery</span></button></nav><div class="sidebar-bottom"><div class="user-mini"><div class="avatar">${(user.name||'A J').split(' ').map(x=>x[0]).slice(0,2).join('')}</div><div><strong>${user.name||'Member'}</strong><span>${user.house_no||'Member'}</span></div></div><button class="outline-btn" id="memberLogout">Log out</button></div></aside><main class="main"><header class="topbar"><div><div class="eyebrow">DEFENSE ENCLAVE SOCIETY</div><h1 id="memberTitle">Member Dashboard</h1></div><div class="top-actions"><button class="icon-btn" id="memberTour">?</button>
 <div class="avatar">${(user.name||'A J').split(' ').map(x=>x[0]).slice(0,2).join('')}</div></div></header><section id="memberContent" class="content"></section></main>`;const nav=app.querySelector('nav');nav.onclick=e=>{const b=e.target.closest('.nav-item');if(!b)return;memberPage(b.dataset.p,user)};document.getElementById('memberLogout').onclick=async()=>{if(sb){const {error}=await sb.auth.signOut();if(error)return toast(error.message)}clearCurrentSections();app.classList.add('hidden');document.getElementById('public').classList.remove('hidden');setPublicLoginButtonVisible(true);toast('Logged out')};document.getElementById('memberTour').onclick=()=>toast('Tour: Dashboard → Finance → Profile → Complaints → Work → Events → Gallery');
-let savedMemberPage='dash';
-savedMemberPage=loadCurrentSection('defenseEnclaveMemberPage','dash');
+let savedMemberPage=window.__memberCurrentPage || loadCurrentSection('defenseEnclaveMemberPage','dash');
 if(!['dash','finance','profile','complaints','work','events','gallery'].includes(savedMemberPage))savedMemberPage='dash';
 memberPage(savedMemberPage,user)}
 function memberOpenGalleryViewer(startIndex){
@@ -4193,14 +4191,20 @@ async function memberPage(p,user){
         ${v.updated_at?`<div class="muted" style="margin-top:14px">Last updated: ${new Date(v.updated_at).toLocaleString('en-IN')}</div>`:''}
       </div>`;
     }else if(p==='dash'){
-      const [{data:finance},{data:work},{data:complaints}]=await Promise.all([
+      const monthValue=monthlySecurityMonthValue();
+      const {start:securityStart,next:securityNext}=monthlySecurityMonthRange(monthValue);
+      const [{data:finance},{data:work},{data:complaints},{data:securityPayment,error:securityError}]=await Promise.all([
         sb.from('society_finance').select('*').eq('id',1).maybeSingle(),
         sb.from('society_work').select('*').order('created_at',{ascending:false}).limit(6),
-        sb.from('complaints').select('*').eq('user_id',user.id).order('created_at',{ascending:false}).limit(5)
+        sb.from('complaints').select('*').eq('user_id',user.id).order('created_at',{ascending:false}).limit(5),
+        sb.from('monthly_security_payments').select('amount,payment_status,payment_month').eq('user_id',user.id).gte('payment_month',securityStart).lt('payment_month',securityNext).order('payment_month',{ascending:false}).limit(1).maybeSingle()
       ]);
       const f=finance||{};
       const active=(work||[]).filter(x=>String(x.status||'').toLowerCase()!=='completed').length;
-      c.innerHTML=`<div class="hero"><div><div class="eyebrow">WELCOME BACK</div><h2> ${user.name||'Member'}!</h2><div class="muted">Latest updates and information from your society.</div></div><button class="primary-btn" id="newComplaint">+ New Complaint</button></div><div class="stats">${[['Society Fund',`₹${Number(f.society_fund||0).toLocaleString('en-IN')}`,'Current balance'],['Total Expenses',`₹${Number(f.total_expenses||0).toLocaleString('en-IN')}`,'This year'],['Active Maintenance',String(active),'Active work items'],['My Complaints',String((complaints||[]).length),'Recent complaints']].map(x=>`<div class="stat"><div class="stat-head">${x[0]}<span>●</span></div><div class="value">${x[1]}</div><div class="trend">${x[2]}</div></div>`).join('')}</div><div class="grid-2-equal"><div class="panel"><h3>Recent Society Work</h3>${(work||[]).slice(0,5).map(w=>`<div class="activity-item"><div class="activity-icon">✓</div><div><strong>${w.name||w.title||w.work_name||w.project_name||w.work_title||w.project||w.work||w.activity||w.task||w.subject||'Work'}</strong><p>${w.status||''} · ${Number(w.progress||0)}%</p></div></div>`).join('')||'<div class="muted">No work records.</div>'}</div><div class="panel"><h3>My Recent Complaints</h3>${(complaints||[]).map(x=>`<div class="activity-item"><div class="activity-icon">⚑</div><div><strong>${x.subject||x.title||x.description||x.message||'Complaint'}</strong><p>${x.status||'Submitted'} · ${x.created_at?new Date(x.created_at).toLocaleDateString('en-IN'):''}</p></div></div>`).join('')||'<div class="muted">No complaints submitted.</div>'}</div></div>`;
+      const securityStatus=monthlySecurityStatus(securityPayment);
+      const securityAmount=securityPayment ? monthlySecurityMoney(securityPayment.amount) : 500;
+      const securityMonthLabel=monthlySecurityMonthLabel(monthValue);
+      c.innerHTML=`<div class="hero"><div><div class="eyebrow">WELCOME BACK</div><h2> ${user.name||'Member'}!</h2><div class="muted">Latest updates and information from your society.</div></div><button class="primary-btn" id="newComplaint">+ New Complaint</button></div><div class="stats">${[['Society Fund',`₹${Number(f.society_fund||0).toLocaleString('en-IN')}`,'Current balance'],['Total Expenses',`₹${Number(f.total_expenses||0).toLocaleString('en-IN')}`,'This year'],['Active Maintenance',String(active),'Active work items'],['My Complaints',String((complaints||[]).length),'Recent complaints']].map(x=>`<div class="stat"><div class="stat-head">${x[0]}<span>●</span></div><div class="value">${x[1]}</div><div class="trend">${x[2]}</div></div>`).join('')}</div><div class="panel member-security-status-panel ${securityStatus==='Completed'?'member-security-completed':'member-security-pending'}"><div class="member-security-status-head"><div><h3>Monthly Security Payment</h3><div class="muted">${securityMonthLabel}</div></div><span class="member-security-badge">${securityStatus}</span></div><div class="member-security-status-body"><div><span class="muted">Amount</span><strong>₹${securityAmount.toLocaleString('en-IN')}</strong></div><div><span class="muted">Payment Status</span><strong>${securityStatus}</strong></div></div>${securityError?'<div class="muted" style="margin-top:10px">Payment status could not be read from the database.</div>':''}</div><div class="grid-2-equal"><div class="panel"><h3>Recent Society Work</h3>${(work||[]).slice(0,5).map(w=>`<div class="activity-item"><div class="activity-icon">✓</div><div><strong>${w.name||w.title||w.work_name||w.project_name||w.work_title||w.project||w.work||w.activity||w.task||w.subject||'Work'}</strong><p>${w.status||''} · ${Number(w.progress||0)}%</p></div></div>`).join('')||'<div class="muted">No work records.</div>'}</div><div class="panel"><h3>My Recent Complaints</h3>${(complaints||[]).map(x=>`<div class="activity-item"><div class="activity-icon">⚑</div><div><strong>${x.subject||x.title||x.description||x.message||'Complaint'}</strong><p>${x.status||'Submitted'} · ${x.created_at?new Date(x.created_at).toLocaleDateString('en-IN'):''}</p></div></div>`).join('')||'<div class="muted">No complaints submitted.</div>'}</div></div>`;
     }else if(p==='complaints'){
       const {data:rows,error}=await sb.from('complaints').select('*').eq('user_id',user.id).order('created_at',{ascending:false});
       if(error)throw error;
@@ -4579,8 +4583,10 @@ if(sb && sb.auth){
                     // Refresh the currently visible dashboard with the
                     // database role instead of a stale/undefined role.
                     if(isAdminRole(role)){
+                        window.__adminCurrentPage=window.__adminCurrentPage || loadCurrentSection('defenseEnclaveAdminPage','dashboard');
                         await openAdminDashboard(window.__adminUser);
                     }else{
+                        window.__memberCurrentPage=window.__memberCurrentPage || loadCurrentSection('defenseEnclaveMemberPage','dash');
                         await openMemberDashboard(window.__adminUser);
                     }
                 }catch(e){
@@ -4600,6 +4606,18 @@ if(sb && sb.auth){
 }
 
 
+
+/* Preserve active portal page when the browser tab is hidden/restored. */
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='hidden'){
+    if(window.__adminCurrentPage) saveCurrentSection('defenseEnclaveAdminPage',window.__adminCurrentPage);
+    if(window.__memberCurrentPage) saveCurrentSection('defenseEnclaveMemberPage',window.__memberCurrentPage);
+  }
+});
+window.addEventListener('pagehide',()=>{
+  if(window.__adminCurrentPage) saveCurrentSection('defenseEnclaveAdminPage',window.__adminCurrentPage);
+  if(window.__memberCurrentPage) saveCurrentSection('defenseEnclaveMemberPage',window.__memberCurrentPage);
+});
 
 /* Responsive UI safeguard: preserve existing functionality while keeping
    navigation/logout controls usable on narrow screens. */
