@@ -893,7 +893,24 @@ function clearCurrentSections(){
   const adminPages=['dashboard','finance','profile','maintenance','work','events','gallery','members','complaints','map','about'];
   const memberPages=['dash','finance','profile','complaints','work','events','gallery'];
   let restoring=false;
-  async function restoreCurrentPortalPage(){
+  // Monthly Security has its own restore key because its content is loaded
+  // asynchronously and can otherwise be replaced by a dashboard rebuild
+  // during a browser-tab visibility/auth refresh.
+  function saveVisiblePortalPage(){
+    try{
+      if(window.__adminCurrentPage){
+        saveCurrentSection('defenseEnclaveAdminPage',window.__adminCurrentPage);
+        saveCurrentSection('defenseEnclaveLastVisiblePage',window.__adminCurrentPage);
+        if(window.__adminCurrentPage==='monthlySecurity'){
+          saveCurrentSection('defenseEnclaveMonthlySecurityPage','monthlySecurity');
+        }
+      }
+      if(window.__memberCurrentPage){
+        saveCurrentSection('defenseEnclaveMemberPage',window.__memberCurrentPage);
+      }
+    }catch(_){ }
+  }
+  async function restoreCurrentPortalPage(force=false){
     if(restoring) return;
     restoring=true;
     try{
@@ -903,13 +920,19 @@ function clearCurrentSections(){
       if(!user) return;
       const role=normalizeRole(user.role||'member');
       if(isAdminRole(role) && typeof adminPage==='function'){
-        const saved=loadCurrentSection('defenseEnclaveAdminPage',window.__adminCurrentPage||'dashboard');
+        const savedLast=loadCurrentSection('defenseEnclaveLastVisiblePage','');
+        const savedMonthly=loadCurrentSection('defenseEnclaveMonthlySecurityPage','');
+        const saved= savedMonthly==='monthlySecurity' && (savedLast==='monthlySecurity' || window.__adminCurrentPage==='monthlySecurity')
+          ? 'monthlySecurity'
+          : loadCurrentSection('defenseEnclaveAdminPage',window.__adminCurrentPage||'dashboard');
         const page=adminPages.includes(saved)?saved:'dashboard';
-        if(window.__adminCurrentPage!==page) await adminPage(page,user);
+        if(force || window.__adminCurrentPage!==page){
+          await adminPage(page,user);
+        }
       }else if(typeof memberPage==='function'){
         const saved=loadCurrentSection('defenseEnclaveMemberPage',window.__memberCurrentPage||'dash');
         const page=memberPages.includes(saved)?saved:'dash';
-        if(window.__memberCurrentPage!==page) await memberPage(page,user);
+        if(force || window.__memberCurrentPage!==page) await memberPage(page,user);
       }
     }catch(e){console.warn('Portal page restore:',e)}
     finally{restoring=false;}
@@ -4478,6 +4501,13 @@ async function adminPage(p,user){
  if(!allowedAdminPages.includes(p))p='dashboard';
  window.__adminCurrentPage=p;
  saveCurrentSection('defenseEnclaveAdminPage',p);
+ saveCurrentSection('defenseEnclaveLastVisiblePage',p);
+ if(p==='monthlySecurity'){
+   saveCurrentSection('defenseEnclaveMonthlySecurityPage','monthlySecurity');
+ }else{
+   try{localStorage.removeItem('defenseEnclaveMonthlySecurityPage');}catch(_){ }
+   try{sessionStorage.removeItem('defenseEnclaveMonthlySecurityPage');}catch(_){ }
+ }
  document.querySelectorAll('#memberApp .nav-item').forEach(b=>b.classList.toggle('active',b.dataset.a===p));
  const titles={dashboard:'Admin Dashboard',finance:'Society Finance',profile:'My Profile',maintenance:'Active Maintenance',monthlySecurity:'Monthly Security',work:'Society Work',events:'Events',gallery:'Photo Gallery',members:'Members',complaints:'Complaints',map:'Society Map',about:'About Society'}; t.textContent=titles[p]||'Admin Dashboard';
  if(p==='profile'){
