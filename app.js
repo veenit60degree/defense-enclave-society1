@@ -3523,7 +3523,7 @@ function adminMonthlySecurityRows(state,month){
             email:profile.email||'',
             address:profile.address||'',
             phone:profile.phone||'',
-            amount:monthlySecurityMoney(payment?.amount),
+            amount:payment?.amount==null ? 500 : monthlySecurityMoney(payment.amount),
             status:monthlySecurityStatus(payment)
         };
     });
@@ -4083,6 +4083,7 @@ async function memberPage(p,user){
   const allowedPages=['dash','finance','profile','complaints','work','events','gallery'];
   if(!allowedPages.includes(p))p='dash';
   window.__memberCurrentPage=p;
+  window.__memberLastNavigationPage=p;
   saveCurrentSection('defenseEnclaveMemberPage',p);
   document.querySelectorAll('#memberApp .nav-item').forEach(b=>b.classList.toggle('active',b.dataset.p===p));
   t.textContent={dash:'Member Dashboard',finance:'Society Finance',profile:'My Profile',complaints:'Complaints',work:'Society Work',events:'Events',gallery:'Photo Gallery'}[p]||'Member Dashboard';
@@ -4277,14 +4278,20 @@ async function memberPage(p,user){
         ${v.updated_at?`<div class="muted" style="margin-top:14px">Last updated: ${new Date(v.updated_at).toLocaleString('en-IN')}</div>`:''}
       </div>`;
     }else if(p==='dash'){
-      const [{data:finance},{data:work},{data:complaints}]=await Promise.all([
+      const [{data:finance},{data:work},{data:complaints},{data:monthlySecurityRows,error:monthlySecurityError}]=await Promise.all([
         sb.from('society_finance').select('*').eq('id',1).maybeSingle(),
         sb.from('society_work').select('*').order('created_at',{ascending:false}).limit(6),
-        sb.from('complaints').select('*').eq('user_id',user.id).order('created_at',{ascending:false}).limit(5)
+        sb.from('complaints').select('*').eq('user_id',user.id).order('created_at',{ascending:false}).limit(5),
+        sb.from('monthly_security_payments').select('id,amount,payment_status,payment_month,updated_at').eq('user_id',user.id).gte('payment_month',monthlySecurityMonthValue()+'-01').lt('payment_month',(()=>{const d=new Date();const n=new Date(d.getFullYear(),d.getMonth()+1,1);return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-01`;})()).order('updated_at',{ascending:false}).limit(1)
       ]);
+      if(monthlySecurityError) console.warn('Member Monthly Security load:',monthlySecurityError.message);
+      const monthlySecurity=Array.isArray(monthlySecurityRows)?(monthlySecurityRows[0]||null):(monthlySecurityRows||null);
+      const memberSecurityStatus=monthlySecurityStatus(monthlySecurity||null);
+      const memberSecurityAmount=monthlySecurityAmount(monthlySecurity||{});
+      const memberSecurityCompleted=memberSecurityStatus==='Completed';
       const f=finance||{};
       const active=(work||[]).filter(x=>String(x.status||'').toLowerCase()!=='completed').length;
-      c.innerHTML=`<div class="hero"><div><div class="eyebrow">WELCOME BACK</div><h2> ${user.name||'Member'}!</h2><div class="muted">Latest updates and information from your society.</div></div><button class="primary-btn" id="newComplaint">+ New Complaint</button></div><div class="stats">${[['Society Fund',`₹${Number(f.society_fund||0).toLocaleString('en-IN')}`,'Current balance'],['Total Expenses',`₹${Number(f.total_expenses||0).toLocaleString('en-IN')}`,'This year'],['Active Maintenance',String(active),'Active work items'],['My Complaints',String((complaints||[]).length),'Recent complaints']].map(x=>`<div class="stat"><div class="stat-head">${x[0]}<span>●</span></div><div class="value">${x[1]}</div><div class="trend">${x[2]}</div></div>`).join('')}</div><div class="grid-2-equal"><div class="panel"><h3>Recent Society Work</h3>${(work||[]).slice(0,5).map(w=>`<div class="activity-item"><div class="activity-icon">✓</div><div><strong>${w.name||w.title||w.work_name||w.project_name||w.work_title||w.project||w.work||w.activity||w.task||w.subject||'Work'}</strong><p>${w.status||''} · ${Number(w.progress||0)}%</p></div></div>`).join('')||'<div class="muted">No work records.</div>'}</div><div class="panel"><h3>My Recent Complaints</h3>${(complaints||[]).map(x=>`<div class="activity-item"><div class="activity-icon">⚑</div><div><strong>${x.subject||x.title||x.description||x.message||'Complaint'}</strong><p>${x.status||'Submitted'} · ${x.created_at?new Date(x.created_at).toLocaleDateString('en-IN'):''}</p></div></div>`).join('')||'<div class="muted">No complaints submitted.</div>'}</div></div>`;
+      c.innerHTML=`<div class="hero"><div><div class="eyebrow">WELCOME BACK</div><h2> ${user.name||'Member'}!</h2><div class="muted">Latest updates and information from your society.</div></div><button class="primary-btn" id="newComplaint">+ New Complaint</button></div><div class="stats">${[['Society Fund',`₹${Number(f.society_fund||0).toLocaleString('en-IN')}`,'Current balance'],['Total Expenses',`₹${Number(f.total_expenses||0).toLocaleString('en-IN')}`,'This year'],['Active Maintenance',String(active),'Active work items'],['My Complaints',String((complaints||[]).length),'Recent complaints']].map(x=>`<div class="stat"><div class="stat-head">${x[0]}<span>●</span></div><div class="value">${x[1]}</div><div class="trend">${x[2]}</div></div>`).join('')}</div><div class="panel member-monthly-security-card ${memberSecurityCompleted?'member-security-completed':'member-security-pending'}"><div class="member-security-card-head"><h3>Monthly Security Payment</h3><span class="member-security-status">${memberSecurityCompleted?'Completed':'Pending'}</span></div><div class="member-security-payment-details"><div><span class="muted">Current Month</span><strong>${monthlySecurityMonthLabel(monthlySecurityMonthValue())}</strong></div><div><span class="muted">Amount</span><strong>₹${Number(Number.isFinite(Number(memberSecurityAmount))?memberSecurityAmount:500).toLocaleString('en-IN')}</strong></div></div><div class="member-security-note">${memberSecurityCompleted?'Payment completed for the current month.':'Payment is pending for the current month.'}</div></div><div class="grid-2-equal"><div class="panel"><h3>Recent Society Work</h3>${(work||[]).slice(0,5).map(w=>`<div class="activity-item"><div class="activity-icon">✓</div><div><strong>${w.name||w.title||w.work_name||w.project_name||w.work_title||w.project||w.work||w.activity||w.task||w.subject||'Work'}</strong><p>${w.status||''} · ${Number(w.progress||0)}%</p></div></div>`).join('')||'<div class="muted">No work records.</div>'}</div><div class="panel"><h3>My Recent Complaints</h3>${(complaints||[]).map(x=>`<div class="activity-item"><div class="activity-icon">⚑</div><div><strong>${x.subject||x.title||x.description||x.message||'Complaint'}</strong><p>${x.status||'Submitted'} · ${x.created_at?new Date(x.created_at).toLocaleDateString('en-IN'):''}</p></div></div>`).join('')||'<div class="muted">No complaints submitted.</div>'}</div></div>`;
     }else if(p==='complaints'){
       const {data:rows,error}=await sb.from('complaints').select('*').eq('user_id',user.id).order('created_at',{ascending:false});
       if(error)throw error;
@@ -4662,7 +4669,15 @@ if(sb && sb.auth){
 
                     // Refresh the currently visible dashboard with the
                     // database role instead of a stale/undefined role.
-                    if(isAdminRole(role)){
+                    if(event==='TOKEN_REFRESHED'){
+                        if(isAdminRole(role)){
+                            const savedAdmin=loadCurrentSection('defenseEnclaveAdminPage',window.__adminCurrentPage||'dashboard');
+                            await adminPage(savedAdmin,window.__adminUser);
+                        }else{
+                            const savedMember=window.__memberLastNavigationPage || loadCurrentSection('defenseEnclaveMemberPage',window.__memberCurrentPage||'dash');
+                            await memberPage(savedMember,window.__adminUser);
+                        }
+                    }else if(isAdminRole(role)){
                         await openAdminDashboard(window.__adminUser);
                     }else{
                         await openMemberDashboard(window.__adminUser);
