@@ -886,6 +886,46 @@ function clearCurrentSections(){
     });
 }
 
+
+/* Preserve the currently open portal page when the browser tab is hidden,
+   restored, or a Supabase token refresh rebuilds the portal shell. */
+(function setupPortalPagePersistence(){
+  const adminPages=['dashboard','finance','profile','maintenance','work','events','gallery','members','complaints','map','about'];
+  const memberPages=['dash','finance','profile','complaints','work','events','gallery'];
+  let restoring=false;
+  async function restoreCurrentPortalPage(){
+    if(restoring) return;
+    restoring=true;
+    try{
+      const app=document.getElementById('memberApp');
+      if(!app || app.classList.contains('hidden')) return;
+      const user=window.__adminUser;
+      if(!user) return;
+      const role=normalizeRole(user.role||'member');
+      if(isAdminRole(role) && typeof adminPage==='function'){
+        const saved=loadCurrentSection('defenseEnclaveAdminPage',window.__adminCurrentPage||'dashboard');
+        const page=adminPages.includes(saved)?saved:'dashboard';
+        if(window.__adminCurrentPage!==page) await adminPage(page,user);
+      }else if(typeof memberPage==='function'){
+        const saved=loadCurrentSection('defenseEnclaveMemberPage',window.__memberCurrentPage||'dash');
+        const page=memberPages.includes(saved)?saved:'dash';
+        if(window.__memberCurrentPage!==page) await memberPage(page,user);
+      }
+    }catch(e){console.warn('Portal page restore:',e)}
+    finally{restoring=false;}
+  }
+  document.addEventListener('visibilitychange',()=>{
+    if(document.visibilityState==='visible') setTimeout(restoreCurrentPortalPage,80);
+  });
+  window.addEventListener('pageshow',()=>setTimeout(restoreCurrentPortalPage,80));
+  window.addEventListener('pagehide',()=>{
+    try{
+      if(window.__adminCurrentPage) saveCurrentSection('defenseEnclaveAdminPage',window.__adminCurrentPage);
+      if(window.__memberCurrentPage) saveCurrentSection('defenseEnclaveMemberPage',window.__memberCurrentPage);
+    }catch(_){ }
+  });
+})();
+
 function publicSectionByHeading(labels){
     const wanted=(labels||[]).map(x=>String(x).trim().toLowerCase());
     const nodes=[...document.querySelectorAll('section,article,.section,.panel,main > div,body > div')];
@@ -4311,12 +4351,12 @@ function monthlySecurityMonthFromRow(row){
 }
 function monthlySecurityStatus(row){
     const v=String(row?.payment_status ?? row?.status ?? row?.paymentState ?? '').toLowerCase().trim();
-    return ['paid','completed','complete','done','success','successful','received'].includes(v)?'Paid':'Pending';
+    return ['paid','completed','complete','done','success','successful','received'].includes(v)?'Completed':'Pending';
 }
 function monthlySecurityAmount(row,profile){
     const vals=[row?.amount,row?.payment_amount,row?.security_amount,row?.monthly_amount,profile?.monthly_security_amount,profile?.security_amount,profile?.monthly_amount,profile?.maintenance_amount];
     for(const v of vals){const n=Number(v);if(Number.isFinite(n)&&n>=0)return n;}
-    return 0;
+    return 500;
 }
 async function monthlySecurityLoadRows(month){
     const tableCandidates=['monthly_security_payments','security_payments','monthly_security'];
@@ -4363,12 +4403,13 @@ async function adminMonthlySecurityPage(user){
         const updateBtn=document.querySelector(`.monthly-security-update-btn[data-user-id="${monthlySecurityEsc(item.profile.id)}"]`);
         const amount=Number(amountInput?.value);
         const uiStatus=String(statusSelect?.value||'Pending');
-        if(!Number.isFinite(amount)||amount<0){toast('Please enter a valid amount.');amountInput?.focus();return;}
+        if(!Number.isFinite(amount) || amount < 0){toast('Please enter a valid amount.');amountInput?.focus();return;}
+        if(uiStatus.toLowerCase() === 'completed' && amount < 100){toast('Completed payment requires a minimum amount of ₹100.');amountInput?.focus();return;}
         if(!state.table){toast('Monthly Security payment table was not found.');return;}
         if(updateBtn){updateBtn.disabled=true;updateBtn.textContent='Saving...';}
         try{
             const paymentMonth=`${selectedMonth}-01`;
-            const dbStatus=uiStatus==='Completed'?'paid':'pending';
+            const dbStatus=uiStatus.toLowerCase()==='completed'?'completed':'pending';
             const existing=item.row;
             let result;
             if(existing?.id){
@@ -4397,15 +4438,15 @@ async function adminMonthlySecurityPage(user){
             const rows=state.profiles.filter(p=>String(p.role||'').toLowerCase()==='member').map(p=>{
                 const paid=state.paidByUser.get(String(p.id));
                 const r=paid?.row||null;
-                return {profile:p,row:r,name:p.full_name||p.name||r?.name||'',email:p.email||r?.email||'',address:p.address||r?.address||'',phone:p.phone||r?.phone||'',amount:monthlySecurityAmount(r,p),status:r?monthlySecurityStatus(r):'Pending'};
+                return {profile:p,row:r,name:p.full_name||p.name||r?.name||'',email:p.email||r?.email||'',address:p.address||r?.address||'',phone:p.phone||r?.phone||'',amount:r?monthlySecurityAmount(r,p):500,status:r?monthlySecurityStatus(r):'Pending'};
             }).filter(x=>!q||[x.name,x.email,x.address,x.phone,x.status].join(' ').toLowerCase().includes(q));
-            const all=state.profiles.filter(p=>String(p.role||'').toLowerCase()==='member').map(p=>{const paid=state.paidByUser.get(String(p.id));return {profile:p,row:paid?.row||null,amount:monthlySecurityAmount(paid?.row,p),status:paid?.row?monthlySecurityStatus(paid.row):'Pending'};});
-            const total=all.filter(x=>x.status==='Paid').reduce((a,x)=>a+x.amount,0);
+            const all=state.profiles.filter(p=>String(p.role||'').toLowerCase()==='member').map(p=>{const paid=state.paidByUser.get(String(p.id));return {profile:p,row:paid?.row||null,amount:paid?.row?monthlySecurityAmount(paid.row,p):500,status:paid?.row?monthlySecurityStatus(paid.row):'Pending'};});
+            const total=all.filter(x=>x.status==='Completed').reduce((a,x)=>a+x.amount,0);
             document.getElementById('monthlySecurityTotal').textContent='₹'+total.toLocaleString('en-IN');
-            document.getElementById('monthlySecurityPaid').textContent=String(all.filter(x=>x.status==='Paid').length);
-            document.getElementById('monthlySecurityPending').textContent=String(all.filter(x=>x.status!=='Paid').length);
+            document.getElementById('monthlySecurityPaid').textContent=String(all.filter(x=>x.status==='Completed').length);
+            document.getElementById('monthlySecurityPending').textContent=String(all.filter(x=>x.status!=='Completed').length);
             const tbody=document.querySelector('#monthlySecurityTable tbody');
-            tbody.innerHTML=rows.map(x=>`<tr class="${x.status==='Paid'?'monthly-security-paid':'monthly-security-pending'}"><td><strong>${monthlySecurityEsc(x.name||'—')}</strong></td><td>${monthlySecurityEsc(x.email||'—')}</td><td>${monthlySecurityEsc(x.address||'—')}</td><td>${monthlySecurityEsc(x.phone||'—')}</td><td><input class="monthly-security-amount-input" type="number" min="0" step="0.01" value="${Number(x.amount||0)}" data-user-id="${monthlySecurityEsc(x.profile.id)}" aria-label="Amount for ${monthlySecurityEsc(x.name||'member')}"></td><td><select class="monthly-security-status-select" data-user-id="${monthlySecurityEsc(x.profile.id)}" aria-label="Payment status for ${monthlySecurityEsc(x.name||'member')}"><option value="Pending" ${x.status==='Paid'?'':'selected'}>Pending</option><option value="Completed" ${x.status==='Paid'?'selected':''}>Completed</option></select></td><td><button type="button" class="monthly-security-update-btn" data-user-id="${monthlySecurityEsc(x.profile.id)}">Update</button></td></tr>`).join('');
+            tbody.innerHTML=rows.map(x=>`<tr class="${x.status==='Completed'?'monthly-security-paid':'monthly-security-pending'}"><td><strong>${monthlySecurityEsc(x.name||'—')}</strong></td><td>${monthlySecurityEsc(x.email||'—')}</td><td>${monthlySecurityEsc(x.address||'—')}</td><td>${monthlySecurityEsc(x.phone||'—')}</td><td><input class="monthly-security-amount-input" type="number" min="0" step="0.01" value="${Number(x.amount||0)}" data-user-id="${monthlySecurityEsc(x.profile.id)}" aria-label="Amount for ${monthlySecurityEsc(x.name||'member')}"></td><td><select class="monthly-security-status-select" data-user-id="${monthlySecurityEsc(x.profile.id)}" aria-label="Payment status for ${monthlySecurityEsc(x.name||'member')}"><option value="Pending" ${x.status==='Completed'?'':'selected'}>Pending</option><option value="Completed" ${x.status==='Completed'?'selected':''}>Completed</option></select></td><td><button type="button" class="monthly-security-update-btn" data-user-id="${monthlySecurityEsc(x.profile.id)}">Update</button></td></tr>`).join('');
             document.getElementById('monthlySecurityEmpty').style.display=rows.length?'none':'block';
             msg.textContent=`${rows.length} member${rows.length===1?'':'s'} shown · ${monthlySecurityMonthLabel(selected)} · Data source: ${state.table}`;
             tbody.querySelectorAll('.monthly-security-update-btn').forEach(btn=>btn.addEventListener('click',()=>{const item=rows.find(x=>String(x.profile.id)===String(btn.dataset.userId));if(item)updateMonthlySecurityPayment(item,selected);}));
@@ -4423,7 +4464,7 @@ async function adminMonthlySecurityPage(user){
 }
 function adminExportMonthlySecurity(state,month){
     const members=(state?.profiles||[]).filter(p=>String(p.role||'').toLowerCase()==='member').map(p=>{const paid=state.paidByUser.get(String(p.id));const row=paid?.row||null;return {name:p.full_name||p.name||row?.name||'',email:p.email||row?.email||'',address:p.address||row?.address||'',phone:p.phone||row?.phone||'',amount:monthlySecurityAmount(row,p),status:row?monthlySecurityStatus(row):'Pending'};});
-    const total=members.filter(x=>x.status==='Paid').reduce((a,x)=>a+x.amount,0);
+    const total=members.filter(x=>x.status==='Completed').reduce((a,x)=>a+x.amount,0);
     const esc=x=>String(x??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     const rows=members.map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.email)}</td><td>${esc(x.address)}</td><td>${esc(x.phone)}</td><td>${x.amount.toFixed(2)}</td><td>${esc(x.status)}</td></tr>`).join('');
     const html=`<html><head><meta charset="UTF-8"></head><body><h2>Monthly Security - ${monthlySecurityMonthLabel(month)}</h2><table border="1"><tr><th>Name</th><th>Email</th><th>Address</th><th>Phone</th><th>Amount</th><th>Payment Status</th></tr>${rows}<tr><td colspan="4"><strong>Amount Total</strong></td><td><strong>${total.toFixed(2)}</strong></td><td></td></tr></table></body></html>`;
@@ -4915,14 +4956,19 @@ async function memberPage(p,user){
         ${v.updated_at?`<div class="muted" style="margin-top:14px">Last updated: ${new Date(v.updated_at).toLocaleString('en-IN')}</div>`:''}
       </div>`;
     }else if(p==='dash'){
-      const [{data:finance},{data:work},{data:complaints}]=await Promise.all([
+      const [{data:finance},{data:work},{data:complaints},{data:monthlySecurity,error:monthlySecurityError}]=await Promise.all([
         sb.from('society_finance').select('*').eq('id',1).maybeSingle(),
         sb.from('society_work').select('*').order('created_at',{ascending:false}).limit(6),
-        sb.from('complaints').select('*').eq('user_id',user.id).order('created_at',{ascending:false}).limit(5)
+        sb.from('complaints').select('*').eq('user_id',user.id).order('created_at',{ascending:false}).limit(5),
+        sb.from('monthly_security_payments').select('id,amount,payment_status,payment_month,updated_at').eq('user_id',user.id).gte('payment_month', monthlySecurityMonthValue()+'-01').lt('payment_month', (()=>{const d=new Date(); const n=new Date(d.getFullYear(),d.getMonth()+1,1); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-01`;})()).order('updated_at',{ascending:false}).limit(1).maybeSingle()
       ]);
+      if(monthlySecurityError) console.warn('Member Monthly Security load:',monthlySecurityError.message);
+      const memberSecurityStatus=monthlySecurityStatus(monthlySecurity||null);
+      const memberSecurityAmount=monthlySecurityAmount(monthlySecurity||null,{});
+      const memberSecurityCompleted=memberSecurityStatus==='Completed';
       const f=finance||{};
       const active=(work||[]).filter(x=>String(x.status||'').toLowerCase()!=='completed').length;
-      c.innerHTML=`<div class="hero"><div><div class="eyebrow">WELCOME BACK</div><h2> ${user.name||'Member'}!</h2><div class="muted">Latest updates and information from your society.</div></div><button class="primary-btn" id="newComplaint">+ New Complaint</button></div><div class="stats">${[['Society Fund',`₹${Number(f.society_fund||0).toLocaleString('en-IN')}`,'Current balance'],['Total Expenses',`₹${Number(f.total_expenses||0).toLocaleString('en-IN')}`,'This year'],['Active Maintenance',String(active),'Active work items'],['My Complaints',String((complaints||[]).length),'Recent complaints']].map(x=>`<div class="stat"><div class="stat-head">${x[0]}<span>●</span></div><div class="value">${x[1]}</div><div class="trend">${x[2]}</div></div>`).join('')}</div><div class="grid-2-equal"><div class="panel"><h3>Recent Society Work</h3>${(work||[]).slice(0,5).map(w=>`<div class="activity-item"><div class="activity-icon">✓</div><div><strong>${w.name||w.title||w.work_name||w.project_name||w.work_title||w.project||w.work||w.activity||w.task||w.subject||'Work'}</strong><p>${w.status||''} · ${Number(w.progress||0)}%</p></div></div>`).join('')||'<div class="muted">No work records.</div>'}</div><div class="panel"><h3>My Recent Complaints</h3>${(complaints||[]).map(x=>`<div class="activity-item"><div class="activity-icon">⚑</div><div><strong>${x.subject||x.title||x.description||x.message||'Complaint'}</strong><p>${x.status||'Submitted'} · ${x.created_at?new Date(x.created_at).toLocaleDateString('en-IN'):''}</p></div></div>`).join('')||'<div class="muted">No complaints submitted.</div>'}</div></div>`;
+      c.innerHTML=`<div class="hero"><div><div class="eyebrow">WELCOME BACK</div><h2> ${user.name||'Member'}!</h2><div class="muted">Latest updates and information from your society.</div></div><button class="primary-btn" id="newComplaint">+ New Complaint</button></div><div class="stats">${[['Society Fund',`₹${Number(f.society_fund||0).toLocaleString('en-IN')}`,'Current balance'],['Total Expenses',`₹${Number(f.total_expenses||0).toLocaleString('en-IN')}`,'This year'],['Active Maintenance',String(active),'Active work items'],['My Complaints',String((complaints||[]).length),'Recent complaints']].map(x=>`<div class="stat"><div class="stat-head">${x[0]}<span>●</span></div><div class="value">${x[1]}</div><div class="trend">${x[2]}</div></div>`).join('')}</div><div class="panel member-monthly-security-card ${memberSecurityCompleted?'member-security-completed':'member-security-pending'}"><div class="member-security-card-head"><h3>Monthly Security Payment</h3><span class="member-security-status">${memberSecurityCompleted?'Completed':'Pending'}</span></div><div class="member-security-payment-details"><div><span class="muted">Current Month</span><strong>${monthlySecurityMonthLabel(monthlySecurityMonthValue())}</strong></div><div><span class="muted">Amount</span><strong>₹${Number(Number.isFinite(Number(memberSecurityAmount))?memberSecurityAmount:500).toLocaleString('en-IN')}</strong></div></div><div class="member-security-note">${memberSecurityCompleted?'Payment completed for the current month.':'Payment is pending for the current month.'}</div></div><div class="grid-2-equal"><div class="panel"><h3>Recent Society Work</h3>${(work||[]).slice(0,5).map(w=>`<div class="activity-item"><div class="activity-icon">✓</div><div><strong>${w.name||w.title||w.work_name||w.project_name||w.work_title||w.project||w.work||w.activity||w.task||w.subject||'Work'}</strong><p>${w.status||''} · ${Number(w.progress||0)}%</p></div></div>`).join('')||'<div class="muted">No work records.</div>'}</div><div class="panel"><h3>My Recent Complaints</h3>${(complaints||[]).map(x=>`<div class="activity-item"><div class="activity-icon">⚑</div><div><strong>${x.subject||x.title||x.description||x.message||'Complaint'}</strong><p>${x.status||'Submitted'} · ${x.created_at?new Date(x.created_at).toLocaleDateString('en-IN'):''}</p></div></div>`).join('')||'<div class="muted">No complaints submitted.</div>'}</div></div>`;
     }else if(p==='complaints'){
       const {data:rows,error}=await sb.from('complaints').select('*').eq('user_id',user.id).order('created_at',{ascending:false});
       if(error)throw error;
