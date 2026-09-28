@@ -3631,9 +3631,23 @@ async function adminMonthlySecurityPage(user){
                 const statusSelect=tbody.querySelector(`.monthly-security-status-select[data-user-id="${CSS.escape(userId)}"]`);
                 const amount=Number(amountInput?.value||0);
                 const status=String(statusSelect?.value||'Pending');
-                if(!Number.isFinite(amount)||amount<100){
-                    toast('Please enter a valid amount.');return;
+              
+                //if(!Number.isFinite(amount)||amount<100){
+               //     toast('Please enter a valid amount.');return;
+              //  }
+
+                if(!Number.isFinite(amount) || amount < 0){
+                    toast('Please enter a valid amount.');
+                    amountInput?.focus();
+                    return;
                 }
+
+                if(status.toLowerCase() === 'completed' && amount < 100){
+                    toast('For Completed payment, minimum amount should be ₹100.');
+                    amountInput?.focus();
+                    return;
+                }
+                
                 btn.disabled=true;
                 btn.textContent='Updating...';
                 try{
