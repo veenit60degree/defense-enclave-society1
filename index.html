@@ -4409,7 +4409,7 @@ async function adminMonthlySecurityPage(user){
         if(updateBtn){updateBtn.disabled=true;updateBtn.textContent='Saving...';}
         try{
             const paymentMonth=`${selectedMonth}-01`;
-            const dbStatus=uiStatus.toLowerCase()==='completed'?'completed':'pending';
+            const dbStatus=uiStatus.trim().toLowerCase()==='completed'?'paid':'pending';
             const existing=item.row;
             let result;
             if(existing?.id){
@@ -4768,6 +4768,7 @@ async function memberPage(p,user){
   const allowedPages=['dash','finance','profile','complaints','work','events','gallery'];
   if(!allowedPages.includes(p))p='dash';
   window.__memberCurrentPage=p;
+  window.__memberLastNavigationPage=p;
   saveCurrentSection('defenseEnclaveMemberPage',p);
   document.querySelectorAll('#memberApp .nav-item').forEach(b=>b.classList.toggle('active',b.dataset.p===p));
   t.textContent={dash:'Member Dashboard',finance:'Society Finance',profile:'My Profile',complaints:'Complaints',work:'Society Work',events:'Events',gallery:'Photo Gallery'}[p]||'Member Dashboard';
@@ -4956,13 +4957,14 @@ async function memberPage(p,user){
         ${v.updated_at?`<div class="muted" style="margin-top:14px">Last updated: ${new Date(v.updated_at).toLocaleString('en-IN')}</div>`:''}
       </div>`;
     }else if(p==='dash'){
-      const [{data:finance},{data:work},{data:complaints},{data:monthlySecurity,error:monthlySecurityError}]=await Promise.all([
+      const [{data:finance},{data:work},{data:complaints},{data:monthlySecurityRows,error:monthlySecurityError}]=await Promise.all([
         sb.from('society_finance').select('*').eq('id',1).maybeSingle(),
         sb.from('society_work').select('*').order('created_at',{ascending:false}).limit(6),
         sb.from('complaints').select('*').eq('user_id',user.id).order('created_at',{ascending:false}).limit(5),
         sb.from('monthly_security_payments').select('id,amount,payment_status,payment_month,updated_at').eq('user_id',user.id).gte('payment_month', monthlySecurityMonthValue()+'-01').lt('payment_month', (()=>{const d=new Date(); const n=new Date(d.getFullYear(),d.getMonth()+1,1); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-01`;})()).order('updated_at',{ascending:false}).limit(1).maybeSingle()
       ]);
       if(monthlySecurityError) console.warn('Member Monthly Security load:',monthlySecurityError.message);
+      const monthlySecurity=Array.isArray(monthlySecurityRows)?(monthlySecurityRows[0]||null):(monthlySecurityRows||null);
       const memberSecurityStatus=monthlySecurityStatus(monthlySecurity||null);
       const memberSecurityAmount=monthlySecurityAmount(monthlySecurity||null,{});
       const memberSecurityCompleted=memberSecurityStatus==='Completed';
@@ -5346,7 +5348,15 @@ if(sb && sb.auth){
 
                     // Refresh the currently visible dashboard with the
                     // database role instead of a stale/undefined role.
-                    if(isAdminRole(role)){
+                    if(event==='TOKEN_REFRESHED'){
+                        if(isAdminRole(role)){
+                            const savedAdmin=loadCurrentSection('defenseEnclaveAdminPage',window.__adminCurrentPage||'dashboard');
+                            await adminPage(savedAdmin,window.__adminUser);
+                        }else{
+                            const savedMember=window.__memberLastNavigationPage || loadCurrentSection('defenseEnclaveMemberPage',window.__memberCurrentPage||'dash');
+                            await memberPage(savedMember,window.__adminUser);
+                        }
+                    }else if(isAdminRole(role)){
                         await openAdminDashboard(window.__adminUser);
                     }else{
                         await openMemberDashboard(window.__adminUser);
