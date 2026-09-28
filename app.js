@@ -3454,6 +3454,13 @@ async function adminPage(p,user){
  if(!allowedAdminPages.includes(p))p='dashboard';
  window.__adminCurrentPage=p;
  saveCurrentSection('defenseEnclaveAdminPage',p);
+ saveCurrentSection('defenseEnclaveLastVisiblePage',p);
+ if(p==='monthlySecurity'){
+   saveCurrentSection('defenseEnclaveMonthlySecurityPage','monthlySecurity');
+ }else{
+   try{localStorage.removeItem('defenseEnclaveMonthlySecurityPage');}catch(_){ }
+   try{sessionStorage.removeItem('defenseEnclaveMonthlySecurityPage');}catch(_){ }
+ }
  document.querySelectorAll('#memberApp .nav-item').forEach(b=>b.classList.toggle('active',b.dataset.a===p));
  const titles={dashboard:'Admin Dashboard',finance:'Society Finance',monthlySecurity:'Monthly Security',profile:'My Profile',maintenance:'Active Maintenance',work:'Society Work',events:'Events',gallery:'Photo Gallery',members:'Members',complaints:'Complaints',map:'Society Map',about:'About Society'}; t.textContent=titles[p]||'Admin Dashboard';
 
