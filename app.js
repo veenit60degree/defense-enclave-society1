@@ -3624,47 +3624,72 @@ async function adminMonthlySecurityPage(user){
           </tr>`).join('');
         document.getElementById('monthlySecurityEmpty').style.display=rows.length?'none':'block';
 
+
         tbody.querySelectorAll('.monthly-security-update-btn').forEach(btn=>{
             btn.onclick=async()=>{
                 const userId=btn.dataset.userId;
-                const amountInput=tbody.querySelector(`.monthly-security-amount[data-user-id="${CSS.escape(userId)}"]`);
-                const statusSelect=tbody.querySelector(`.monthly-security-status-select[data-user-id="${CSS.escape(userId)}"]`);
+        
+                const amountInput=tbody.querySelector(
+                    `.monthly-security-amount[data-user-id="${CSS.escape(userId)}"]`
+                );
+        
+                const statusSelect=tbody.querySelector(
+                    `.monthly-security-status-select[data-user-id="${CSS.escape(userId)}"]`
+                );
+        
                 const amount=Number(amountInput?.value||0);
                 const status=String(statusSelect?.value||'Pending');
-              
-                //if(!Number.isFinite(amount)||amount<100){
-               //     toast('Please enter a valid amount.');return;
-              //  }
-
+        
+                // Amount must always be a valid non-negative number
                 if(!Number.isFinite(amount) || amount < 0){
                     toast('Please enter a valid amount.');
                     amountInput?.focus();
                     return;
                 }
-
+        
+                // Completed payment must be minimum ₹100
                 if(status.toLowerCase() === 'completed' && amount < 100){
                     toast('For Completed payment, minimum amount should be ₹100.');
                     amountInput?.focus();
                     return;
                 }
-                
+        
                 btn.disabled=true;
                 btn.textContent='Updating...';
+        
                 try{
-                    const payload={user_id:userId,payment_month:sel.value+'-01',amount,payment_status:status.toLowerCase(),updated_at:new Date().toISOString()};
-                    const {error}=await sb.from('monthly_security_payments').upsert(payload,{onConflict:'user_id,payment_month'});
-                    if(error)throw error;
+                    const payload={
+                        user_id:userId,
+                        payment_month:sel.value+'-01',
+                        amount,
+                        payment_status:status.toLowerCase(),
+                        updated_at:new Date().toISOString()
+                    };
+        
+                    const {error}=await sb
+                        .from('monthly_security_payments')
+                        .upsert(payload,{
+                            onConflict:'user_id,payment_month'
+                        });
+        
+                    if(error) throw error;
+        
                     toast('Monthly Security payment updated.');
                     await loadAndRender();
+        
                 }catch(e){
                     console.error('Monthly Security update error:',e);
                     toast('Unable to update payment: '+(e?.message||e));
+        
                     btn.disabled=false;
                     btn.textContent='Update';
                 }
             };
         });
+    
     }
+
+    
     sel.onchange=loadAndRender;
     document.getElementById('monthlySecuritySearch').oninput=render;
     document.getElementById('monthlySecurityExport').onclick=()=>adminExportMonthlySecurity(state,sel.value);
