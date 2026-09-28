@@ -664,3 +664,18 @@
   .admin-profile-panel{width:100%;box-sizing:border-box;}
   .admin-profile-hero{gap:12px;}
 }
+
+
+/* Monthly Security editable payment controls */
+.monthly-security-message{padding:12px 0;min-height:20px}
+.monthly-security-amount,.monthly-security-status-select{box-sizing:border-box;width:100%;min-width:110px;height:38px;border:1px solid #d0d5dd;border-radius:8px;background:#fff;padding:7px 10px;color:#172b30;font:inherit}
+.monthly-security-amount:focus,.monthly-security-status-select:focus{outline:2px solid rgba(11,168,121,.18);border-color:#0ba879}
+.monthly-security-update-btn{padding:8px 13px!important;white-space:nowrap}
+.admin-monthly-security-table-scroll .table{min-width:1100px}
+.admin-monthly-security-table-scroll tr.monthly-security-paid td{background:#ecfdf3!important}
+.admin-monthly-security-table-scroll tr.monthly-security-pending td{background:#fff1f1!important}
+@media(max-width:720px){
+ .monthly-security-actions{width:100%}
+ .monthly-security-actions .primary-btn{width:100%}
+ .monthly-security-amount,.monthly-security-status-select{min-width:105px}
+}
