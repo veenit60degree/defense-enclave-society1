@@ -3628,6 +3628,7 @@ async function adminMonthlySecurityPage(user){
       tbody.querySelectorAll('.monthly-security-update-btn').forEach(btn => {
     btn.onclick = async () => {
 
+       console.log('=========== 1');
         const userId = btn.dataset.userId;
 
         const amountInput = tbody.querySelector(
@@ -3664,6 +3665,7 @@ async function adminMonthlySecurityPage(user){
             return;
         }
 
+        console.log('=========== 2');
         // ---------------------------------------------------------
         // Convert UI status to database status
         //
@@ -3691,6 +3693,8 @@ async function adminMonthlySecurityPage(user){
                 throw new Error('Please select a payment month.');
             }
 
+            console.log('=========== 3');
+
             const paymentMonth = `${sel.value}-01`;
 
             // -----------------------------------------------------
@@ -3704,6 +3708,7 @@ async function adminMonthlySecurityPage(user){
                 updated_at: new Date().toISOString()
             };
 
+            console.log('========= MONTHLY SECURITY DEBUG ==========');
             console.log('STATUS SELECT VALUE:', statusSelect?.value);
             console.log('DATABASE STATUS:', databaseStatus);
             console.log('AMOUNT:', amount);
@@ -3711,6 +3716,7 @@ async function adminMonthlySecurityPage(user){
             
             console.log('Monthly Security Update:', JSON.stringify(payload, null, 2) );
 
+            console.log('=========== 4');
             // -----------------------------------------------------
             // Update / Insert payment
             // -----------------------------------------------------
@@ -3747,6 +3753,7 @@ async function adminMonthlySecurityPage(user){
 
         } catch (e) {
 
+          console.log('=========== 5');
             console.error(
                 'Monthly Security update error:',
                 e
