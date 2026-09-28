@@ -679,20 +679,3 @@
  .monthly-security-actions .primary-btn{width:100%}
  .monthly-security-amount,.monthly-security-status-select{min-width:105px}
 }
-
-/* Member Dashboard - Monthly Security payment status */
-.member-security-status-panel{margin:20px 0;padding:18px 20px;border:1px solid #e2e8f0;border-radius:14px;box-sizing:border-box}
-.member-security-pending{background:#fff1f1!important;border-color:#fecaca!important}
-.member-security-completed{background:#ecfdf3!important;border-color:#bbf7d0!important}
-.member-security-status-head{display:flex;align-items:center;justify-content:space-between;gap:16px}
-.member-security-status-head h3{margin:0 0 4px}
-.member-security-badge{display:inline-flex;align-items:center;justify-content:center;padding:6px 12px;border-radius:999px;font-size:13px;font-weight:700;white-space:nowrap}
-.member-security-pending .member-security-badge{background:#fee2e2;color:#b42318}
-.member-security-completed .member-security-badge{background:#d1fadf;color:#027a48}
-.member-security-status-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-top:16px}
-.member-security-status-body>div{display:flex;flex-direction:column;gap:4px}
-.member-security-status-body strong{font-size:20px;color:#172b30}
-@media(max-width:600px){
- .member-security-status-head{align-items:flex-start;flex-direction:column}
- .member-security-status-body{grid-template-columns:1fr}
-}
