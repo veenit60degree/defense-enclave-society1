@@ -38,6 +38,66 @@ function clearCurrentSections(){
     });
 }
 
+/* Preserve the currently open portal page when the browser tab is hidden,
+   restored, or a Supabase token refresh rebuilds the portal shell. */
+(function setupPortalPagePersistence(){
+  const adminPages=['dashboard','finance','profile','maintenance','monthlySecurity','work','events','gallery','members','complaints','map','about'];
+  const memberPages=['dash','finance','profile','complaints','work','events','gallery'];
+  let restoring=false;
+  // Monthly Security has its own restore key because its content is loaded
+  // asynchronously and can otherwise be replaced by a dashboard rebuild
+  // during a browser-tab visibility/auth refresh.
+  function saveVisiblePortalPage(){
+    try{
+      if(window.__adminCurrentPage){
+        saveCurrentSection('defenseEnclaveAdminPage',window.__adminCurrentPage);
+        saveCurrentSection('defenseEnclaveLastVisiblePage',window.__adminCurrentPage);
+        if(window.__adminCurrentPage==='monthlySecurity'){
+          saveCurrentSection('defenseEnclaveMonthlySecurityPage','monthlySecurity');
+        }
+      }
+      if(window.__memberCurrentPage){
+        saveCurrentSection('defenseEnclaveMemberPage',window.__memberCurrentPage);
+      }
+    }catch(_){ }
+  }
+  async function restoreCurrentPortalPage(force=false){
+    if(restoring) return;
+    restoring=true;
+    try{
+      const app=document.getElementById('memberApp');
+      if(!app || app.classList.contains('hidden')) return;
+      const user=window.__adminUser;
+      if(!user) return;
+      const role=normalizeRole(user.role||'member');
+      if(isAdminRole(role) && typeof adminPage==='function'){
+        const savedLast=loadCurrentSection('defenseEnclaveLastVisiblePage','');
+        const savedMonthly=loadCurrentSection('defenseEnclaveMonthlySecurityPage','');
+        const saved= savedMonthly==='monthlySecurity' && (savedLast==='monthlySecurity' || window.__adminCurrentPage==='monthlySecurity')
+          ? 'monthlySecurity'
+          : loadCurrentSection('defenseEnclaveAdminPage',window.__adminCurrentPage||'dashboard');
+        const page=adminPages.includes(saved)?saved:'dashboard';
+        if(force || window.__adminCurrentPage!==page){
+          await adminPage(page,user);
+        }
+      }else if(typeof memberPage==='function'){
+        const saved=loadCurrentSection('defenseEnclaveMemberPage',window.__memberCurrentPage||'dash');
+        const page=memberPages.includes(saved)?saved:'dash';
+        if(force || window.__memberCurrentPage!==page) await memberPage(page,user);
+      }
+    }catch(e){console.warn('Portal page restore:',e)}
+    finally{restoring=false;}
+  }
+  document.addEventListener('visibilitychange',()=>{
+    if(document.visibilityState==='hidden') saveVisiblePortalPage();
+    if(document.visibilityState==='visible') setTimeout(restoreCurrentPortalPage,80);
+  });
+  window.addEventListener('pageshow',()=>setTimeout(restoreCurrentPortalPage,80));
+  window.addEventListener('pagehide',()=>{
+    saveVisiblePortalPage();
+  });
+})();
+
 function publicSectionByHeading(labels){
     const wanted=(labels||[]).map(x=>String(x).trim().toLowerCase());
     const nodes=[...document.querySelectorAll('section,article,.section,.panel,main > div,body > div')];
@@ -3487,9 +3547,17 @@ function monthlySecurityMoney(value){
     const n=Number(value||0);
     return Number.isFinite(n)?n:0;
 }
+function monthlySecurityMonthFromRow(row){
+    const raw=row?.payment_month ?? row?.month ?? row?.created_at;
+    if(!raw)return '';
+    const iso=String(raw).match(/^(\d{4})-(\d{1,2})(?:-|T|\s|$)/);
+    if(iso)return `${iso[1]}-${String(Number(iso[2])).padStart(2,'0')}`;
+    const d=new Date(raw);
+    return Number.isNaN(d.getTime())?'':monthlySecurityMonthValue(d);
+}
 function monthlySecurityStatus(row){
     const v=String(row?.payment_status ?? row?.status ?? 'pending').trim().toLowerCase();
-    return ['completed','complete','paid'].includes(v) ? 'Completed' : 'Pending';
+    return ['paid','completed','complete','done','success','successful','received'].includes(v) ? 'Completed' : 'Pending';
 }
 function monthlySecurityMonthRange(month){
     const [y,m]=String(month).split('-').map(Number);
@@ -4289,10 +4357,12 @@ async function memberPage(p,user){
         sb.from('society_finance').select('*').eq('id',1).maybeSingle(),
         sb.from('society_work').select('*').order('created_at',{ascending:false}).limit(6),
         sb.from('complaints').select('*').eq('user_id',user.id).order('created_at',{ascending:false}).limit(5),
-        sb.from('monthly_security_payments').select('id,amount,payment_status,payment_month,updated_at').eq('user_id',user.id).gte('payment_month',monthlySecurityMonthValue()+'-01').lt('payment_month',(()=>{const d=new Date();const n=new Date(d.getFullYear(),d.getMonth()+1,1);return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-01`;})()).order('updated_at',{ascending:false}).limit(1)
+        sb.from('monthly_security_payments').select('id,amount,payment_status,payment_month,updated_at,created_at').eq('user_id',user.id).order('updated_at',{ascending:false}).limit(36)
       ]);
       if(monthlySecurityError) console.warn('Member Monthly Security load:',monthlySecurityError.message);
-      const monthlySecurity=Array.isArray(monthlySecurityRows)?(monthlySecurityRows[0]||null):(monthlySecurityRows||null);
+      const currentSecurityMonth=monthlySecurityMonthValue();
+      const monthlySecurityList=Array.isArray(monthlySecurityRows)?monthlySecurityRows:(monthlySecurityRows?[monthlySecurityRows]:[]);
+      const monthlySecurity=monthlySecurityList.find(r=>monthlySecurityMonthFromRow(r)===currentSecurityMonth)||null;
       const memberSecurityStatus=monthlySecurityStatus(monthlySecurity||null);
       const memberSecurityAmount=monthlySecurityAmount(monthlySecurity||{});
       const memberSecurityCompleted=memberSecurityStatus==='Completed';
@@ -4601,6 +4671,7 @@ async function restoreLoginSession(){
         };
 
         window.__adminUser=user;
+        window.__portalShownFor=authUser.id+':'+user.role;
 
         document.getElementById('authModal')?.classList.add('hidden');
         document.getElementById('authOverlay')?.classList.add('hidden');
@@ -4674,6 +4745,15 @@ if(sb && sb.auth){
                         window.__adminUser.role
                     );
 
+                    // Supabase fires SIGNED_IN / TOKEN_REFRESHED whenever a tab regains
+                    // focus. If the portal is already open for this same user and role,
+                    // keep the current page exactly as it is instead of rebuilding it.
+                    const portalOpen=!document.getElementById('memberApp')?.classList.contains('hidden');
+                    if(portalOpen && window.__portalShownFor===authUser.id+':'+role){
+                        return;
+                    }
+                    window.__portalShownFor=authUser.id+':'+role;
+
                     // Refresh the currently visible dashboard with the
                     // database role instead of a stale/undefined role.
                     if(event==='TOKEN_REFRESHED'){
@@ -4697,6 +4777,7 @@ if(sb && sb.auth){
 
         if(event==='SIGNED_OUT'){
             window.__adminUser=null;
+            window.__portalShownFor=null;
             document.getElementById('memberApp')?.classList.add('hidden');
             document.getElementById('public')?.classList.remove('hidden');
             setPublicLoginButtonVisible(true);
