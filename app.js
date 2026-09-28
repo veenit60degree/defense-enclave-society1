@@ -1030,6 +1030,7 @@ function openAdminDashboard(user){
  app.innerHTML=`<aside class="sidebar"><div class="brand"><div class="brand-mark">DE</div><div><strong>Defense Enclave</strong><span>Admin Portal</span></div></div><nav>
  <button class="nav-item active" data-a="dashboard">⌂ <span>Dashboard</span></button>
  <button class="nav-item" data-a="finance">₹ <span>Society Finance</span></button>
+ <button class="nav-item" data-a="monthlySecurity">🛡 <span>Monthly Security</span></button>
  <button class="nav-item" data-a="profile">♙ <span>My Profile</span></button>
  <button class="nav-item" data-a="maintenance">▣ <span>Maintenance</span></button>
  <button class="nav-item" data-a="work">⚙ <span>Society Work</span></button>
@@ -1057,7 +1058,7 @@ function openAdminDashboard(user){
  };
  let savedAdminPage='dashboard';
  savedAdminPage=loadCurrentSection('defenseEnclaveAdminPage','dashboard');
- const validAdminPages=['dashboard','finance','profile','maintenance','work','events','gallery','members','complaints','map','about'];
+ const validAdminPages=['dashboard','finance','monthlySecurity','profile','maintenance','work','events','gallery','members','complaints','map','about'];
  if(!validAdminPages.includes(savedAdminPage))savedAdminPage='dashboard';
  adminPage(savedAdminPage,user);
 }
@@ -3449,12 +3450,227 @@ async function adminProfilePage(user){
 
 async function adminPage(p,user){
  const c=document.getElementById('adminContent'),t=document.getElementById('adminTitle');
- const allowedAdminPages=['dashboard','finance','profile','maintenance','work','events','gallery','members','complaints','map','about'];
+ const allowedAdminPages=['dashboard','finance','monthlySecurity','profile','maintenance','work','events','gallery','members','complaints','map','about'];
  if(!allowedAdminPages.includes(p))p='dashboard';
  window.__adminCurrentPage=p;
  saveCurrentSection('defenseEnclaveAdminPage',p);
  document.querySelectorAll('#memberApp .nav-item').forEach(b=>b.classList.toggle('active',b.dataset.a===p));
- const titles={dashboard:'Admin Dashboard',finance:'Society Finance',profile:'My Profile',maintenance:'Active Maintenance',work:'Society Work',events:'Events',gallery:'Photo Gallery',members:'Members',complaints:'Complaints',map:'Society Map',about:'About Society'}; t.textContent=titles[p]||'Admin Dashboard';
+ const titles={dashboard:'Admin Dashboard',finance:'Society Finance',monthlySecurity:'Monthly Security',profile:'My Profile',maintenance:'Active Maintenance',work:'Society Work',events:'Events',gallery:'Photo Gallery',members:'Members',complaints:'Complaints',map:'Society Map',about:'About Society'}; t.textContent=titles[p]||'Admin Dashboard';
+
+/* =========================================================
+   MONTHLY SECURITY
+   Admin/SuperAdmin can review and update each member's monthly
+   security payment. Payment data is stored in
+   public.monthly_security_payments.
+   ========================================================= */
+function monthlySecurityMonthValue(date=new Date()){
+    const y=date.getFullYear();
+    const m=String(date.getMonth()+1).padStart(2,'0');
+    return `${y}-${m}`;
+}
+function monthlySecurityMonthLabel(value){
+    const [y,m]=String(value||'').split('-').map(Number);
+    if(!y || !m) return String(value||'');
+    return new Date(y,m-1,1).toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+}
+function monthlySecurityEsc(value){
+    return String(value??'').replace(/[&<>'"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
+}
+function monthlySecurityMoney(value){
+    const n=Number(value||0);
+    return Number.isFinite(n)?n:0;
+}
+function monthlySecurityStatus(row){
+    const v=String(row?.payment_status ?? row?.status ?? 'pending').trim().toLowerCase();
+    return ['completed','complete','paid'].includes(v) ? 'Completed' : 'Pending';
+}
+function monthlySecurityMonthRange(month){
+    const [y,m]=String(month).split('-').map(Number);
+    const start=`${y}-${String(m).padStart(2,'0')}-01`;
+    const nextDate=new Date(y,m,1);
+    const next=`${nextDate.getFullYear()}-${String(nextDate.getMonth()+1).padStart(2,'0')}-01`;
+    return {start,next};
+}
+
+async function monthlySecurityLoadRows(month){
+    if(!sb) throw new Error('Supabase is not configured.');
+    const {start,next}=monthlySecurityMonthRange(month);
+    const {data:profiles,error:profileError}=await sb
+        .from('profiles')
+        .select('id,full_name,name,email,address,phone,role')
+        .order('full_name',{ascending:true});
+    if(profileError) throw profileError;
+
+    const {data:payments,error:paymentError}=await sb
+        .from('monthly_security_payments')
+        .select('id,user_id,payment_month,amount,payment_status,created_at,updated_at')
+        .gte('payment_month',start)
+        .lt('payment_month',next);
+    if(paymentError) throw paymentError;
+
+    const paymentByUser=new Map((payments||[]).map(row=>[String(row.user_id),row]));
+    const members=(profiles||[]).filter(p=>String(p.role||'').toLowerCase()==='member');
+    return {profiles:members,paymentByUser};
+}
+
+function adminMonthlySecurityRows(state,month){
+    return (state?.profiles||[]).map(profile=>{
+        const payment=state.paymentByUser.get(String(profile.id))||null;
+        return {
+            id:profile.id,
+            paymentId:payment?.id||'',
+            name:profile.full_name||profile.name||'',
+            email:profile.email||'',
+            address:profile.address||'',
+            phone:profile.phone||'',
+            amount:monthlySecurityMoney(payment?.amount),
+            status:monthlySecurityStatus(payment)
+        };
+    });
+}
+
+async function adminMonthlySecurityPage(user){
+    const c=document.getElementById('adminContent');
+    const month=window.__monthlySecurityMonth||monthlySecurityMonthValue();
+    window.__monthlySecurityMonth=month;
+
+    c.innerHTML=`
+      <div class="hero monthly-security-hero">
+        <div>
+          <div class="eyebrow">ADMINISTRATION</div>
+          <h2>Monthly Security</h2>
+          <div class="muted">Manage monthly security payments for all society members.</div>
+        </div>
+        <div class="monthly-security-actions">
+          <button class="primary-btn" type="button" id="monthlySecurityExport">Export Excel</button>
+        </div>
+      </div>
+      <div class="panel monthly-security-toolbar">
+        <div class="monthly-security-toolbar-grid">
+          <label>Month
+            <select id="monthlySecurityMonth"></select>
+          </label>
+          <label class="monthly-security-search-label">Search Members
+            <input id="monthlySecuritySearch" type="search" placeholder="Search name, email, phone or address" autocomplete="off">
+          </label>
+        </div>
+      </div>
+      <div class="stats monthly-security-stats">
+        <div class="stat"><div class="stat-head">Total Collection<span>₹</span></div><div class="value" id="monthlySecurityTotal">₹0</div><div class="trend" id="monthlySecurityMonthLabel">${monthlySecurityEsc(monthlySecurityMonthLabel(month))}</div></div>
+        <div class="stat"><div class="stat-head">Paid Members<span>✓</span></div><div class="value" id="monthlySecurityPaid">0</div><div class="trend">Completed</div></div>
+        <div class="stat"><div class="stat-head">Pending Members<span>!</span></div><div class="value" id="monthlySecurityPending">0</div><div class="trend">Pending</div></div>
+      </div>
+      <div id="monthlySecurityMessage" class="muted monthly-security-message"></div>
+      <div class="panel">
+        <div class="table-wrap admin-monthly-security-table-scroll">
+          <table class="table" id="monthlySecurityTable">
+            <thead><tr><th>Name</th><th>Email</th><th>Address</th><th>Phone</th><th>Amount</th><th>Payment Status</th><th>Action</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div id="monthlySecurityEmpty" class="muted" style="display:none;padding:18px">No members found.</div>
+      </div>`;
+
+    const sel=document.getElementById('monthlySecurityMonth');
+    const now=new Date();
+    for(let i=0;i<24;i++){
+        const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+        const v=monthlySecurityMonthValue(d);
+        sel.insertAdjacentHTML('beforeend',`<option value="${v}">${monthlySecurityMonthLabel(v)}</option>`);
+    }
+    sel.value=month;
+
+    let state=null;
+    async function loadAndRender(){
+        const selected=sel.value;
+        window.__monthlySecurityMonth=selected;
+        const msg=document.getElementById('monthlySecurityMessage');
+        msg.textContent='Loading monthly security data...';
+        try{
+            state=await monthlySecurityLoadRows(selected);
+            render();
+            msg.textContent=`${state.profiles.length} member${state.profiles.length===1?'':'s'} shown · ${monthlySecurityMonthLabel(selected)}`;
+        }catch(e){
+            console.error('Monthly Security load error:',e);
+            state=null;
+            document.querySelector('#monthlySecurityTable tbody').innerHTML='';
+            document.getElementById('monthlySecurityEmpty').style.display='none';
+            msg.innerHTML=`<span style="color:#b42318">Unable to load Monthly Security: ${monthlySecurityEsc(e?.message||e)}</span>`;
+        }
+    }
+    function render(){
+        if(!state)return;
+        const q=String(document.getElementById('monthlySecuritySearch').value||'').trim().toLowerCase();
+        const all=adminMonthlySecurityRows(state,sel.value);
+        const rows=all.filter(x=>[x.name,x.email,x.address,x.phone].some(v=>String(v||'').toLowerCase().includes(q)));
+        const total=all.filter(x=>x.status==='Completed').reduce((sum,x)=>sum+x.amount,0);
+        document.getElementById('monthlySecurityTotal').textContent='₹'+total.toLocaleString('en-IN');
+        document.getElementById('monthlySecurityPaid').textContent=String(all.filter(x=>x.status==='Completed').length);
+        document.getElementById('monthlySecurityPending').textContent=String(all.filter(x=>x.status!=='Completed').length);
+        document.getElementById('monthlySecurityMonthLabel').textContent=monthlySecurityMonthLabel(sel.value);
+        const tbody=document.querySelector('#monthlySecurityTable tbody');
+        tbody.innerHTML=rows.map(x=>`
+          <tr class="${x.status==='Completed'?'monthly-security-paid':'monthly-security-pending'}" data-user-id="${monthlySecurityEsc(x.id)}">
+            <td><strong>${monthlySecurityEsc(x.name||'—')}</strong></td>
+            <td>${monthlySecurityEsc(x.email||'—')}</td>
+            <td>${monthlySecurityEsc(x.address||'—')}</td>
+            <td>${monthlySecurityEsc(x.phone||'—')}</td>
+            <td><input class="monthly-security-amount" type="number" min="0" step="0.01" value="${x.amount}" data-user-id="${monthlySecurityEsc(x.id)}" aria-label="Amount for ${monthlySecurityEsc(x.name||'member')}"></td>
+            <td><select class="monthly-security-status-select" data-user-id="${monthlySecurityEsc(x.id)}" aria-label="Payment status for ${monthlySecurityEsc(x.name||'member')}">
+              <option value="Pending" ${x.status==='Pending'?'selected':''}>Pending</option>
+              <option value="Completed" ${x.status==='Completed'?'selected':''}>Completed</option>
+            </select></td>
+            <td><button type="button" class="primary-btn monthly-security-update-btn" data-user-id="${monthlySecurityEsc(x.id)}">Update</button></td>
+          </tr>`).join('');
+        document.getElementById('monthlySecurityEmpty').style.display=rows.length?'none':'block';
+
+        tbody.querySelectorAll('.monthly-security-update-btn').forEach(btn=>{
+            btn.onclick=async()=>{
+                const userId=btn.dataset.userId;
+                const amountInput=tbody.querySelector(`.monthly-security-amount[data-user-id="${CSS.escape(userId)}"]`);
+                const statusSelect=tbody.querySelector(`.monthly-security-status-select[data-user-id="${CSS.escape(userId)}"]`);
+                const amount=Number(amountInput?.value||0);
+                const status=String(statusSelect?.value||'Pending');
+                if(!Number.isFinite(amount)||amount<0){toast('Please enter a valid amount.');return;}
+                btn.disabled=true;
+                btn.textContent='Updating...';
+                try{
+                    const payload={user_id:userId,payment_month:sel.value+'-01',amount,payment_status:status.toLowerCase(),updated_at:new Date().toISOString()};
+                    const {error}=await sb.from('monthly_security_payments').upsert(payload,{onConflict:'user_id,payment_month'});
+                    if(error)throw error;
+                    toast('Monthly Security payment updated.');
+                    await loadAndRender();
+                }catch(e){
+                    console.error('Monthly Security update error:',e);
+                    toast('Unable to update payment: '+(e?.message||e));
+                    btn.disabled=false;
+                    btn.textContent='Update';
+                }
+            };
+        });
+    }
+    sel.onchange=loadAndRender;
+    document.getElementById('monthlySecuritySearch').oninput=render;
+    document.getElementById('monthlySecurityExport').onclick=()=>adminExportMonthlySecurity(state,sel.value);
+    await loadAndRender();
+}
+
+function adminExportMonthlySecurity(state,month){
+    if(!state)return toast('Monthly Security data is not loaded.');
+    const rows=adminMonthlySecurityRows(state,month);
+    const total=rows.filter(x=>x.status==='Completed').reduce((sum,x)=>sum+x.amount,0);
+    const esc=v=>monthlySecurityEsc(v);
+    const body=rows.map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.email)}</td><td>${esc(x.address)}</td><td>${esc(x.phone)}</td><td>${x.amount.toFixed(2)}</td><td>${esc(x.status)}</td></tr>`).join('');
+    const html=`<html><head><meta charset="UTF-8"></head><body><h2>Monthly Security - ${esc(monthlySecurityMonthLabel(month))}</h2><table border="1"><tr><th>Name</th><th>Email</th><th>Address</th><th>Phone</th><th>Amount</th><th>Payment Status</th></tr>${body}<tr><td colspan="4"><strong>Amount Total</strong></td><td><strong>${total.toFixed(2)}</strong></td><td></td></tr></table></body></html>`;
+    const blob=new Blob([html],{type:'application/vnd.ms-excel'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;a.download=`Monthly-Security-${month}.xls`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
+ if(p==='monthlySecurity'){
+  await adminMonthlySecurityPage(user);
+  return;
+ }
  if(p==='profile'){
   await adminProfilePage(user);
   return;
@@ -3473,6 +3689,7 @@ async function adminPage(p,user){
   <div class="grid-2-equal"><div class="panel"><h3>Management</h3><div class="muted">Use the sections below to manage saved society records.</div></div>
   <div class="panel"><h3>Quick actions</h3><div class="form-grid">
   <button class="primary-btn" onclick="adminPage('finance',window.__adminUser)">Finance</button>
+  <button class="primary-btn" onclick="adminPage('monthlySecurity',window.__adminUser)">Monthly Security</button>
   <button class="primary-btn" onclick="adminPage('maintenance',window.__adminUser)">Maintenance</button>
   <button class="primary-btn" onclick="adminPage('work',window.__adminUser)">Society Work</button>
   <button class="primary-btn" onclick="adminPage('events',window.__adminUser)">Events</button>
