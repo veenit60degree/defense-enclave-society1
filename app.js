@@ -3662,7 +3662,7 @@ async function adminMonthlySecurityPage(user){
                         user_id:userId,
                         payment_month:sel.value+'-01',
                         amount,
-                        payment_status:status.toLowerCase(),
+                        payment_status: status.toLowerCase() === 'completed' ? 'paid' : 'pending' ,
                         updated_at:new Date().toISOString()
                     };
         
