@@ -3704,10 +3704,12 @@ async function adminMonthlySecurityPage(user){
                 updated_at: new Date().toISOString()
             };
 
-            console.log(
-                'Monthly Security Update:',
-                JSON.stringify(payload, null, 2)
-            );
+            console.log('STATUS SELECT VALUE:', statusSelect?.value);
+            console.log('DATABASE STATUS:', databaseStatus);
+            console.log('AMOUNT:', amount);
+            console.log('PAYLOAD:', payload);
+            
+            console.log('Monthly Security Update:', JSON.stringify(payload, null, 2) );
 
             // -----------------------------------------------------
             // Update / Insert payment
