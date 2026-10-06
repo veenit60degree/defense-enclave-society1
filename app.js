@@ -4896,3 +4896,4 @@ async function ensureDynamicAboutFields() {
    This build intentionally does not clear Supabase auth storage,
    cookies, localStorage, or sessionStorage during page initialization.
 */
+    
