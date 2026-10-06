@@ -848,6 +848,161 @@ img{max-width:100%;height:auto}
 .member-security-completed .member-security-status{background:#e8f7f2;color:#067a55;border-color:#bfe8d7}
 @media(max-width:520px){.member-monthly-security-card{padding:16px 16px 16px 20px!important}.member-security-icon{width:40px;height:40px;font-size:19px}}
 </style>
+<style id="material-design-theme">
+/* ============ Material Design 3 inspired theme ============
+   Layered on top of the existing component classes. No markup/JS changes needed. */
+:root{
+  --md-primary:#0ba879;
+  --md-primary-600:#089068;
+  --md-primary-700:#077a58;
+  --md-primary-container:#d7f4e8;
+  --md-on-primary:#ffffff;
+  --md-on-primary-container:#04402c;
+  --md-surface:#ffffff;
+  --md-surface-dim:#eef2f4;
+  --md-surface-variant:#f3f7f6;
+  --md-surface-hover:#f3faf7;
+  --md-outline:#dce6e5;
+  --md-outline-soft:#e8eeed;
+  --md-on-surface:#16222a;
+  --md-on-surface-variant:#5c6c6f;
+  --md-error:#b3261e;
+  --md-error-container:#ffe3e1;
+  --md-warn:#95660a;
+  --md-warn-container:#fff2d1;
+  --md-info:#3a56a8;
+  --md-info-container:#e6ecff;
+  --md-success:#077a58;
+  --md-success-container:#d7f4e8;
+  --e1:0 1px 2px rgba(15,30,32,.06),0 1px 3px rgba(15,30,32,.08);
+  --e2:0 2px 6px rgba(15,30,32,.07),0 6px 16px rgba(15,30,32,.09);
+  --e3:0 10px 28px rgba(15,30,32,.14);
+  --r-xs:8px;--r-sm:12px;--r-md:16px;--r-lg:20px;--r-pill:999px;
+}
+*{scrollbar-width:thin;scrollbar-color:#bfd4d0 transparent}
+*::-webkit-scrollbar{width:9px;height:9px}
+*::-webkit-scrollbar-thumb{background:#bfd4d0;border-radius:10px}
+*::-webkit-scrollbar-track{background:transparent}
+
+body{background:var(--md-surface-dim);-webkit-font-smoothing:antialiased}
+h1,h2,h3{letter-spacing:-.01em}
+
+/* ---------- Sidebar / navigation rail ---------- */
+.sidebar{box-shadow:var(--e1);border-right:1px solid var(--md-outline-soft);z-index:30}
+.brand-mark,.auth-logo{box-shadow:0 6px 16px rgba(9,168,121,.35)}
+.nav-item{border-radius:var(--r-pill)!important;transition:background .18s ease,color .18s ease,transform .12s ease;gap:11px}
+.nav-item:hover:not(.active){background:var(--md-surface-hover);color:var(--md-primary-700)}
+.nav-item:active{transform:scale(.98)}
+.nav-item.active{background:linear-gradient(135deg,var(--md-primary),var(--md-primary-600))!important;box-shadow:0 6px 16px rgba(9,168,121,.32)!important}
+.user-mini .avatar{box-shadow:var(--e1)}
+
+/* ---------- Topbar ---------- */
+.topbar{box-shadow:var(--e1);position:sticky;top:0;z-index:20;backdrop-filter:saturate(1.1)}
+.icon-btn{border-radius:var(--r-pill);transition:background .15s ease,box-shadow .15s ease}
+.icon-btn:hover{background:var(--md-surface-hover);box-shadow:var(--e1)}
+.search{border-radius:var(--r-pill);transition:box-shadow .15s ease,border-color .15s ease}
+.search:focus-within{border-color:var(--md-primary);box-shadow:0 0 0 3px rgba(11,168,121,.14)}
+
+/* ---------- Buttons ---------- */
+.primary-btn{border-radius:var(--r-pill)!important;box-shadow:var(--e1);transition:box-shadow .18s ease,transform .12s ease,filter .15s ease}
+.primary-btn:hover{box-shadow:var(--e2);filter:brightness(1.03)}
+.primary-btn:active{transform:translateY(1px) scale(.99);box-shadow:var(--e1)}
+.outline-btn{border-radius:var(--r-pill)!important;border-color:var(--md-outline);transition:background .15s ease,border-color .15s ease,color .15s ease}
+.outline-btn:hover{background:var(--md-surface-hover);border-color:var(--md-primary);color:var(--md-primary-700)}
+
+/* ---------- Surfaces: cards / panels / stats ---------- */
+.panel,.stat,.card,.member-card{border-radius:var(--r-lg)!important;border-color:var(--md-outline-soft)!important;box-shadow:var(--e1)!important;transition:box-shadow .2s ease,transform .2s ease}
+.panel:hover,.stat:hover,.card:hover,.member-card:hover{box-shadow:var(--e2)!important}
+.stat{position:relative;overflow:hidden}
+.stat:before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:linear-gradient(var(--md-primary),var(--md-primary-600));opacity:.9}
+.stat .value{font-size:26px}
+.card .photo{border-radius:0}
+.card-body{padding:16px 17px}
+
+/* ---------- Status chips ---------- */
+.status{border-radius:var(--r-pill);padding:6px 12px 6px 10px;font-weight:700;display:inline-flex;align-items:center;gap:6px}
+.status:before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.status.ongoing{background:var(--md-info-container);color:var(--md-info)}
+.status.pending{background:var(--md-warn-container);color:var(--md-warn)}
+.status.completed{background:var(--md-success-container);color:var(--md-success)}
+.status.danger{background:var(--md-error-container);color:var(--md-error)}
+
+/* ---------- Progress ---------- */
+.progress{border-radius:var(--r-pill);background:var(--md-outline-soft)}
+.progress>i{background:linear-gradient(90deg,var(--md-primary),var(--md-primary-600));border-radius:var(--r-pill);transition:width .3s ease}
+
+/* ---------- Tables ---------- */
+.table{border-collapse:separate;border-spacing:0}
+.table thead th{background:var(--md-surface-variant);position:sticky;top:0}
+.table tbody tr{transition:background .12s ease}
+.table tbody tr:hover{background:var(--md-surface-hover)}
+.table-wrap,.public-work-table-panel{border-radius:var(--r-lg);border:1px solid var(--md-outline-soft);box-shadow:var(--e1)}
+
+/* ---------- Forms ---------- */
+label input,label textarea,label select{border-radius:var(--r-sm)!important;transition:border-color .15s ease,box-shadow .15s ease;border-color:var(--md-outline)!important}
+label input:focus,label textarea:focus,label select:focus{outline:0;border-color:var(--md-primary)!important;box-shadow:0 0 0 3px rgba(11,168,121,.14)}
+label{color:var(--md-on-surface-variant)}
+
+/* ---------- Modals / overlays ---------- */
+.modal,.auth-overlay,.tour-overlay{background:rgba(10,22,26,.5);backdrop-filter:blur(6px)}
+.modal-card,.auth-card,.tour-card{border-radius:24px!important;box-shadow:var(--e3)!important;border:1px solid var(--md-outline-soft)}
+.close{border-radius:var(--r-pill);width:34px;height:34px;display:grid;place-items:center;transition:background .15s ease}
+.close:hover{background:var(--md-surface-hover)}
+
+/* ---------- Misc surfaces ---------- */
+.notice{border-radius:var(--r-md);background:var(--md-primary-container);border-left-color:var(--md-primary)}
+.map{border-radius:var(--r-lg)}
+.donut-wrap .donut{box-shadow:var(--e1)}
+#toast{border-radius:var(--r-md);box-shadow:var(--e3)}
+.gallery-icon-btn,.gallery-photo-delete-btn{border-radius:var(--r-pill)!important}
+.gallery-admin-photo-open,.public-gallery-thumb,.member-photo,.avatar,.activity-icon,.tour-icon{border-radius:var(--r-md)}
+.avatar,.activity-icon{border-radius:50%}
+
+/* ---------- Fluid typography ---------- */
+.topbar h1{font-size:clamp(18px,2vw,23px)}
+.hero h2,.hero-card h2{font-size:clamp(22px,3.2vw,30px)}
+.stat .value{font-size:clamp(20px,2.4vw,26px)}
+
+/* ================= Responsive: desktop / tablet / mobile ================= */
+
+/* Tablet: collapse sidebar into a compact icon rail */
+@media(max-width:1024px) and (min-width:769px){
+  .sidebar{width:86px;padding:18px 10px;align-items:center}
+  .brand{padding:4px 0 22px;justify-content:center}
+  .brand strong,.brand span{display:none}
+  .nav-item{justify-content:center;padding:12px;gap:0;font-size:17px}
+  .nav-item span{display:none}
+  .sidebar-bottom{padding-top:12px}
+  .user-mini span{display:none}
+  .user-mini{justify-content:center}
+  .sidebar-bottom .outline-btn{padding:9px;font-size:0}
+  .sidebar-bottom .outline-btn:before{content:"⎋";font-size:16px}
+  .main{margin-left:86px;width:calc(100% - 86px)}
+  .stats{grid-template-columns:1fr 1fr}
+  .grid-2,.grid-2-equal{grid-template-columns:1fr}
+  .member-grid,.event-grid,.gallery-grid{grid-template-columns:1fr 1fr}
+}
+
+/* Mobile: horizontal scrollable nav as rounded pill chips */
+@media(max-width:768px){
+  .content{padding:16px}
+  .stats{grid-template-columns:1fr 1fr;gap:10px}
+  .member-grid,.event-grid,.gallery-grid{grid-template-columns:1fr 1fr;gap:10px}
+  .nav-item{border-radius:var(--r-pill)!important;padding:9px 14px!important;font-size:13px}
+  .sidebar nav{gap:7px!important;padding:4px 2px}
+  .topbar h1{font-size:19px}
+  .panel,.stat,.card,.member-card{border-radius:var(--r-md)!important}
+  .modal-card,.auth-card,.tour-card{border-radius:18px!important;padding:18px!important}
+}
+
+@media(max-width:480px){
+  .stats{grid-template-columns:1fr}
+  .member-grid,.event-grid,.gallery-grid{grid-template-columns:1fr}
+  .content{padding:12px}
+  .hero{flex-direction:column;align-items:flex-start;gap:10px}
+}
+</style>
+
 </head><body>
 <div id="toast"></div>
 <header class="public-nav" id="login_btn_panel"><div class="inner"><div class="brand"><div class="brand-mark">DE</div><div><strong>Defense Enclave</strong><span>Society Portal</span></div></div><a href="#home">Home</a><a href="#members">Members</a><a href="#work">Work</a><a href="#events">Events</a><a href="#gallery">Gallery</a><a href="#map">Map</a><a href="#about">About</a><button class="login-pill" id="openLogin">Member Login</button></div></header>
