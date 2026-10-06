@@ -1544,7 +1544,7 @@ function escapeHtml(v){
     }
 
     const [members,works,events,gallery,maintenance,about]=await Promise.all([
-        sb.from('profiles').select('id,full_name,phone,house_number,address,role,is_active').eq('role','member').eq('is_active',true),
+        sb.from('profiles').select('id,full_name,phone,house_number,address,role,is_active').eq('is_active',true),
         sb.from('society_work').select('*').order('created_at',{ascending:false}),
         sb.from('events').select('*').order('event_date',{ascending:false}),
         sb.from('gallery_photos').select('*').order('created_at',{ascending:false}),
