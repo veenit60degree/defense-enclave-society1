@@ -3777,7 +3777,10 @@ async function adminEditMember(i){
                         house_number,
                         phone:phone||null,
                         email:email||null,
-                        password:password||null,
+                        // Password is optional when an Admin/SuperAdmin edits an existing user.
+                        // Do not send null/empty password to the Edge Function; omitting it
+                        // tells the update operation to keep the user's existing password.
+                        ...(password ? {password} : {}),
                         address:address||null,
                         role
                     },
