@@ -1108,42 +1108,44 @@ async function login(){
     if(!loginValue||!password)return toast('Please enter phone/email and password');
     if(!sb)return toast('Supabase is not configured yet');
 
-    // Email login: use Supabase email/password authentication directly.
-    // Phone login: DO NOT use Supabase Phone Auth here because Phone Auth is
-    // intentionally disabled. Instead, resolve the phone number from the
-    // profiles table and authenticate the matching account with its email and
-    // password. No SMS/OTP is involved in this login flow.
-    let credentials;
+    let emailForAuth=loginValue;
+
+    // Email login: authenticate directly with Supabase Auth.
     if(loginValue.includes('@')){
         if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginValue))return toast('Please enter a valid email address');
-        credentials={email:loginValue,password};
     }else{
-        const e164Phone=toE164Phone(loginValue);
-        if(!e164Phone||!/^[+]\d{10,15}$/.test(e164Phone))return toast('Please enter a valid phone number');
-
-        const rawDigits=String(loginValue).replace(/\D/g,'');
-        const phoneCandidates=[e164Phone,rawDigits];
-        if(rawDigits.length===12 && rawDigits.startsWith('91'))phoneCandidates.push('+'+rawDigits);
-
-        const {data:phoneProfiles,error:phoneLookupError}=await sb
-            .from('profiles')
-            .select('id,email,phone,is_active')
-            .in('phone',[...new Set(phoneCandidates)])
-            .limit(2);
-
-        if(phoneLookupError){
-            console.error('Phone login profile lookup error:',phoneLookupError);
-            return toast('Unable to find the account for this phone number.');
+        // Phone login: DO NOT use Supabase Phone Auth. Phone Auth may be disabled.
+        // Resolve the phone from our profiles table, then authenticate the
+        // corresponding Auth user with their existing email + password.
+        const digits=String(loginValue).replace(/\D/g,'');
+        if(!digits || (digits.length!==10 && digits.length!==12)){
+            return toast('Please enter a valid phone number');
         }
 
-        const activeProfiles=(phoneProfiles||[]).filter(p=>p.is_active!==false && p.email);
-        if(activeProfiles.length===0)return toast('No active account found for this phone number.');
-        if(activeProfiles.length>1)return toast('Multiple accounts use this phone number. Please login with email.');
+        const variants=[loginValue, digits, digits.length===10 ? '+91'+digits : null, digits.length===12 && digits.startsWith('91') ? '+'+digits : null].filter(Boolean);
+        let profile=null;
+        let profileError=null;
 
-        credentials={email:activeProfiles[0].email,password};
+        for(const phoneValue of variants){
+            const result=await sb.from('profiles')
+                .select('id,email,phone,full_name,house_number,address,role')
+                .eq('phone',phoneValue)
+                .limit(1);
+            if(result.error){profileError=result.error;break;}
+            if(result.data?.length){profile=result.data[0];break;}
+        }
+
+        if(profileError){
+            console.error('Phone lookup error:',profileError);
+            return toast('Unable to find account for this phone number.');
+        }
+        if(!profile?.email){
+            return toast('No account found for this phone number.');
+        }
+        emailForAuth=String(profile.email).trim();
     }
 
-    const {data,error}=await sb.auth.signInWithPassword(credentials);
+    const {data,error}=await sb.auth.signInWithPassword({email:emailForAuth,password});
     if(error)return toast(error.message);
 
     const result=await sb.from('profiles').select('*').eq('id',data.user.id).maybeSingle();
@@ -1154,8 +1156,8 @@ async function login(){
     const user={
         ...data.user,
         name:profile?.full_name||data.user.user_metadata?.full_name||data.user.email?.split('@')[0]||data.user.phone||'Member',
-        email:data.user.email||profile?.email||'',
-        phone:data.user.phone||profile?.phone||'',
+        email:data.user.email||profile?.email||emailForAuth||'',
+        phone:profile?.phone||data.user.phone||'',
         house_no:profile?.house_number||profile?.house_no||'',
         address:profile?.address||'',
         role:normalizeRole(profile?.role||'member')
@@ -1165,18 +1167,6 @@ async function login(){
     else openMemberDashboard(user);
     toast('Login successful');
 }
-// Normalizes a 10-digit Indian mobile number (or one already carrying a
-// country code) into E.164 format (e.g. +919876543210), which is what
-// Supabase Auth requires for phone-based login/OTP.
-function toE164Phone(raw){
-    const digits=String(raw||'').replace(/[^\d]/g,'');
-    if(!digits)return '';
-    if(String(raw).trim().startsWith('+'))return '+'+digits;
-    if(digits.length===10)return '+91'+digits;
-    if(digits.length>10)return '+'+digits;
-    return '';
-}
-
 async function register(){
     const name=document.getElementById('regName').value.trim();
     const email=document.getElementById('regEmail').value.trim();
