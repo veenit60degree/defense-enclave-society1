@@ -906,34 +906,8 @@ const authModal=document.getElementById('authModal');const showLogin=()=>{docume
                     sentMessage.textContent='A verification OTP has been sent to '+email+'. Enter the OTP below to continue.';
                     toast('OTP sent to your email');
                 }else{
-                    const rawPhone=phoneInput.value.trim();
-                    if(!rawPhone){
-                        showError('forgotPasswordPhoneError','Please enter your phone number.');
-                        return;
-                    }
-                    const e164Phone=toE164Phone(rawPhone);
-                    if(!e164Phone||!/^\+\d{10,15}$/.test(e164Phone)){
-                        showError('forgotPasswordPhoneError','Please enter a valid 10-digit phone number.');
-                        return;
-                    }
-
-                    /*
-                     * Phone OTP password reset. This requires the Phone auth
-                     * provider plus an SMS gateway (Twilio / MessageBird /
-                     * Vonage / MSG91 etc.) to be configured in the Supabase
-                     * dashboard under Authentication -> Providers -> Phone.
-                     * Without that, this call will return an error.
-                     */
-                    const {error}=await sb.auth.signInWithOtp({
-                        phone:e164Phone,
-                        options:{shouldCreateUser:false}
-                    });
-                    if(error)throw error;
-
-                    recoveryPhone=e164Phone;
-                    recoveryEmail='';
-                    sentMessage.textContent='A verification OTP has been sent to '+e164Phone+'. Enter the OTP below to continue.';
-                    toast('OTP sent to your phone');
+                    showError('forgotPasswordPhoneError','Password reset is available by email only.');
+                    return;
                 }
 
                 step1.style.display='none';
@@ -1108,76 +1082,32 @@ async function login(){
     if(!loginValue||!password)return toast('Please enter phone/email and password');
     if(!sb)return toast('Supabase is not configured yet');
 
-    let emailForAuth='';
-
-    // EMAIL LOGIN: authenticate directly with Supabase email/password.
+    let emailForAuth = loginValue;
     if(loginValue.includes('@')){
-        if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginValue)){
-            return toast('Please enter a valid email address');
-        }
+        if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginValue))return toast('Please enter a valid email address');
         emailForAuth=loginValue;
     }else{
-        // PHONE LOGIN: DO NOT use Supabase Phone Auth.
-        // Resolve the phone from public.profiles first, then authenticate
-        // with the user's existing EMAIL + PASSWORD account.
-        const rawDigits=String(loginValue).replace(/[^\d]/g,'');
-        if(rawDigits.length===10){
-            // The registration flow stores Indian numbers as +91XXXXXXXXXX.
-            emailForAuth='';
-        }else if(rawDigits.length<10 || rawDigits.length>15){
-            return toast('Please enter a valid phone number');
+        const e164Phone=toE164Phone(loginValue);
+        if(!e164Phone||!/^\+\d{10,15}$/.test(e164Phone))return toast('Please enter a valid 10-digit phone number');
+
+        // Phone is used only as an identifier. Do NOT call Supabase Phone Auth.
+        // Resolve the phone from profiles and authenticate with the user's email.
+        const {data:phoneRows,error:phoneLookupError}=await sb
+            .from('profiles')
+            .select('id,email,phone,role,full_name,house_number,address')
+            .eq('phone',e164Phone)
+            .limit(2);
+        if(phoneLookupError){
+            console.error('Phone lookup error:',phoneLookupError);
+            return toast('Unable to find account for this phone number.');
         }
-
-        const phoneCandidates=[];
-        const addPhone=(v)=>{ if(v && !phoneCandidates.includes(v)) phoneCandidates.push(v); };
-        addPhone(loginValue.trim());
-        addPhone(rawDigits);
-        if(rawDigits.length===10) addPhone('+91'+rawDigits);
-        if(loginValue.trim().startsWith('+')) addPhone('+'+rawDigits);
-
-        let phoneProfile=null;
-        let lookupError=null;
-
-        // Try all common formats because older members may have been saved
-        // before phone numbers were normalized to E.164.
-        for(const candidate of phoneCandidates){
-            const result=await sb
-                .from('profiles')
-                .select('id,email,phone,full_name,house_number,address,role')
-                .eq('phone',candidate)
-                .limit(1)
-                .maybeSingle();
-            if(result.error){
-                lookupError=result.error;
-                console.error('Phone profile lookup error:',result.error);
-                continue;
-            }
-            if(result.data){
-                phoneProfile=result.data;
-                break;
-            }
-        }
-
-        if(!phoneProfile){
-            if(lookupError){
-                return toast('Unable to find this phone number. Please check your phone number or contact the administrator.');
-            }
-            return toast('No account found with this phone number. Please check your phone number.');
-        }
-
-        emailForAuth=String(phoneProfile.email||'').trim();
-        if(!emailForAuth){
-            return toast('This phone number is not linked to an email account. Please contact the administrator.');
-        }
+        if(!phoneRows || phoneRows.length===0)return toast('No account found with this phone number.');
+        if(phoneRows.length>1)return toast('Multiple accounts found with this phone number. Please login with email.');
+        if(!phoneRows[0].email)return toast('This account does not have a login email. Please login with email or contact administrator.');
+        emailForAuth=String(phoneRows[0].email).trim();
     }
 
-    // IMPORTANT: always authenticate with EMAIL + PASSWORD here.
-    // This intentionally avoids Supabase Phone Auth, so "Phone logins are
-    // disabled" can never be triggered by this login flow.
-    const {data,error}=await sb.auth.signInWithPassword({
-        email:emailForAuth,
-        password
-    });
+    const {data,error}=await sb.auth.signInWithPassword({email:emailForAuth,password});
     if(error)return toast(error.message);
 
     const result=await sb.from('profiles').select('*').eq('id',data.user.id).maybeSingle();
@@ -1189,7 +1119,7 @@ async function login(){
         ...data.user,
         name:profile?.full_name||data.user.user_metadata?.full_name||data.user.email?.split('@')[0]||data.user.phone||'Member',
         email:data.user.email||profile?.email||'',
-        phone:profile?.phone||data.user.phone||'',
+        phone:data.user.phone||profile?.phone||'',
         house_no:profile?.house_number||profile?.house_no||'',
         address:profile?.address||'',
         role:normalizeRole(profile?.role||'member')
@@ -1228,17 +1158,6 @@ async function register(){
     if(!data.user)return toast('Registration could not be completed');
     const profileResult=await sb.from('profiles').update({full_name:name,email:data.user.email||email,phone:e164Phone,house_number:house_no,address:address||null}).eq('id',data.user.id);
     if(profileResult.error){console.error('Profile update error:',profileResult.error);return toast('Account created, but profile details could not be saved');}
-    // Link the phone number onto the Supabase Auth user itself (not just the
-    // profiles table) so phone + password login and phone OTP password reset
-    // can work later. This requires a session, and requires the Phone auth
-    // provider + an SMS gateway to be configured in the Supabase dashboard;
-    // if either isn't set up yet this silently fails without blocking signup.
-    if(data.session){
-        try{
-            const {error:phoneLinkError}=await sb.auth.updateUser({phone:e164Phone});
-            if(phoneLinkError)console.warn('Phone link error (non-blocking):',phoneLinkError);
-        }catch(linkErr){console.warn('Phone link error (non-blocking):',linkErr);}
-    }
     authModal.classList.add('hidden');
     if(!data.session){showLogin();return toast('Registration successful. Please verify your email before login.');}
     openMemberDashboard({...data.user,name,email,phone:e164Phone,house_no,address,role:'member'});
