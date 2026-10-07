@@ -1110,10 +1110,11 @@ async function login(){
 
     let credentials;
     if(loginValue.includes('@')){
+        if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginValue))return toast('Please enter a valid email address');
         credentials={email:loginValue,password};
     }else{
         const e164Phone=toE164Phone(loginValue);
-        if(!e164Phone)return toast('Please enter a valid email or 10-digit phone number');
+        if(!e164Phone||!/^\+\d{10,15}$/.test(e164Phone))return toast('Please enter a valid 10-digit phone number');
         credentials={phone:e164Phone,password};
     }
 
@@ -3703,7 +3704,7 @@ function adminMonthlySecurityRows(state,month){
             email:profile.email||'',
             address:profile.address||'',
             phone:profile.phone||'',
-            amount:payment?.amount==null ? 500 : monthlySecurityMoney(payment.amount),
+            amount:payment?.amount==null ? 200 : monthlySecurityMoney(payment.amount),
             status:monthlySecurityStatus(payment)
         };
     });
@@ -3783,7 +3784,7 @@ async function adminMonthlySecurityPage(user){
         const q=String(document.getElementById('monthlySecuritySearch').value||'').trim().toLowerCase();
         const all=adminMonthlySecurityRows(state,sel.value);
         const rows=all.filter(x=>[x.name,x.email,x.address,x.phone].some(v=>String(v||'').toLowerCase().includes(q)));
-        const total=all.filter(x=>x.status==='Completed').reduce((sum,x)=>sum+x.amount,500);
+        const total=all.filter(x=>x.status==='Completed').reduce((sum,x)=>sum+x.amount,0);
         document.getElementById('monthlySecurityTotal').textContent='₹'+total.toLocaleString('en-IN');
         document.getElementById('monthlySecurityPaid').textContent=String(all.filter(x=>x.status==='Completed').length);
         document.getElementById('monthlySecurityPending').textContent=String(all.filter(x=>x.status!=='Completed').length);
