@@ -1081,6 +1081,7 @@ label{color:var(--md-on-surface-variant)}
 }
 </style>
 
+<style id="required-mark-style">.required-mark{color:#b42318;margin-left:3px;font-weight:700}</style>
 </head><body>
 <div id="toast"></div>
 <header class="public-nav" id="login_btn_panel"><div class="inner"><div class="brand"><div class="brand-mark">DE</div><div><strong>Defense Enclave</strong><span>Society Portal</span></div></div><button class="public-nav-toggle" id="publicNavToggle" aria-label="Open menu" aria-expanded="false"><span></span><span></span><span></span></button><div class="public-nav-links" id="publicNavLinks"><a href="#home">Home</a><a href="#members">Members</a><a href="#work">Work</a><a href="#events">Events</a><a href="#gallery">Gallery</a><a href="#map">Map</a><a href="#about">About</a><button class="login-pill" id="openLogin">Member Login</button></div><div class="public-nav-backdrop" id="publicNavBackdrop"></div></div></header>
@@ -1109,7 +1110,7 @@ document.addEventListener('DOMContentLoaded',function(){
 <section id="about" class="public-section"><h2>About Us</h2><div class="panel about-box"><div class="notice"><strong>Official society information:</strong> replace the sample details below with your actual committee-approved information before publishing.</div><p id="aboutText">Defense Enclave Society is a residential community focused on maintaining shared facilities, improving neighborhood services and keeping residents informed.</p><p><strong>Phone:</strong> <span id="societyPhone">+91 98765 43210</span><br><strong>Email:</strong> <span id="societyEmail">contact@defenseenclave.example</span><br><strong>Address:</strong> <span id="societyAddress">Defense Enclave Society, Punjab, India</span></p></div></section>
 </main>
 <div id="memberApp" class="hidden"></div>
-<div class="modal hidden" id="authModal"><div class="modal-card"><div class="modal-head"><h3 id="authHeading">Member Login</h3><button class="close" id="authClose">×</button></div><div id="authLogin"><label>Email<input id="loginEmail" type="email"></label><label>Password<input id="loginPassword" type="password"></label><button class="primary-btn full" id="loginBtn">Login</button><p class="auth-switch">New member? <button id="switchRegister">Register</button></p></div><div id="authRegister" class="hidden"><div class="form-grid"><label>Name<input id="regName"></label><label>Phone<input id="regPhone"></label><label>Email<input id="regEmail" type="email"></label><label>House<input id="regHouse"></label></div><label>Address<textarea id="regAddress"></textarea></label><label>Password<input id="regPassword" type="password"></label><label>Profile photo<input id="regPhoto" type="file" accept="image/*"></label><button class="primary-btn full" id="registerBtn">Create Member Account</button><p class="auth-switch">Already registered? <button id="switchLogin">Login</button></p></div></div></div>
+<div class="modal hidden" id="authModal"><div class="modal-card"><div class="modal-head"><h3 id="authHeading">Member Login</h3><button class="close" id="authClose">×</button></div><div id="authLogin"><label>Email or Phone<input id="loginEmail" type="text" autocomplete="username" placeholder="Email address or 10-digit phone number"></label><label>Password<input id="loginPassword" type="password"></label><button class="primary-btn full" id="loginBtn">Login</button><p class="auth-switch">New member? <button id="switchRegister">Register</button></p></div><div id="authRegister" class="hidden"><div class="form-grid"><label>Name<input id="regName"></label><label>Phone<span class="required-mark">*</span><input id="regPhone" type="tel" inputmode="numeric" maxlength="10" autocomplete="tel" placeholder="10-digit mobile number" required></label><label>Email<input id="regEmail" type="email"></label><label>House<input id="regHouse"></label></div><label>Address<textarea id="regAddress"></textarea></label><label>Password<input id="regPassword" type="password"></label><label>Profile photo<input id="regPhoto" type="file" accept="image/*"></label><button class="primary-btn full" id="registerBtn">Create Member Account</button><p class="auth-switch">Already registered? <button id="switchLogin">Login</button></p></div></div></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script id="app-v2-inline">
 /* Defense Enclave Admin Buttons: 2026-09-19 */
 //const CONFIG={SUPABASE_URL:'https://gujtekpteezejmtaxtcj.supabase.co',SUPABASE_ANON_KEY:'sb_publishable_KvdsKcUr_vuvPrg7xU11Ww_q1H7vhg1'};
@@ -1878,9 +1879,20 @@ const authModal=document.getElementById('authModal');const showLogin=()=>{docume
             </div>
 
             <div id="forgotPasswordStep1">
-              <label for="forgotPasswordEmail" style="display:block;font-weight:600;font-size:14px;color:#344054;margin-bottom:6px;">Email Address</label>
-              <input id="forgotPasswordEmail" type="email" autocomplete="email" placeholder="Enter your registered email" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
-              <div id="forgotPasswordEmailError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
+              <div id="forgotMethodToggle" style="display:flex;gap:8px;margin-bottom:16px;background:#f2f4f7;padding:4px;border-radius:10px;">
+                <button type="button" id="forgotMethodEmailBtn" data-method="email" style="flex:1;padding:9px 10px;border:0;border-radius:7px;background:#fff;color:#101828;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.08);">Email OTP</button>
+                <button type="button" id="forgotMethodPhoneBtn" data-method="phone" style="flex:1;padding:9px 10px;border:0;border-radius:7px;background:transparent;color:#475467;font-size:13px;font-weight:600;cursor:pointer;">Phone OTP</button>
+              </div>
+              <div id="forgotEmailField">
+                <label for="forgotPasswordEmail" style="display:block;font-weight:600;font-size:14px;color:#344054;margin-bottom:6px;">Email Address</label>
+                <input id="forgotPasswordEmail" type="email" autocomplete="email" placeholder="Enter your registered email" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
+                <div id="forgotPasswordEmailError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
+              </div>
+              <div id="forgotPhoneField" style="display:none;">
+                <label for="forgotPasswordPhone" style="display:block;font-weight:600;font-size:14px;color:#344054;margin-bottom:6px;">Phone Number</label>
+                <input id="forgotPasswordPhone" type="tel" inputmode="numeric" maxlength="10" autocomplete="tel" placeholder="Enter your registered 10-digit phone number" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;">
+                <div id="forgotPasswordPhoneError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
+              </div>
               <button type="button" id="sendForgotOtpBtn" style="width:100%;margin-top:14px;padding:11px 14px;border:0;border-radius:9px;background:#2563eb;color:#fff;font-size:15px;font-weight:600;cursor:pointer;">Send OTP</button>
             </div>
 
@@ -1888,7 +1900,7 @@ const authModal=document.getElementById('authModal');const showLogin=()=>{docume
               <div id="forgotPasswordSentMessage" style="padding:10px 12px;border-radius:9px;background:#f0fdf4;color:#166534;font-size:13px;margin-bottom:14px;"></div>
 
               <label for="forgotPasswordOtp" style="display:block;font-weight:600;font-size:14px;color:#344054;margin-bottom:6px;">OTP</label>
-              <input id="forgotPasswordOtp" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="Enter OTP received on email" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;letter-spacing:2px;">
+              <input id="forgotPasswordOtp" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="Enter the OTP you received" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #d0d5dd;border-radius:9px;font-size:15px;letter-spacing:2px;">
               <div id="forgotPasswordOtpError" style="display:none;color:#b42318;font-size:12px;margin-top:5px;"></div>
 
               <div style="margin-top:14px;">
@@ -1913,6 +1925,7 @@ const authModal=document.getElementById('authModal');const showLogin=()=>{docume
         document.body.appendChild(overlay);
 
         const emailInput=overlay.querySelector('#forgotPasswordEmail');
+        const phoneInput=overlay.querySelector('#forgotPasswordPhone');
         const otpInput=overlay.querySelector('#forgotPasswordOtp');
         const newPasswordInput=overlay.querySelector('#forgotNewPassword');
         const confirmInput=overlay.querySelector('#forgotConfirmPassword');
@@ -1922,8 +1935,29 @@ const authModal=document.getElementById('authModal');const showLogin=()=>{docume
         const step1=overlay.querySelector('#forgotPasswordStep1');
         const step2=overlay.querySelector('#forgotPasswordStep2');
         const sentMessage=overlay.querySelector('#forgotPasswordSentMessage');
+        const methodEmailBtn=overlay.querySelector('#forgotMethodEmailBtn');
+        const methodPhoneBtn=overlay.querySelector('#forgotMethodPhoneBtn');
+        const emailField=overlay.querySelector('#forgotEmailField');
+        const phoneField=overlay.querySelector('#forgotPhoneField');
 
+        let recoveryMethod='email';
         let recoveryEmail='';
+        let recoveryPhone='';
+
+        function setRecoveryMethod(method){
+            recoveryMethod=method;
+            const isEmail=method==='email';
+            emailField.style.display=isEmail?'block':'none';
+            phoneField.style.display=isEmail?'none':'block';
+            methodEmailBtn.style.background=isEmail?'#fff':'transparent';
+            methodEmailBtn.style.color=isEmail?'#101828':'#475467';
+            methodEmailBtn.style.boxShadow=isEmail?'0 1px 2px rgba(16,24,40,.08)':'none';
+            methodPhoneBtn.style.background=isEmail?'transparent':'#fff';
+            methodPhoneBtn.style.color=isEmail?'#475467':'#101828';
+            methodPhoneBtn.style.boxShadow=isEmail?'none':'0 1px 2px rgba(16,24,40,.08)';
+        }
+        methodEmailBtn.onclick=()=>setRecoveryMethod('email');
+        methodPhoneBtn.onclick=()=>setRecoveryMethod('phone');
 
         const showError=(id,message)=>{
             const el=overlay.querySelector('#'+id);
@@ -1942,18 +1976,10 @@ const authModal=document.getElementById('authModal');const showLogin=()=>{docume
 
         async function sendOtp(){
             showError('forgotPasswordEmailError','');
-            const email=emailInput.value.trim().toLowerCase();
+            showError('forgotPasswordPhoneError','');
 
-            if(!email){
-                showError('forgotPasswordEmailError','Please enter your email address.');
-                return;
-            }
-            if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
-                showError('forgotPasswordEmailError','Please enter a valid email address.');
-                return;
-            }
             if(!sb){
-                showError('forgotPasswordEmailError','Supabase is not configured yet.');
+                showError(recoveryMethod==='email'?'forgotPasswordEmailError':'forgotPasswordPhoneError','Supabase is not configured yet.');
                 return;
             }
 
@@ -1961,36 +1987,76 @@ const authModal=document.getElementById('authModal');const showLogin=()=>{docume
             setBusy(resendBtn,true,'Sending...','Resend OTP');
 
             try{
-                /*
-                 * Send a Supabase authentication OTP instead of a password
-                 * recovery link. This prevents the old "Reset password" link
-                 * flow and allows the user to enter the OTP directly in this
-                 * website.
-                 *
-                 * IMPORTANT:
-                 * Supabase's Magic Link email template should contain
-                 * {{ .Token }} so the actual OTP is included in the email.
-                 * shouldCreateUser:false prevents this flow from creating
-                 * a new account when the email is not registered.
-                 */
-                const {error}=await sb.auth.signInWithOtp({
-                    email,
-                    options:{
-                        shouldCreateUser:false
+                if(recoveryMethod==='email'){
+                    const email=emailInput.value.trim().toLowerCase();
+                    if(!email){
+                        showError('forgotPasswordEmailError','Please enter your email address.');
+                        return;
                     }
-                });
+                    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+                        showError('forgotPasswordEmailError','Please enter a valid email address.');
+                        return;
+                    }
 
-                if(error)throw error;
+                    /*
+                     * Send a Supabase authentication OTP instead of a password
+                     * recovery link. This prevents the old "Reset password" link
+                     * flow and allows the user to enter the OTP directly in this
+                     * website.
+                     *
+                     * IMPORTANT:
+                     * Supabase's Magic Link email template should contain
+                     * {{ .Token }} so the actual OTP is included in the email.
+                     * shouldCreateUser:false prevents this flow from creating
+                     * a new account when the email is not registered.
+                     */
+                    const {error}=await sb.auth.signInWithOtp({
+                        email,
+                        options:{shouldCreateUser:false}
+                    });
+                    if(error)throw error;
 
-                recoveryEmail=email;
+                    recoveryEmail=email;
+                    recoveryPhone='';
+                    sentMessage.textContent='A verification OTP has been sent to '+email+'. Enter the OTP below to continue.';
+                    toast('OTP sent to your email');
+                }else{
+                    const rawPhone=phoneInput.value.trim();
+                    if(!rawPhone){
+                        showError('forgotPasswordPhoneError','Please enter your phone number.');
+                        return;
+                    }
+                    const e164Phone=toE164Phone(rawPhone);
+                    if(!e164Phone||!/^\+\d{10,15}$/.test(e164Phone)){
+                        showError('forgotPasswordPhoneError','Please enter a valid 10-digit phone number.');
+                        return;
+                    }
+
+                    /*
+                     * Phone OTP password reset. This requires the Phone auth
+                     * provider plus an SMS gateway (Twilio / MessageBird /
+                     * Vonage / MSG91 etc.) to be configured in the Supabase
+                     * dashboard under Authentication -> Providers -> Phone.
+                     * Without that, this call will return an error.
+                     */
+                    const {error}=await sb.auth.signInWithOtp({
+                        phone:e164Phone,
+                        options:{shouldCreateUser:false}
+                    });
+                    if(error)throw error;
+
+                    recoveryPhone=e164Phone;
+                    recoveryEmail='';
+                    sentMessage.textContent='A verification OTP has been sent to '+e164Phone+'. Enter the OTP below to continue.';
+                    toast('OTP sent to your phone');
+                }
+
                 step1.style.display='none';
                 step2.style.display='block';
-                sentMessage.textContent='A verification OTP has been sent to '+email+'. Enter the OTP below to continue.';
                 otpInput.focus();
-                toast('OTP sent to your email');
             }catch(error){
                 console.error('Forgot password OTP error:',error);
-                showError('forgotPasswordEmailError',error?.message||'Unable to send OTP. Please try again.');
+                showError(recoveryMethod==='email'?'forgotPasswordEmailError':'forgotPasswordPhoneError',error?.message||'Unable to send OTP. Please try again.');
             }finally{
                 setBusy(sendBtn,false,'Sending...','Send OTP');
                 setBusy(resendBtn,false,'Sending...','Resend OTP');
@@ -2005,18 +2071,19 @@ const authModal=document.getElementById('authModal');const showLogin=()=>{docume
             const token=otpInput.value.trim();
             const newPassword=newPasswordInput.value;
             const confirmPassword=confirmInput.value;
+            const identifier=recoveryMethod==='email'?recoveryEmail:recoveryPhone;
 
-            if(!recoveryEmail){
-                showError('forgotPasswordOtpError','Please enter your email address first.');
+            if(!identifier){
+                showError('forgotPasswordOtpError','Please enter your '+(recoveryMethod==='email'?'email address':'phone number')+' first.');
                 step1.style.display='block';
                 step2.style.display='none';
                 return;
             }
             if(!token){
-                showError('forgotPasswordOtpError','Please enter the OTP received on your email.');
+                showError('forgotPasswordOtpError','Please enter the OTP you received.');
                 return;
             }
-            if(!/^\d{6,8}$/.test(token)){
+            if(!/^\d{4,8}$/.test(token)){
                 showError('forgotPasswordOtpError','Please enter a valid OTP.');
                 return;
             }
@@ -2036,11 +2103,10 @@ const authModal=document.getElementById('authModal');const showLogin=()=>{docume
             setBusy(updateBtn,true,'Verifying...','Update Password');
 
             try{
-                const {data,error}=await sb.auth.verifyOtp({
-                    email:recoveryEmail,
-                    token,
-                    type:'email'
-                });
+                const verifyPayload=recoveryMethod==='email'
+                    ? {email:identifier,token,type:'email'}
+                    : {phone:identifier,token,type:'sms'};
+                const {data,error}=await sb.auth.verifyOtp(verifyPayload);
 
                 if(error)throw error;
                 if(!data?.session)throw new Error('OTP verified, but the recovery session could not be created.');
@@ -2058,7 +2124,7 @@ const authModal=document.getElementById('authModal');const showLogin=()=>{docume
                 showLogin();
 
                 const loginInput=document.getElementById('loginEmail');
-                if(loginInput)loginInput.value=recoveryEmail;
+                if(loginInput)loginInput.value=recoveryMethod==='email'?identifier:identifier.replace(/^\+91/,'');
                 const loginPassword=document.getElementById('loginPassword');
                 if(loginPassword)loginPassword.value='';
             }catch(error){
@@ -2081,6 +2147,12 @@ const authModal=document.getElementById('authModal');const showLogin=()=>{docume
         emailInput.addEventListener('keydown',e=>{
             if(e.key==='Enter')sendOtp();
         });
+        phoneInput.addEventListener('input',()=>{
+            phoneInput.value=phoneInput.value.replace(/\D/g,'').slice(0,10);
+        });
+        phoneInput.addEventListener('keydown',e=>{
+            if(e.key==='Enter')sendOtp();
+        });
         otpInput.addEventListener('input',()=>{
             otpInput.value=otpInput.value.replace(/\D/g,'').slice(0,8);
         });
@@ -2088,6 +2160,7 @@ const authModal=document.getElementById('authModal');const showLogin=()=>{docume
             if(e.target===overlay)overlay.remove();
         });
 
+        setRecoveryMethod('email');
         emailInput.focus();
     }
 
@@ -2150,9 +2223,14 @@ async function login(){
     if(!loginValue||!password)return toast('Please enter phone/email and password');
     if(!sb)return toast('Supabase is not configured yet');
 
-    const credentials=loginValue.includes('@')
-        ? {email:loginValue,password}
-        : {phone:loginValue,password};
+    let credentials;
+    if(loginValue.includes('@')){
+        credentials={email:loginValue,password};
+    }else{
+        const e164Phone=toE164Phone(loginValue);
+        if(!e164Phone)return toast('Please enter a valid email or 10-digit phone number');
+        credentials={phone:e164Phone,password};
+    }
 
     const {data,error}=await sb.auth.signInWithPassword(credentials);
     if(error)return toast(error.message);
@@ -2176,6 +2254,18 @@ async function login(){
     else openMemberDashboard(user);
     toast('Login successful');
 }
+// Normalizes a 10-digit Indian mobile number (or one already carrying a
+// country code) into E.164 format (e.g. +919876543210), which is what
+// Supabase Auth requires for phone-based login/OTP.
+function toE164Phone(raw){
+    const digits=String(raw||'').replace(/[^\d]/g,'');
+    if(!digits)return '';
+    if(String(raw).trim().startsWith('+'))return '+'+digits;
+    if(digits.length===10)return '+91'+digits;
+    if(digits.length>10)return '+'+digits;
+    return '';
+}
+
 async function register(){
     const name=document.getElementById('regName').value.trim();
     const email=document.getElementById('regEmail').value.trim();
@@ -2183,17 +2273,30 @@ async function register(){
     const phone=document.getElementById('regPhone').value.trim();
     const house_no=document.getElementById('regHouse').value.trim();
     const address=document.getElementById('regAddress').value.trim();
-    if(!name||!email||!password||!house_no)return toast('Please fill name, email, house and password');
+    if(!name||!email||!password||!phone||!house_no)return toast('Please fill name, email, phone, house and password');
     if(password.length<6)return toast('Password must be at least 6 characters');
+    const e164Phone=toE164Phone(phone);
+    if(!e164Phone||!/^\+\d{10,15}$/.test(e164Phone))return toast('Please enter a valid 10-digit phone number');
     if(!sb)return toast('Supabase is not configured yet');
-    const {data,error}=await sb.auth.signUp({email,password,options:{data:{full_name:name}}});
+    const {data,error}=await sb.auth.signUp({email,password,options:{data:{full_name:name,phone:e164Phone}}});
     if(error)return toast(error.message);
     if(!data.user)return toast('Registration could not be completed');
-    const profileResult=await sb.from('profiles').update({full_name:name,email:data.user.email||email,phone:phone||null,house_number:house_no,address:address||null}).eq('id',data.user.id);
+    const profileResult=await sb.from('profiles').update({full_name:name,email:data.user.email||email,phone:e164Phone,house_number:house_no,address:address||null}).eq('id',data.user.id);
     if(profileResult.error){console.error('Profile update error:',profileResult.error);return toast('Account created, but profile details could not be saved');}
+    // Link the phone number onto the Supabase Auth user itself (not just the
+    // profiles table) so phone + password login and phone OTP password reset
+    // can work later. This requires a session, and requires the Phone auth
+    // provider + an SMS gateway to be configured in the Supabase dashboard;
+    // if either isn't set up yet this silently fails without blocking signup.
+    if(data.session){
+        try{
+            const {error:phoneLinkError}=await sb.auth.updateUser({phone:e164Phone});
+            if(phoneLinkError)console.warn('Phone link error (non-blocking):',phoneLinkError);
+        }catch(linkErr){console.warn('Phone link error (non-blocking):',linkErr);}
+    }
     authModal.classList.add('hidden');
     if(!data.session){showLogin();return toast('Registration successful. Please verify your email before login.');}
-    openMemberDashboard({...data.user,name,email,phone,house_no,address,role:'member'});
+    openMemberDashboard({...data.user,name,email,phone:e164Phone,house_no,address,role:'member'});
     toast('Registration complete');
 }
 document.getElementById('loginBtn').onclick=login;
@@ -4727,12 +4830,12 @@ async function adminMonthlySecurityPage(user){
         try{
             state=await monthlySecurityLoadRows(selected);
             const q=String(document.getElementById('monthlySecuritySearch').value||'').trim().toLowerCase();
-            const rows=state.profiles.filter(p=>String(p.role||'').toLowerCase()==='member').map(p=>{
+            const rows=state.profiles.filter(p=>['member','admin','superadmin'].includes(String(p.role||'').toLowerCase())).map(p=>{
                 const paid=state.paidByUser.get(String(p.id));
                 const r=paid?.row||null;
                 return {profile:p,row:r,name:p.full_name||p.name||r?.name||'',email:p.email||r?.email||'',address:p.address||r?.address||'',phone:p.phone||r?.phone||'',amount:r?monthlySecurityAmount(r,p):500,status:r?monthlySecurityStatus(r):'Pending'};
             }).filter(x=>!q||[x.name,x.email,x.address,x.phone,x.status].join(' ').toLowerCase().includes(q));
-            const all=state.profiles.filter(p=>String(p.role||'').toLowerCase()==='member').map(p=>{const paid=state.paidByUser.get(String(p.id));return {profile:p,row:paid?.row||null,amount:paid?.row?monthlySecurityAmount(paid.row,p):500,status:paid?.row?monthlySecurityStatus(paid.row):'Pending'};});
+            const all=state.profiles.filter(p=>['member','admin','superadmin'].includes(String(p.role||'').toLowerCase())).map(p=>{const paid=state.paidByUser.get(String(p.id));return {profile:p,row:paid?.row||null,amount:paid?.row?monthlySecurityAmount(paid.row,p):500,status:paid?.row?monthlySecurityStatus(paid.row):'Pending'};});
             const total=all.filter(x=>x.status==='Completed').reduce((a,x)=>a+x.amount,0);
             document.getElementById('monthlySecurityTotal').textContent='₹'+total.toLocaleString('en-IN');
             document.getElementById('monthlySecurityPaid').textContent=String(all.filter(x=>x.status==='Completed').length);
@@ -4755,7 +4858,7 @@ async function adminMonthlySecurityPage(user){
     await render();
 }
 function adminExportMonthlySecurity(state,month){
-    const members=(state?.profiles||[]).filter(p=>String(p.role||'').toLowerCase()==='member').map(p=>{const paid=state.paidByUser.get(String(p.id));const row=paid?.row||null;return {name:p.full_name||p.name||row?.name||'',email:p.email||row?.email||'',address:p.address||row?.address||'',phone:p.phone||row?.phone||'',amount:monthlySecurityAmount(row,p),status:row?monthlySecurityStatus(row):'Pending'};});
+    const members=(state?.profiles||[]).filter(p=>['member','admin','superadmin'].includes(String(p.role||'').toLowerCase())).map(p=>{const paid=state.paidByUser.get(String(p.id));const row=paid?.row||null;return {name:p.full_name||p.name||row?.name||'',email:p.email||row?.email||'',address:p.address||row?.address||'',phone:p.phone||row?.phone||'',amount:monthlySecurityAmount(row,p),status:row?monthlySecurityStatus(row):'Pending'};});
     const total=members.filter(x=>x.status==='Completed').reduce((a,x)=>a+x.amount,0);
     const esc=x=>String(x??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     const rows=members.map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.email)}</td><td>${esc(x.address)}</td><td>${esc(x.phone)}</td><td>${x.amount.toFixed(2)}</td><td>${esc(x.status)}</td></tr>`).join('');
