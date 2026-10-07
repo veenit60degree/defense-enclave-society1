@@ -1082,6 +1082,78 @@ label{color:var(--md-on-surface-variant)}
 </style>
 
 <style id="required-mark-style">.required-mark{color:#b42318;margin-left:3px;font-weight:700}</style>
+<style id="news-announcements-inline">
+/* =========================================================
+   NEWS & ANNOUNCEMENTS - Material responsive UI
+   ========================================================= */
+.public-news-section{margin-top:18px}
+.public-news-section .panel-head{margin-bottom:14px}
+.public-news-section .panel-head h2{margin-bottom:6px}
+.news-grid{display:grid;grid-template-columns:1fr;gap:18px}
+.news-card{position:relative;display:flex;overflow:hidden;background:var(--md-surface,#fff);border:1px solid var(--md-outline,#dce6e5);border-radius:24px;box-shadow:var(--e1);transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
+.news-card:hover{transform:translateY(-2px);box-shadow:var(--e2)}
+.news-card-accent{width:7px;flex:0 0 7px;background:#178fd1}
+.news-card-urgent .news-card-accent{background:#ef3038}
+.news-card-notice .news-card-accent{background:#0ba879}
+.news-card-announcement .news-card-accent{background:#4b49a8}
+.news-card-main{position:relative;min-width:0;flex:1;padding:26px 28px 25px}
+.news-meta-row{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}
+.news-labels{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+.news-chip{display:inline-flex;align-items:center;gap:7px;min-height:30px;padding:6px 13px;border-radius:999px;border:1px solid #dce3e9;background:#f6f8fb;color:#667085;font-size:12px;font-weight:800;letter-spacing:.07em;line-height:1;white-space:nowrap}
+.news-chip-dot{width:8px;height:8px;border-radius:50%;background:currentColor}
+.news-chip-urgent{background:#ffe8e8;color:#d92832;border-color:#ffd0d0}
+.news-chip-meeting{background:#e6f4ff;color:#1178b6;border-color:#cfeaff}
+.news-chip-event{background:#eeeefe;color:#3d3c98;border-color:#deddf9}
+.news-chip-notice{background:#e8f7f2;color:#067a55;border-color:#ccebdd}
+.news-chip-announcement{background:#eef0ff;color:#3f43a2;border-color:#dde0ff}
+.news-chip-pinned{background:#f6f7fb;color:#667085;border-color:#e1e4eb}
+.news-date-badge{flex:0 0 88px;width:88px;height:88px;border-radius:22px;background:#3031a4;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 8px 20px rgba(48,49,164,.20)}
+.news-card-urgent .news-date-badge{background:#ef3038;box-shadow:0 8px 20px rgba(239,48,56,.18)}
+.news-date-badge strong{font-size:34px;line-height:1;font-weight:800;letter-spacing:-.04em}
+.news-date-badge span{margin-top:5px;font-size:12px;font-weight:800;letter-spacing:.14em}
+.news-posted{margin-top:16px;color:#7a8795;font-size:13px;font-weight:500}
+.news-card h3{margin:10px 0 8px;color:#20286d;font-size:clamp(21px,2.2vw,31px);line-height:1.13;text-decoration:underline;text-decoration-color:#9699dc;text-decoration-thickness:2px;text-underline-offset:5px}
+.news-card p{max-width:850px;margin:0;color:#687484;font-size:16px;line-height:1.75}
+.news-read-btn{margin-top:17px;border:0;background:transparent;padding:0;color:#252b78;font-size:15px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:9px}
+.news-read-btn span{font-size:22px;line-height:1;transition:transform .15s ease}
+.news-read-btn:hover span{transform:translateX(3px)}
+.news-empty{padding:28px;border:1px dashed var(--md-outline,#dce6e5);border-radius:16px;text-align:center;background:#fff}
+
+/* Admin news manager */
+.admin-news-hero{align-items:center}
+.admin-news-panel{margin-top:18px}
+.admin-news-list{display:grid;gap:12px}
+.admin-news-row{display:grid;grid-template-columns:72px minmax(0,1fr) auto;gap:18px;align-items:center;padding:18px;border:1px solid var(--md-outline,#dce6e5);border-radius:18px;background:#fff;box-shadow:var(--e1);border-left:5px solid #4b49a8}
+.admin-news-row.is-pinned{border-left-color:#ef3038}
+.admin-news-row-date{width:64px;height:64px;border-radius:16px;background:#eef0ff;color:#3031a4;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.admin-news-row-date strong{font-size:23px;line-height:1;font-weight:800}.admin-news-row-date span{font-size:10px;font-weight:800;letter-spacing:.12em;margin-top:4px}
+.admin-news-row-body{min-width:0}.admin-news-row-top{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:7px}.admin-news-row-body h3{margin:0 0 5px;font-size:17px;color:#18262d}.admin-news-row-body p{margin:0;color:#68777d;line-height:1.55;font-size:13px}.admin-news-row-meta{margin-top:8px;color:#849296;font-size:11px}
+.admin-news-row-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.admin-news-row-actions .danger-btn{border:1px solid #f0b9b5;background:#fff4f3;color:#b42318;border-radius:999px;padding:9px 13px;font-weight:700;cursor:pointer}
+.admin-news-row-actions .danger-btn:hover{background:#ffe8e6}
+.admin-news-empty{padding:28px;text-align:center}.admin-news-error{padding:14px;border-radius:12px;background:#fff1f1;color:#b42318;border:1px solid #fecdca}
+.admin-news-editor-overlay{z-index:100000!important;padding:16px}.admin-news-editor-card{width:min(720px,100%);max-height:calc(100vh - 32px);overflow:auto}
+.admin-news-form-grid{grid-template-columns:minmax(0,1fr) 180px}.admin-news-editor-card>label{display:block;margin-top:12px}.admin-news-editor-card input,.admin-news-editor-card textarea,.admin-news-editor-card select{box-sizing:border-box;width:100%}
+.admin-news-checks{display:flex;gap:18px;flex-wrap:wrap;margin:14px 0}.check-row{display:flex!important;align-items:center;gap:8px!important;margin:0!important;font-size:13px!important;font-weight:600!important}.check-row input{width:auto!important}
+.admin-news-editor-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}
+
+.public-news-all-modal{max-width:1050px!important}.public-news-list{display:grid;gap:16px}.news-notice-modal{max-width:720px!important}.news-notice-content{margin-top:20px;color:#43535a;font-size:16px;line-height:1.8;padding:18px;border-radius:16px;background:#f7faf9;border:1px solid #e2ece9}
+
+#news>h2:before{content:"📰";display:grid;place-items:center;font-size:16px}
+
+@media(max-width:720px){
+  .news-card-main{padding:20px 18px}
+  .news-meta-row{gap:10px}.news-date-badge{width:72px;height:72px;flex-basis:72px;border-radius:18px}.news-date-badge strong{font-size:27px}.news-date-badge span{font-size:10px}
+  .news-card h3{font-size:21px}.news-card p{font-size:14px;line-height:1.65}.news-posted{font-size:12px}
+  .admin-news-row{grid-template-columns:56px minmax(0,1fr);gap:12px}.admin-news-row-date{width:56px;height:56px;border-radius:14px}.admin-news-row-actions{grid-column:1/-1;justify-content:flex-start;padding-left:68px}
+  .admin-news-form-grid{grid-template-columns:1fr}.admin-news-editor-actions{position:sticky;bottom:0;background:#fff;padding-top:12px}
+}
+@media(max-width:480px){
+  .public-news-section .panel-head h2{font-size:20px}.news-card{border-radius:18px}.news-card-accent{width:5px;flex-basis:5px}.news-meta-row{align-items:flex-start}.news-labels{padding-right:0}.news-chip{font-size:10px;padding:6px 9px}.news-date-badge{width:62px;height:62px;flex-basis:62px;border-radius:15px}.news-date-badge strong{font-size:23px}.news-date-badge span{font-size:9px}.news-card h3{font-size:19px}.news-card p{font-size:13px}.news-read-btn{font-size:14px}
+  .admin-news-row-actions{padding-left:0}.admin-news-row-actions .outline-btn,.admin-news-row-actions .danger-btn{flex:1;text-align:center}
+}
+
+</style>
 </head><body>
 <div id="toast"></div>
 <header class="public-nav" id="login_btn_panel"><div class="inner"><div class="brand"><div class="brand-mark">DE</div><div><strong>Defense Enclave</strong><span>Society Portal</span></div></div><button class="public-nav-toggle" id="publicNavToggle" aria-label="Open menu" aria-expanded="false"><span></span><span></span><span></span></button><div class="public-nav-links" id="publicNavLinks"><a href="#home">Home</a><a href="#members">Members</a><a href="#work">Work</a><a href="#events">Events</a><a href="#gallery">Gallery</a><a href="#map">Map</a><a href="#about">About</a><button class="login-pill" id="openLogin">Member Login</button></div><div class="public-nav-backdrop" id="publicNavBackdrop"></div></div></header>
@@ -1102,6 +1174,7 @@ document.addEventListener('DOMContentLoaded',function(){
 <main id="public" class="public-main">
 <section id="home" class="public-hero"><div class="hero-card"><div class="eyebrow">DEFENSE ENCLAVE SOCIETY</div><h2>A connected, transparent community.</h2><p class="muted">View society members, events, work progress, financial summaries and community updates in one place.</p><div class="hero-actions"><button class="primary-btn" id="openRegister">Become a Member</button><a class="outline-btn" href="#about" style="text-decoration:none">Contact Society</a></div><div class="hero-badges"><span>🔒 Secure &amp; Transparent</span><span>📋 Live Updates</span><span>🏘 Community First</span></div></div><div class="hero-art"><img src="/logo.jpeg" alt="logo"></div></section>
 <section class="public-stats" id="publicStats"></section>
+<section id="news" class="public-section public-news-section"><div class="panel-head"><div><h2>News &amp; Announcements <button type="button" class="public-view-all-btn" data-public-news-view-all="1">(View all)</button></h2><p class="muted">Latest notices and important society updates.</p></div></div><div class="news-grid" id="newsGrid"></div></section>
 <section id="members" class="public-section"><div class="panel-head"><div><h2>Society Members</h2><p class="muted">Registered residents.</p></div></div><div class="member-grid" id="memberGrid"></div></section>
 <section id="work" class="public-section"><h2>Society Work</h2><p class="muted">Current and completed projects.</p><div class="panel public-work-table-panel"><div class="public-work-table-scroll"><table class="table" id="workTable"></table></div></div></section>
 <section id="events" class="public-section"><h2>Events <button type="button" class="public-view-all-btn" data-public-events-view-all="1">(View all)</button></h2><p class="muted">Upcoming community activities.</p><div class="event-grid public-events-scroll" id="eventGrid"></div></section>
@@ -1544,13 +1617,14 @@ function escapeHtml(v){
         return;
     }
 
-    const [members,works,events,gallery,maintenance,about]=await Promise.all([
+    const [members,works,events,gallery,maintenance,about,news]=await Promise.all([
         sb.from('profiles').select('id,full_name,phone,house_number,address,role,is_active').eq('is_active',true),
         sb.from('society_work').select('*').order('created_at',{ascending:false}),
         sb.from('events').select('*').order('event_date',{ascending:false}),
         sb.from('gallery_photos').select('*').order('created_at',{ascending:false}),
         sb.from('maintenance').select('*').order('created_at',{ascending:false}),
-        sb.from('society_about').select('*').eq('id',1).maybeSingle()
+        sb.from('society_about').select('*').eq('id',1).maybeSingle(),
+        sb.from('news_announcements').select('*').order('is_pinned',{ascending:false}).order('published_at',{ascending:false}).order('created_at',{ascending:false})
     ]);
 
     console.log('[PUBLIC] members:',members.data,'error:',members.error);
@@ -1583,6 +1657,21 @@ function escapeHtml(v){
             memberGrid.style.paddingRight='6px';
             memberGrid.style.webkitOverflowScrolling='touch';
             addPublicMembersViewAll(memberSection,memberRows);
+        }
+    }
+
+    const newsSection=publicSectionByHeading(['News & Announcements']);
+    const newsGrid=document.getElementById('newsGrid') ||
+        publicContentContainer(['News & Announcements'],['.news-grid','.public-news-grid','.cards-grid']);
+    if(newsGrid){
+        if(news.error){
+            newsGrid.innerHTML='<div class="muted">Unable to load news and announcements.</div>';
+        }else{
+            const newsRows=news.data||[];
+            window.__publicNewsRows=newsRows;
+            newsGrid.innerHTML=newsRows.map(newsPublicCard).join('') || '<div class="muted news-empty">No news or announcements available.</div>';
+            addPublicNewsViewAll(newsSection,newsRows);
+            setupPublicNewsReadHandlers();
         }
     }
 
@@ -2338,6 +2427,7 @@ function openAdminDashboard(user){
  <button class="nav-item" data-a="profile">♙ <span>My Profile</span></button>
  <button class="nav-item" data-a="maintenance">▣ <span>Maintenance</span></button>
  <button class="nav-item" data-a="monthlySecurity">₹ <span>Monthly Security</span></button>
+ <button class="nav-item" data-a="news">📰 <span>News &amp; Announcements</span></button>
  <button class="nav-item" data-a="work">⚙ <span>Society Work</span></button>
  <button class="nav-item" data-a="events">◷ <span>Events</span></button>
  <button class="nav-item" data-a="gallery">▧ <span>Gallery</span></button>
@@ -2363,7 +2453,7 @@ function openAdminDashboard(user){
  };
  let savedAdminPage='dashboard';
  savedAdminPage=loadCurrentSection('defenseEnclaveAdminPage','dashboard');
- const validAdminPages=['dashboard','finance','profile','maintenance','monthlySecurity','work','events','gallery','members','complaints','map','about'];
+ const validAdminPages=['dashboard','finance','profile','maintenance','monthlySecurity','news','work','events','gallery','members','complaints','map','about'];
  if(!validAdminPages.includes(savedAdminPage))savedAdminPage='dashboard';
  adminPage(savedAdminPage,user);
 }
@@ -4895,6 +4985,184 @@ function adminExportMonthlySecurity(state,month){
     const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`Monthly-Security-${month}.xls`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 }
 
+
+/* =========================================================
+   NEWS & ANNOUNCEMENTS
+   Public announcements + Admin/SuperAdmin CRUD.
+   Expected table: public.news_announcements
+   ========================================================= */
+function newsEscape(v){
+  return String(v ?? '').replace(/[&<>\"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[ch]||ch));
+}
+function newsDateLabel(v){
+  if(!v)return '';
+  const d=new Date(v);
+  if(Number.isNaN(d.getTime()))return String(v);
+  return d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+}
+function newsDateBadge(v){
+  if(!v)return {day:'',month:''};
+  const d=new Date(v);
+  if(Number.isNaN(d.getTime()))return {day:'',month:''};
+  return {day:d.toLocaleDateString('en-IN',{day:'2-digit'}),month:d.toLocaleDateString('en-IN',{month:'short'}).toUpperCase()};
+}
+function newsExcerpt(v,max=190){
+  const s=String(v||'').replace(/\s+/g,' ').trim();
+  return s.length>max ? s.slice(0,max-1).trim()+'…' : s;
+}
+function newsCategory(v){
+  const s=String(v||'announcement').trim().toLowerCase();
+  return ['urgent','meeting','event','notice','announcement'].includes(s)?s:'announcement';
+}
+function newsCategoryLabel(v){
+  const s=newsCategory(v);
+  return s==='announcement'?'ANNOUNCEMENT':s.toUpperCase();
+}
+function addPublicNewsViewAll(section,rows){
+  if(!section)return;
+  const heading=section.querySelector('h1,h2,h3,h4');
+  if(!heading)return;
+  let link=heading.querySelector('[data-public-news-view-all]');
+  if(!link){
+    link=document.createElement('button');
+    link.type='button';
+    link.className='public-view-all-btn';
+    link.setAttribute('data-public-news-view-all','1');
+    link.textContent='(View all)';
+    heading.appendChild(link);
+  }
+  link.onclick=(e)=>{e.preventDefault();e.stopPropagation();openPublicNewsPage(rows||[]);};
+}
+function openPublicNewsPage(rows){
+  const old=document.getElementById('publicNewsAllOverlay');
+  if(old)old.remove();
+  const data=Array.isArray(rows)?rows:[];
+  const overlay=document.createElement('div');
+  overlay.id='publicNewsAllOverlay';
+  overlay.className='public-all-overlay public-news-overlay';
+  overlay.innerHTML=`<div class="public-all-modal public-news-all-modal">
+    <div class="public-all-modal-head">
+      <div><h2>News &amp; Announcements</h2><div class="muted">Latest society notices and community updates.</div></div>
+      <button type="button" class="public-all-close" aria-label="Close">×</button>
+    </div>
+    <div class="public-news-list">${data.map(x=>newsPublicCard(x)).join('')||'<div class="muted">No news or announcements available.</div>'}</div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('.public-all-close').onclick=()=>overlay.remove();
+  overlay.onclick=e=>{if(e.target===overlay)overlay.remove();};
+}
+function newsPublicCard(x){
+  const badge=newsDateBadge(x.published_at||x.posted_at||x.created_at);
+  const category=newsCategory(x.category||x.type);
+  const urgent=Boolean(x.is_urgent)||category==='urgent';
+  const pinned=Boolean(x.is_pinned);
+  return `<article class="news-card news-card-${newsEscape(category)}${urgent?' news-card-urgent':''}${pinned?' news-card-pinned':''}">
+    <div class="news-card-accent"></div>
+    <div class="news-card-main">
+      <div class="news-meta-row"><div class="news-labels"><span class="news-chip news-chip-${newsEscape(category)}"><span class="news-chip-dot"></span>${newsEscape(newsCategoryLabel(category))}</span>${pinned?'<span class="news-chip news-chip-pinned">📌 PINNED</span>':''}</div><div class="news-date-badge"><strong>${newsEscape(badge.day)}</strong><span>${newsEscape(badge.month)}</span></div></div>
+      <div class="news-posted">Posted ${newsEscape(newsDateLabel(x.published_at||x.posted_at||x.created_at))}</div>
+      <h3>${newsEscape(x.title||'Untitled announcement')}</h3>
+      <p>${newsEscape(newsExcerpt(x.content||x.description||'',210))}</p>
+      <button type="button" class="news-read-btn" data-news-read="${newsEscape(x.id||'')}">Read notice <span>→</span></button>
+    </div>
+  </article>`;
+}
+function openPublicNewsNotice(row){
+  const old=document.getElementById('publicNewsNoticeOverlay');
+  if(old)old.remove();
+  const overlay=document.createElement('div');
+  overlay.id='publicNewsNoticeOverlay';
+  overlay.className='public-all-overlay';
+  overlay.innerHTML=`<div class="public-all-modal news-notice-modal">
+    <div class="public-all-modal-head"><div><span class="news-chip news-chip-${newsEscape(newsCategory(row?.category||row?.type))}">${newsEscape(newsCategoryLabel(row?.category||row?.type))}</span><h2>${newsEscape(row?.title||'Announcement')}</h2><div class="muted">Posted ${newsEscape(newsDateLabel(row?.published_at||row?.posted_at||row?.created_at))}</div></div><button type="button" class="public-all-close">×</button></div>
+    <div class="news-notice-content">${newsEscape(row?.content||row?.description||'').replace(/\n/g,'<br>')}</div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('.public-all-close').onclick=()=>overlay.remove();
+  overlay.onclick=e=>{if(e.target===overlay)overlay.remove();};
+}
+function setupPublicNewsReadHandlers(){
+  document.querySelectorAll('[data-news-read]').forEach(btn=>{
+    if(btn.dataset.newsBound==='1')return;
+    btn.dataset.newsBound='1';
+    btn.onclick=()=>{
+      const id=btn.getAttribute('data-news-read');
+      const row=(window.__publicNewsRows||[]).find(x=>String(x.id)===String(id));
+      if(row)openPublicNewsNotice(row);
+    };
+  });
+}
+
+async function adminNewsPage(c,user){
+  const role=String(user?.role||window.__adminUser?.role||'').toLowerCase();
+  if(role!=='admin' && role!=='superadmin'){
+    c.innerHTML='<div class="panel"><div class="muted">You are not authorized to manage news and announcements.</div></div>';
+    return;
+  }
+  const {data,error}=await sb.from('news_announcements').select('*').order('is_pinned',{ascending:false}).order('published_at',{ascending:false}).order('created_at',{ascending:false});
+  if(error){
+    console.error('News load error:',error);
+    c.innerHTML=`<div class="panel"><h2>News &amp; Announcements</h2><div class="admin-news-error">Unable to load news. ${newsEscape(error.message||'Check the news_announcements table and RLS policies.')}</div></div>`;
+    return;
+  }
+  const rows=data||[];
+  window.__adminNewsRows=rows;
+  c.innerHTML=`<div class="hero admin-news-hero"><div><div class="eyebrow">SOCIETY UPDATES</div><h2>News &amp; Announcements</h2><div class="muted">Add, update or remove notices shown on the public page.</div></div><button type="button" class="primary-btn" id="adminNewsAddBtn">+ Add News</button></div>
+  <div class="panel admin-news-panel"><div class="admin-news-list">${rows.map((x,i)=>adminNewsRowHtml(x,i)).join('')||'<div class="muted admin-news-empty">No news or announcements added yet.</div>'}</div></div>`;
+  c.querySelector('#adminNewsAddBtn').onclick=()=>openAdminNewsEditor(null);
+  c.querySelectorAll('[data-news-edit]').forEach(btn=>btn.onclick=()=>openAdminNewsEditor(rows[Number(btn.dataset.newsEdit)]||null));
+  c.querySelectorAll('[data-news-delete]').forEach(btn=>btn.onclick=()=>adminDeleteNews(rows[Number(btn.dataset.newsDelete)]||null,user));
+}
+function adminNewsRowHtml(x,i){
+  const category=newsCategory(x.category||x.type);
+  return `<article class="admin-news-row ${x.is_pinned?'is-pinned':''}"><div class="admin-news-row-date"><strong>${newsEscape(newsDateBadge(x.published_at||x.created_at).day)}</strong><span>${newsEscape(newsDateBadge(x.published_at||x.created_at).month)}</span></div><div class="admin-news-row-body"><div class="admin-news-row-top"><span class="news-chip news-chip-${newsEscape(category)}">${newsEscape(newsCategoryLabel(category))}</span>${x.is_urgent?'<span class="news-chip news-chip-urgent">URGENT</span>':''}${x.is_pinned?'<span class="news-chip news-chip-pinned">📌 PINNED</span>':''}</div><h3>${newsEscape(x.title||'Untitled')}</h3><p>${newsEscape(newsExcerpt(x.content||x.description||'',240))}</p><div class="admin-news-row-meta">Posted ${newsEscape(newsDateLabel(x.published_at||x.created_at))}</div></div><div class="admin-news-row-actions"><button type="button" class="outline-btn" data-news-edit="${i}">Edit</button><button type="button" class="danger-btn" data-news-delete="${i}">Delete</button></div></article>`;
+}
+function openAdminNewsEditor(row){
+  const old=document.getElementById('adminNewsEditorOverlay'); if(old)old.remove();
+  const isEdit=!!row;
+  const published=row?.published_at||row?.created_at||'';
+  let dateValue='';
+  if(published){const d=new Date(published);if(!Number.isNaN(d.getTime()))dateValue=new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);}
+  const overlay=document.createElement('div');
+  overlay.id='adminNewsEditorOverlay'; overlay.className='modal admin-news-editor-overlay';
+  overlay.innerHTML=`<div class="modal-card admin-news-editor-card"><div class="modal-head"><div><h2>${isEdit?'Update':'Add'} News &amp; Announcement</h2><div class="muted">This notice will appear on the public page.</div></div><button type="button" class="close" id="adminNewsEditorClose">×</button></div>
+  <div class="form-grid admin-news-form-grid"><label>Title<input id="adminNewsTitle" maxlength="180" value="${newsEscape(row?.title||'')}" required></label><label>Category<select id="adminNewsCategory"><option value="announcement">Announcement</option><option value="urgent">Urgent</option><option value="meeting">Meeting</option><option value="event">Event</option><option value="notice">Notice</option></select></label></div>
+  <label>Posted date/time<input id="adminNewsPublishedAt" type="datetime-local" value="${newsEscape(dateValue)}"></label>
+  <label>Details / Description<textarea id="adminNewsContent" rows="7" maxlength="5000" required>${newsEscape(row?.content||row?.description||'')}</textarea></label>
+  <div class="admin-news-checks"><label class="check-row"><input id="adminNewsUrgent" type="checkbox" ${row?.is_urgent?'checked':''}> Mark as Urgent</label><label class="check-row"><input id="adminNewsPinned" type="checkbox" ${row?.is_pinned?'checked':''}> Pin this announcement</label></div>
+  <div class="admin-news-editor-actions"><button type="button" class="outline-btn" id="adminNewsCancel">Cancel</button><button type="button" class="primary-btn" id="adminNewsSave">${isEdit?'Update':'Publish'}</button></div></div>`;
+  document.body.appendChild(overlay);
+  const cat=overlay.querySelector('#adminNewsCategory'); cat.value=newsCategory(row?.category||row?.type||'announcement');
+  const close=()=>overlay.remove();
+  overlay.querySelector('#adminNewsEditorClose').onclick=close; overlay.querySelector('#adminNewsCancel').onclick=close; overlay.onclick=e=>{if(e.target===overlay)close();};
+  overlay.querySelector('#adminNewsSave').onclick=async()=>{
+    const title=overlay.querySelector('#adminNewsTitle').value.trim();
+    const content=overlay.querySelector('#adminNewsContent').value.trim();
+    if(!title)return toast('Please enter a title.');
+    if(!content)return toast('Please enter announcement details.');
+    const payload={title,content,category:cat.value,is_urgent:overlay.querySelector('#adminNewsUrgent').checked,is_pinned:overlay.querySelector('#adminNewsPinned').checked,published_at:overlay.querySelector('#adminNewsPublishedAt').value?new Date(overlay.querySelector('#adminNewsPublishedAt').value).toISOString():new Date().toISOString(),updated_at:new Date().toISOString()};
+    const save=overlay.querySelector('#adminNewsSave'); save.disabled=true; save.textContent=isEdit?'Updating...':'Publishing...';
+    try{
+      const result=isEdit ? await sb.from('news_announcements').update(payload).eq('id',row.id) : await sb.from('news_announcements').insert(payload);
+      if(result.error)throw result.error;
+      close(); toast(isEdit?'News updated successfully.':'News published successfully.');
+      await adminPage('news',window.__adminUser);
+      await renderPublic();
+    }catch(e){console.error('News save error:',e);toast('Unable to save news: '+(e?.message||e));save.disabled=false;save.textContent=isEdit?'Update':'Publish';}
+  };
+}
+async function adminDeleteNews(row,user){
+  if(!row?.id)return;
+  if(!confirm(`Delete "${String(row.title||'this announcement').replace(/"/g,'')}"?`))return;
+  try{
+    const {error}=await sb.from('news_announcements').delete().eq('id',row.id);
+    if(error)throw error;
+    toast('News deleted successfully.');
+    await adminPage('news',user);
+    await renderPublic();
+  }catch(e){console.error('News delete error:',e);toast('Unable to delete news: '+(e?.message||e));}
+}
+
 async function adminPage(p,user){
  const c=document.getElementById('adminContent'),t=document.getElementById('adminTitle');
  const allowedAdminPages=['dashboard','finance','profile','maintenance','monthlySecurity','work','events','gallery','members','complaints','map','about'];
@@ -4909,7 +5177,7 @@ async function adminPage(p,user){
    try{sessionStorage.removeItem('defenseEnclaveMonthlySecurityPage');}catch(_){ }
  }
  document.querySelectorAll('#memberApp .nav-item').forEach(b=>b.classList.toggle('active',b.dataset.a===p));
- const titles={dashboard:'Admin Dashboard',finance:'Society Finance',profile:'My Profile',maintenance:'Active Maintenance',monthlySecurity:'Monthly Security',work:'Society Work',events:'Events',gallery:'Photo Gallery',members:'Members',complaints:'Complaints',map:'Society Map',about:'About Society'}; t.textContent=titles[p]||'Admin Dashboard';
+ const titles={dashboard:'Admin Dashboard',finance:'Society Finance',profile:'My Profile',maintenance:'Active Maintenance',monthlySecurity:'Monthly Security',news:'News & Announcements',work:'Society Work',events:'Events',gallery:'Photo Gallery',members:'Members',complaints:'Complaints',map:'Society Map',about:'About Society'}; t.textContent=titles[p]||'Admin Dashboard';
  if(p==='profile'){
   await adminProfilePage(user);
   return;
@@ -5027,7 +5295,9 @@ else if(p==='maintenance'){
         </div>
       </div>`;
     }).join('')}</div>${folders.length?'':`<div class="panel"><div class="muted">No gallery folders or photos saved yet.</div></div>`}`;
- }else if(p==='members'){
+ }else if(p==='news'){
+   await adminNewsPage(c,user);
+}else if(p==='members'){
    const currentRole=String(user?.role||window.__adminUser?.role||'admin').trim().toLowerCase().replace(/[\s-]+/g,'_');
    const isSuperAdmin=currentRole==='superadmin';
 
