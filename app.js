@@ -1108,14 +1108,39 @@ async function login(){
     if(!loginValue||!password)return toast('Please enter phone/email and password');
     if(!sb)return toast('Supabase is not configured yet');
 
+    // Email login: use Supabase email/password authentication directly.
+    // Phone login: DO NOT use Supabase Phone Auth here because Phone Auth is
+    // intentionally disabled. Instead, resolve the phone number from the
+    // profiles table and authenticate the matching account with its email and
+    // password. No SMS/OTP is involved in this login flow.
     let credentials;
     if(loginValue.includes('@')){
         if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginValue))return toast('Please enter a valid email address');
         credentials={email:loginValue,password};
     }else{
         const e164Phone=toE164Phone(loginValue);
-        if(!e164Phone||!/^\+\d{10,15}$/.test(e164Phone))return toast('Please enter a valid 10-digit phone number');
-        credentials={phone:e164Phone,password};
+        if(!e164Phone||!/^[+]\d{10,15}$/.test(e164Phone))return toast('Please enter a valid phone number');
+
+        const rawDigits=String(loginValue).replace(/\D/g,'');
+        const phoneCandidates=[e164Phone,rawDigits];
+        if(rawDigits.length===12 && rawDigits.startsWith('91'))phoneCandidates.push('+'+rawDigits);
+
+        const {data:phoneProfiles,error:phoneLookupError}=await sb
+            .from('profiles')
+            .select('id,email,phone,is_active')
+            .in('phone',[...new Set(phoneCandidates)])
+            .limit(2);
+
+        if(phoneLookupError){
+            console.error('Phone login profile lookup error:',phoneLookupError);
+            return toast('Unable to find the account for this phone number.');
+        }
+
+        const activeProfiles=(phoneProfiles||[]).filter(p=>p.is_active!==false && p.email);
+        if(activeProfiles.length===0)return toast('No active account found for this phone number.');
+        if(activeProfiles.length>1)return toast('Multiple accounts use this phone number. Please login with email.');
+
+        credentials={email:activeProfiles[0].email,password};
     }
 
     const {data,error}=await sb.auth.signInWithPassword(credentials);
@@ -4474,7 +4499,7 @@ async function memberPage(p,user){
       const memberSecurityCompleted=memberSecurityStatus==='Completed';
       const f=finance||{};
       const active=(work||[]).filter(x=>String(x.status||'').toLowerCase()!=='completed').length;
-      c.innerHTML=`<div class="hero"><div><div class="eyebrow">WELCOME BACK</div><h2> ${user.name||'Member'}!</h2><div class="muted">Latest updates and information from your society.</div></div><button class="primary-btn" id="newComplaint">+ New Complaint</button></div><div class="stats">${[['Society Fund',`₹${Number(f.society_fund||0).toLocaleString('en-IN')}`,'Current balance'],['Total Expenses',`₹${Number(f.total_expenses||0).toLocaleString('en-IN')}`,'This year'],['Active Maintenance',String(active),'Active work items'],['My Complaints',String((complaints||[]).length),'Recent complaints']].map(x=>`<div class="stat"><div class="stat-head">${x[0]}<span>●</span></div><div class="value">${x[1]}</div><div class="trend">${x[2]}</div></div>`).join('')}</div><div class="panel member-monthly-security-card ${memberSecurityCompleted?'member-security-completed':'member-security-pending'}"><div class="member-security-card-head"><h3>Monthly Security Payment</h3><span class="member-security-status">${memberSecurityCompleted?'Completed':'Pending'}</span></div><div class="member-security-payment-details"><div><span class="muted">Current Month</span><strong>${monthlySecurityMonthLabel(monthlySecurityMonthValue())}</strong></div><div><span class="muted">Amount</span><strong>₹${Number(Number.isFinite(Number(memberSecurityAmount))?memberSecurityAmount:200).toLocaleString('en-IN')}</strong></div></div><div class="member-security-note">${memberSecurityCompleted?'Payment completed for the current month.':'Payment is pending for the current month.'}</div></div><div class="grid-2-equal"><div class="panel"><h3>Recent Society Work</h3>${(work||[]).slice(0,5).map(w=>`<div class="activity-item"><div class="activity-icon">✓</div><div><strong>${w.name||w.title||w.work_name||w.project_name||w.work_title||w.project||w.work||w.activity||w.task||w.subject||'Work'}</strong><p>${w.status||''} · ${Number(w.progress||0)}%</p></div></div>`).join('')||'<div class="muted">No work records.</div>'}</div><div class="panel"><h3>My Recent Complaints</h3>${(complaints||[]).map(x=>`<div class="activity-item"><div class="activity-icon">⚑</div><div><strong>${x.subject||x.title||x.description||x.message||'Complaint'}</strong><p>${x.status||'Submitted'} · ${x.created_at?new Date(x.created_at).toLocaleDateString('en-IN'):''}</p></div></div>`).join('')||'<div class="muted">No complaints submitted.</div>'}</div></div>`;
+      c.innerHTML=`<div class="hero"><div><div class="eyebrow">WELCOME BACK</div><h2> ${user.name||'Member'}!</h2><div class="muted">Latest updates and information from your society.</div></div><button class="primary-btn" id="newComplaint">+ New Complaint</button></div><div class="stats">${[['Society Fund',`₹${Number(f.society_fund||0).toLocaleString('en-IN')}`,'Current balance'],['Total Expenses',`₹${Number(f.total_expenses||0).toLocaleString('en-IN')}`,'This year'],['Active Maintenance',String(active),'Active work items'],['My Complaints',String((complaints||[]).length),'Recent complaints']].map(x=>`<div class="stat"><div class="stat-head">${x[0]}<span>●</span></div><div class="value">${x[1]}</div><div class="trend">${x[2]}</div></div>`).join('')}</div><div class="panel member-monthly-security-card ${memberSecurityCompleted?'member-security-completed':'member-security-pending'}"><div class="member-security-card-head"><h3>Monthly Security Payment</h3><span class="member-security-status">${memberSecurityCompleted?'Completed':'Pending'}</span></div><div class="member-security-payment-details"><div><span class="muted">Current Month</span><strong>${monthlySecurityMonthLabel(monthlySecurityMonthValue())}</strong></div><div><span class="muted">Amount</span><strong>₹${Number(Number.isFinite(Number(memberSecurityAmount))?memberSecurityAmount:500).toLocaleString('en-IN')}</strong></div></div><div class="member-security-note">${memberSecurityCompleted?'Payment completed for the current month.':'Payment is pending for the current month.'}</div></div><div class="grid-2-equal"><div class="panel"><h3>Recent Society Work</h3>${(work||[]).slice(0,5).map(w=>`<div class="activity-item"><div class="activity-icon">✓</div><div><strong>${w.name||w.title||w.work_name||w.project_name||w.work_title||w.project||w.work||w.activity||w.task||w.subject||'Work'}</strong><p>${w.status||''} · ${Number(w.progress||0)}%</p></div></div>`).join('')||'<div class="muted">No work records.</div>'}</div><div class="panel"><h3>My Recent Complaints</h3>${(complaints||[]).map(x=>`<div class="activity-item"><div class="activity-icon">⚑</div><div><strong>${x.subject||x.title||x.description||x.message||'Complaint'}</strong><p>${x.status||'Submitted'} · ${x.created_at?new Date(x.created_at).toLocaleDateString('en-IN'):''}</p></div></div>`).join('')||'<div class="muted">No complaints submitted.</div>'}</div></div>`;
     }else if(p==='complaints'){
       const {data:rows,error}=await sb.from('complaints').select('*').eq('user_id',user.id).order('created_at',{ascending:false});
       if(error)throw error;
