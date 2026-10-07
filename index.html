@@ -2225,10 +2225,11 @@ async function login(){
 
     let credentials;
     if(loginValue.includes('@')){
+        if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginValue))return toast('Please enter a valid email address');
         credentials={email:loginValue,password};
     }else{
         const e164Phone=toE164Phone(loginValue);
-        if(!e164Phone)return toast('Please enter a valid email or 10-digit phone number');
+        if(!e164Phone||!/^\+\d{10,15}$/.test(e164Phone))return toast('Please enter a valid 10-digit phone number');
         credentials={phone:e164Phone,password};
     }
 
@@ -4751,7 +4752,7 @@ function monthlySecurityStatus(row){
 function monthlySecurityAmount(row,profile){
     const vals=[row?.amount,row?.payment_amount,row?.security_amount,row?.monthly_amount,profile?.monthly_security_amount,profile?.security_amount,profile?.monthly_amount,profile?.maintenance_amount];
     for(const v of vals){const n=Number(v);if(Number.isFinite(n)&&n>=0)return n;}
-    return 500;
+    return 200;
 }
 async function monthlySecurityLoadRows(month){
     const tableCandidates=['monthly_security_payments','security_payments','monthly_security'];
