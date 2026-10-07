@@ -906,8 +906,34 @@ const authModal=document.getElementById('authModal');const showLogin=()=>{docume
                     sentMessage.textContent='A verification OTP has been sent to '+email+'. Enter the OTP below to continue.';
                     toast('OTP sent to your email');
                 }else{
-                    showError('forgotPasswordPhoneError','Password reset is available by email only. Please use your email address.');
-                    return;
+                    const rawPhone=phoneInput.value.trim();
+                    if(!rawPhone){
+                        showError('forgotPasswordPhoneError','Please enter your phone number.');
+                        return;
+                    }
+                    const e164Phone=toE164Phone(rawPhone);
+                    if(!e164Phone||!/^\+\d{10,15}$/.test(e164Phone)){
+                        showError('forgotPasswordPhoneError','Please enter a valid 10-digit phone number.');
+                        return;
+                    }
+
+                    /*
+                     * Phone OTP password reset. This requires the Phone auth
+                     * provider plus an SMS gateway (Twilio / MessageBird /
+                     * Vonage / MSG91 etc.) to be configured in the Supabase
+                     * dashboard under Authentication -> Providers -> Phone.
+                     * Without that, this call will return an error.
+                     */
+                    const {error}=await sb.auth.signInWithOtp({
+                        phone:e164Phone,
+                        options:{shouldCreateUser:false}
+                    });
+                    if(error)throw error;
+
+                    recoveryPhone=e164Phone;
+                    recoveryEmail='';
+                    sentMessage.textContent='A verification OTP has been sent to '+e164Phone+'. Enter the OTP below to continue.';
+                    toast('OTP sent to your phone');
                 }
 
                 step1.style.display='none';
@@ -1082,17 +1108,44 @@ async function login(){
     if(!loginValue||!password)return toast('Please enter phone/email and password');
     if(!sb)return toast('Supabase is not configured yet');
 
-    let credentials;
+    let emailForAuth='';
+
     if(loginValue.includes('@')){
-        if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginValue))return toast('Please enter a valid email address');
-        credentials={email:loginValue,password};
+        if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginValue)){
+            return toast('Please enter a valid email address');
+        }
+        emailForAuth=loginValue;
     }else{
-        const e164Phone=toE164Phone(loginValue);
-        if(!e164Phone||!/^\+\d{10,15}$/.test(e164Phone))return toast('Please enter a valid 10-digit phone number');
-        credentials={phone:e164Phone,password};
+        // Phone login does NOT use Supabase Phone Auth/OTP.
+        // Look up the member email through the secure RPC, then authenticate
+        // with the existing email + password Auth flow.
+        let phoneDigits=loginValue.replace(/\D/g,'');
+        if(phoneDigits.length===12 && phoneDigits.startsWith('91')){
+            phoneDigits=phoneDigits.slice(2);
+        }
+        if(phoneDigits.length!==10){
+            return toast('Please enter a valid 10-digit phone number');
+        }
+
+        const {data:lookupEmail,error:lookupError}=await sb.rpc('get_email_by_phone',{
+            p_phone:phoneDigits
+        });
+
+        if(lookupError){
+            console.error('Phone login lookup error:',lookupError);
+            return toast('Unable to find account for this phone number. Please try again.');
+        }
+
+        emailForAuth=typeof lookupEmail==='string' ? lookupEmail.trim() : '';
+        if(!emailForAuth){
+            return toast('No account found for this phone number. Please check the number.');
+        }
     }
 
-    const {data,error}=await sb.auth.signInWithPassword(credentials);
+    const {data,error}=await sb.auth.signInWithPassword({
+        email:emailForAuth,
+        password
+    });
     if(error)return toast(error.message);
 
     const result=await sb.from('profiles').select('*').eq('id',data.user.id).maybeSingle();
@@ -1102,9 +1155,9 @@ async function login(){
 
     const user={
         ...data.user,
-        name:profile?.full_name||data.user.user_metadata?.full_name||data.user.email?.split('@')[0]||data.user.phone||'Member',
+        name:profile?.full_name||data.user.user_metadata?.full_name||data.user.email?.split('@')[0]||profile?.phone||'Member',
         email:data.user.email||profile?.email||'',
-        phone:data.user.phone||profile?.phone||'',
+        phone:profile?.phone||data.user.phone||'',
         house_no:profile?.house_number||profile?.house_no||'',
         address:profile?.address||'',
         role:normalizeRole(profile?.role||'member')
@@ -1143,6 +1196,17 @@ async function register(){
     if(!data.user)return toast('Registration could not be completed');
     const profileResult=await sb.from('profiles').update({full_name:name,email:data.user.email||email,phone:e164Phone,house_number:house_no,address:address||null}).eq('id',data.user.id);
     if(profileResult.error){console.error('Profile update error:',profileResult.error);return toast('Account created, but profile details could not be saved');}
+    // Link the phone number onto the Supabase Auth user itself (not just the
+    // profiles table) so phone + password login and phone OTP password reset
+    // can work later. This requires a session, and requires the Phone auth
+    // provider + an SMS gateway to be configured in the Supabase dashboard;
+    // if either isn't set up yet this silently fails without blocking signup.
+    if(data.session){
+        try{
+            const {error:phoneLinkError}=await sb.auth.updateUser({phone:e164Phone});
+            if(phoneLinkError)console.warn('Phone link error (non-blocking):',phoneLinkError);
+        }catch(linkErr){console.warn('Phone link error (non-blocking):',linkErr);}
+    }
     authModal.classList.add('hidden');
     if(!data.session){showLogin();return toast('Registration successful. Please verify your email before login.');}
     openMemberDashboard({...data.user,name,email,phone:e164Phone,house_no,address,role:'member'});
