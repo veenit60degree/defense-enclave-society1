@@ -2223,17 +2223,64 @@ async function login(){
     if(!loginValue||!password)return toast('Please enter phone/email and password');
     if(!sb)return toast('Supabase is not configured yet');
 
-    let credentials;
+    let authEmail=loginValue;
+
+    // Email login: use Supabase email/password authentication directly.
     if(loginValue.includes('@')){
         if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginValue))return toast('Please enter a valid email address');
-        credentials={email:loginValue,password};
+        authEmail=loginValue.toLowerCase();
     }else{
-        const e164Phone=toE164Phone(loginValue);
+        // Phone login WITHOUT Supabase Phone Auth / SMS / OTP.
+        // Resolve the member's stored phone number to their email first,
+        // then authenticate through the existing email/password provider.
+        const rawPhone=loginValue.trim();
+        const e164Phone=toE164Phone(rawPhone);
         if(!e164Phone||!/^\+\d{10,15}$/.test(e164Phone))return toast('Please enter a valid 10-digit phone number');
-        credentials={phone:e164Phone,password};
+
+        const digitsOnly=e164Phone.replace(/\D/g,'');
+        const tenDigit=digitsOnly.length===12 && digitsOnly.startsWith('91')
+            ? digitsOnly.slice(2)
+            : digitsOnly;
+
+        let phoneProfile=null;
+        let phoneLookupError=null;
+
+        // Existing installations may have phone values stored as E.164,
+        // 10 digits, or digits-only country-code format. Try all common forms.
+        const candidates=[e164Phone,tenDigit,digitsOnly];
+        for(const candidate of [...new Set(candidates)]){
+            const result=await sb
+                .from('profiles')
+                .select('id,email,phone,role,full_name,house_number,house_no,address')
+                .eq('phone',candidate)
+                .limit(1);
+            if(result.error){
+                phoneLookupError=result.error;
+                continue;
+            }
+            if(result.data?.length){
+                phoneProfile=result.data[0];
+                break;
+            }
+        }
+
+        if(!phoneProfile){
+            console.error('Phone login lookup failed:',phoneLookupError);
+            return toast('No account found for this phone number. Please check the number.');
+        }
+        if(!phoneProfile.email){
+            return toast('This account does not have an email address for password authentication.');
+        }
+
+        authEmail=String(phoneProfile.email).trim().toLowerCase();
     }
 
-    const {data,error}=await sb.auth.signInWithPassword(credentials);
+    // IMPORTANT: always authenticate with EMAIL + PASSWORD.
+    // Do NOT pass phone to signInWithPassword; that requires Supabase Phone Auth.
+    const {data,error}=await sb.auth.signInWithPassword({
+        email:authEmail,
+        password
+    });
     if(error)return toast(error.message);
 
     const result=await sb.from('profiles').select('*').eq('id',data.user.id).maybeSingle();
@@ -2257,7 +2304,7 @@ async function login(){
 }
 // Normalizes a 10-digit Indian mobile number (or one already carrying a
 // country code) into E.164 format (e.g. +919876543210), which is what
-// Supabase Auth requires for phone-based login/OTP.
+// used for profile phone matching. It is NOT passed to Supabase Auth.
 function toE164Phone(raw){
     const digits=String(raw||'').replace(/[^\d]/g,'');
     if(!digits)return '';
@@ -2284,17 +2331,9 @@ async function register(){
     if(!data.user)return toast('Registration could not be completed');
     const profileResult=await sb.from('profiles').update({full_name:name,email:data.user.email||email,phone:e164Phone,house_number:house_no,address:address||null}).eq('id',data.user.id);
     if(profileResult.error){console.error('Profile update error:',profileResult.error);return toast('Account created, but profile details could not be saved');}
-    // Link the phone number onto the Supabase Auth user itself (not just the
-    // profiles table) so phone + password login and phone OTP password reset
-    // can work later. This requires a session, and requires the Phone auth
-    // provider + an SMS gateway to be configured in the Supabase dashboard;
-    // if either isn't set up yet this silently fails without blocking signup.
-    if(data.session){
-        try{
-            const {error:phoneLinkError}=await sb.auth.updateUser({phone:e164Phone});
-            if(phoneLinkError)console.warn('Phone link error (non-blocking):',phoneLinkError);
-        }catch(linkErr){console.warn('Phone link error (non-blocking):',linkErr);}
-    }
+    // Phone is stored in public.profiles for phone-as-identifier login.
+    // We intentionally do NOT link it to Supabase Auth, because this project
+    // uses email/password Auth and does not use Supabase Phone Auth/OTP.
     authModal.classList.add('hidden');
     if(!data.session){showLogin();return toast('Registration successful. Please verify your email before login.');}
     openMemberDashboard({...data.user,name,email,phone:e164Phone,house_no,address,role:'member'});
