@@ -906,7 +906,7 @@ const authModal=document.getElementById('authModal');const showLogin=()=>{docume
                     sentMessage.textContent='A verification OTP has been sent to '+email+'. Enter the OTP below to continue.';
                     toast('OTP sent to your email');
                 }else{
-                    showError('forgotPasswordPhoneError','Password reset is available by email only.');
+                    showError('forgotPasswordPhoneError','Password reset is available by email only. Please use your email address.');
                     return;
                 }
 
@@ -1082,32 +1082,17 @@ async function login(){
     if(!loginValue||!password)return toast('Please enter phone/email and password');
     if(!sb)return toast('Supabase is not configured yet');
 
-    let emailForAuth = loginValue;
+    let credentials;
     if(loginValue.includes('@')){
         if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginValue))return toast('Please enter a valid email address');
-        emailForAuth=loginValue;
+        credentials={email:loginValue,password};
     }else{
         const e164Phone=toE164Phone(loginValue);
         if(!e164Phone||!/^\+\d{10,15}$/.test(e164Phone))return toast('Please enter a valid 10-digit phone number');
-
-        // Phone is used only as an identifier. Do NOT call Supabase Phone Auth.
-        // Resolve the phone from profiles and authenticate with the user's email.
-        const {data:phoneRows,error:phoneLookupError}=await sb
-            .from('profiles')
-            .select('id,email,phone,role,full_name,house_number,address')
-            .eq('phone',e164Phone)
-            .limit(2);
-        if(phoneLookupError){
-            console.error('Phone lookup error:',phoneLookupError);
-            return toast('Unable to find account for this phone number.');
-        }
-        if(!phoneRows || phoneRows.length===0)return toast('No account found with this phone number.');
-        if(phoneRows.length>1)return toast('Multiple accounts found with this phone number. Please login with email.');
-        if(!phoneRows[0].email)return toast('This account does not have a login email. Please login with email or contact administrator.');
-        emailForAuth=String(phoneRows[0].email).trim();
+        credentials={phone:e164Phone,password};
     }
 
-    const {data,error}=await sb.auth.signInWithPassword({email:emailForAuth,password});
+    const {data,error}=await sb.auth.signInWithPassword(credentials);
     if(error)return toast(error.message);
 
     const result=await sb.from('profiles').select('*').eq('id',data.user.id).maybeSingle();
