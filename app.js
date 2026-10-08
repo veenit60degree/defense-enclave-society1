@@ -4275,6 +4275,38 @@ else if(p==='maintenance'){
     ${(rows||[]).map((x,i)=>`<tr><td><strong>${x.name||x.title||x.work_name||x.project_name||x.work_title||x.project||x.work||x.activity||x.task||x.subject||''}</strong></td><td>${x.description||''}</td><td>${x.status||''}</td><td>${Number(x.progress||0)}%</td><td>${x.target_date||x.target||''}</td><td><button type="button" class="action-icon-btn action-edit" onclick="adminEditWork(${i})" aria-label="Edit society work" title="Edit">✎</button>
       <button type="button" class="gallery-icon-btn gallery-icon-danger" onclick="adminDeleteWork(${i})" aria-label="Delete society work" title="Delete"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v6M14 11v6"/></svg></button></td></tr>`).join('')}
     </tbody></table></div>${rows?.length?'':`<div class="muted" style="padding:18px">No society work records saved yet.</div>`}</div>`;
+}else if(p==='events'){
+    // Admin/SuperAdmin Events page. The navigation button already routes to
+    // adminPage('events'); this branch renders the page and keeps the
+    // existing add/edit/delete event functions intact.
+    const {data:rows,error}=await sb.from('events').select('*').order('event_date',{ascending:false});
+    if(error){
+        console.error('Events load error:',error);
+        return toast('Unable to load Events: '+error.message);
+    }
+    window.__eventRows=rows||[];
+    c.innerHTML=`<div class="hero admin-events-hero">
+      <div><div class="eyebrow">ADMINISTRATION</div><h2>Events</h2><div class="muted">Manage society events shown on the website.</div></div>
+      <button type="button" class="primary-btn" onclick="adminAddEvent()">+ Add Event</button>
+    </div>
+    <div class="panel admin-events-panel">
+      <div class="admin-events-grid">
+        ${(rows||[]).map((x,i)=>`<article class="card admin-event-card">
+          <div class="photo admin-event-photo">📅</div>
+          <div class="card-body">
+            <div class="event-date">${x.event_date||x.date||''}</div>
+            <h3>${x.title||x.name||''}</h3>
+            <div class="muted">${x.location||x.place||x.description||''}</div>
+            ${x.description && (x.location||x.place) ? `<div class="admin-event-description">${x.description}</div>` : ''}
+            <div class="admin-event-actions">
+              <button type="button" class="outline-btn" onclick="adminEditEvent(${i})">Edit</button>
+              <button type="button" class="outline-btn gallery-icon-danger" onclick="adminDeleteEvent(${i})">Delete</button>
+            </div>
+          </div>
+        </article>`).join('')}
+      </div>
+      ${rows?.length?'':`<div class="muted admin-events-empty">No events saved yet. Click <strong>+ Add Event</strong> to create one.</div>`}
+    </div>`;
 }else if(p==='news'){
     const {data:rows,error}=await sb.from('society_news').select('*').order('is_pinned',{ascending:false}).order('created_at',{ascending:false});
     if(error){ console.error('News load error:',error); return toast('Unable to load News & Announcements: '+error.message); }
