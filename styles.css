@@ -1014,3 +1014,17 @@ label{color:var(--md-on-surface-variant)}
   .public-news-date-badge{width:46px;height:46px;font-size:15px;border-radius:12px}
   .public-news-date-badge span{font-size:9px}
 }
+
+
+/* ===== Admin Events page ===== */
+.admin-events-hero{align-items:center}
+.admin-events-panel{overflow:hidden}
+.admin-events-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.admin-event-card{min-width:0;overflow:hidden}
+.admin-event-photo{display:flex;align-items:center;justify-content:center;min-height:110px;font-size:44px;background:var(--md-info-container,#e6ecff)}
+.admin-event-description{margin-top:10px;color:var(--md-on-surface-variant,#5c6c6f);white-space:pre-wrap;line-height:1.5}
+.admin-event-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.admin-event-actions .outline-btn{min-width:78px}
+.admin-events-empty{padding:24px;text-align:center}
+@media(max-width:1100px){.admin-events-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:680px){.admin-events-hero{align-items:flex-start;flex-direction:column}.admin-events-hero .primary-btn{width:100%}.admin-events-grid{grid-template-columns:1fr}.admin-event-actions .outline-btn{flex:1 1 auto}}
