@@ -4041,7 +4041,12 @@ async function adminMonthlySecurityPage(user){
               <option value="Pending" ${x.status==='Pending'?'selected':''}>Pending</option>
               <option value="Completed" ${x.status==='Completed'?'selected':''}>Completed</option>
             </select></td>
-            <td><button type="button" class="primary-btn monthly-security-update-btn" data-user-id="${monthlySecurityEsc(x.id)}">Update</button></td>
+            <td>
+              <div class="monthly-security-action-buttons">
+                <button type="button" class="primary-btn monthly-security-update-btn" data-user-id="${monthlySecurityEsc(x.id)}">Update</button>
+                <button type="button" class="outline-btn monthly-security-history-btn" data-user-id="${monthlySecurityEsc(x.id)}" data-user-name="${monthlySecurityEsc(x.name||'Member')}">History</button>
+              </div>
+            </td>
           </tr>`).join('');
         document.getElementById('monthlySecurityEmpty').style.display=rows.length?'none':'block';
 
@@ -4192,7 +4197,68 @@ async function adminMonthlySecurityPage(user){
 });
 
         
+async function showMonthlySecurityHistory(userId,userName){
+    if(!sb)return toast('Supabase is not configured.');
+    const existing=document.getElementById('monthlySecurityHistoryModal');
+    if(existing) existing.remove();
+
+    const modal=document.createElement('div');
+    modal.id='monthlySecurityHistoryModal';
+    modal.className='monthly-security-history-modal';
+    modal.innerHTML=`
+      <div class="monthly-security-history-backdrop" data-close-history="1"></div>
+      <div class="monthly-security-history-dialog" role="dialog" aria-modal="true" aria-labelledby="monthlySecurityHistoryTitle">
+        <div class="monthly-security-history-header">
+          <div><div class="eyebrow">PAYMENT HISTORY</div><h3 id="monthlySecurityHistoryTitle">${monthlySecurityEsc(userName)}</h3></div>
+          <button type="button" class="monthly-security-history-close" aria-label="Close">×</button>
+        </div>
+        <div class="monthly-security-history-subtitle">Monthly Security payment history</div>
+        <div id="monthlySecurityHistoryBody" class="monthly-security-history-body">Loading history...</div>
+      </div>`;
+    document.body.appendChild(modal);
+
+    const close=()=>modal.remove();
+    modal.querySelector('.monthly-security-history-close').onclick=close;
+    modal.querySelector('[data-close-history="1"]').onclick=close;
+    const onKey=e=>{if(e.key==='Escape'){close();document.removeEventListener('keydown',onKey);}};
+    document.addEventListener('keydown',onKey);
+
+    try{
+        const {data,error}=await sb.from('monthly_security_payments')
+            .select('id,payment_month,amount,payment_status,created_at,updated_at')
+            .eq('user_id',userId)
+            .order('payment_month',{ascending:false})
+            .limit(36);
+        if(error)throw error;
+        const rows=Array.isArray(data)?data:[];
+        const body=modal.querySelector('#monthlySecurityHistoryBody');
+        if(!rows.length){
+            body.innerHTML='<div class="monthly-security-history-empty">No payment history found for this member.</div>';
+            return;
+        }
+        body.innerHTML=`<div class="monthly-security-history-list">${rows.map(row=>{
+            const status=monthlySecurityStatus(row);
+            const month=monthlySecurityMonthLabel(monthlySecurityMonthFromRow(row));
+            const amount=monthlySecurityMoney(row.amount);
+            const updated=row.updated_at||row.created_at;
+            const date=updated?new Date(updated).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'—';
+            return `<div class="monthly-security-history-item ${status==='Completed'?'history-paid':'history-pending'}">
+              <div class="monthly-security-history-month"><strong>${monthlySecurityEsc(month||'Unknown month')}</strong><span>${monthlySecurityEsc(date)}</span></div>
+              <div class="monthly-security-history-amount">₹${amount.toLocaleString('en-IN')}</div>
+              <span class="monthly-security-history-status">${status}</span>
+            </div>`;
+        }).join('')}</div>`;
+    }catch(e){
+        console.error('Monthly Security history error:',e);
+        modal.querySelector('#monthlySecurityHistoryBody').innerHTML=`<div class="monthly-security-history-error">Unable to load payment history: ${monthlySecurityEsc(e?.message||e)}</div>`;
     }
+}
+
+    }
+
+    tbody.querySelectorAll('.monthly-security-history-btn').forEach(btn=>{
+        btn.onclick=()=>showMonthlySecurityHistory(btn.dataset.userId,btn.dataset.userName||'Member');
+    });
 
     
     sel.onchange=loadAndRender;
