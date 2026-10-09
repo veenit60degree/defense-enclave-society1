@@ -4206,6 +4206,23 @@ async function adminMonthlySecurityPage(user){
 
         
 async function showMonthlySecurityHistory(userId,userName){
+    // Keep history rendering self-contained so it works whether this function
+    // is loaded from the external script or the legacy inline HTML script.
+    const historyMoney = value => { const n = Number(value ?? 0); return Number.isFinite(n) ? n : 0; };
+    const historyEsc = value => String(value ?? '').replace(/[&<>\"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[ch]));
+    const historyMonthFromRow = row => {
+        const raw = row?.payment_month ?? row?.month ?? row?.created_at;
+        if (!raw) return '';
+        const match = String(raw).match(/^(\d{4})-(\d{1,2})(?:-|T|\s|$)/);
+        if (match) return `${match[1]}-${String(Number(match[2])).padStart(2,'0')}`;
+        const d = new Date(raw);
+        return Number.isNaN(d.getTime()) ? '' : `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    };
+    const historyMonthLabel = value => {
+        const [y,m] = String(value || '').split('-').map(Number);
+        return y && m ? new Date(y,m-1,1).toLocaleDateString('en-IN',{month:'long',year:'numeric'}) : String(value || '');
+    };
+    const historyStatus = row => ['paid','completed','complete','done','success','successful','received'].includes(String(row?.payment_status ?? row?.status ?? 'pending').trim().toLowerCase()) ? 'Completed' : 'Pending';
     if(!sb)return toast('Supabase is not configured.');
     const existing=document.getElementById('monthlySecurityHistoryModal');
     if(existing) existing.remove();
@@ -4217,7 +4234,7 @@ async function showMonthlySecurityHistory(userId,userName){
       <div class="monthly-security-history-backdrop" data-close-history="1"></div>
       <div class="monthly-security-history-dialog" role="dialog" aria-modal="true" aria-labelledby="monthlySecurityHistoryTitle">
         <div class="monthly-security-history-header">
-          <div><div class="eyebrow">PAYMENT HISTORY</div><h3 id="monthlySecurityHistoryTitle">${monthlySecurityEsc(userName)}</h3></div>
+          <div><div class="eyebrow">PAYMENT HISTORY</div><h3 id="monthlySecurityHistoryTitle">${historyEsc(userName)}</h3></div>
           <button type="button" class="monthly-security-history-close" aria-label="Close">×</button>
         </div>
         <div class="monthly-security-history-subtitle">Monthly Security payment history</div>
@@ -4245,20 +4262,20 @@ async function showMonthlySecurityHistory(userId,userName){
             return;
         }
         body.innerHTML=`<div class="monthly-security-history-list">${rows.map(row=>{
-            const status=monthlySecurityStatus(row);
-            const month=monthlySecurityMonthLabel(monthlySecurityMonthFromRow(row));
-            const amount=monthlySecurityMoney(row.amount);
+            const status=historyStatus(row);
+            const month=historyMonthLabel(historyMonthFromRow(row));
+            const amount=historyMoney(row.amount);
             const updated=row.updated_at||row.created_at;
             const date=updated?new Date(updated).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'—';
             return `<div class="monthly-security-history-item ${status==='Completed'?'history-paid':'history-pending'}">
-              <div class="monthly-security-history-month"><strong>${monthlySecurityEsc(month||'Unknown month')}</strong><span>${monthlySecurityEsc(date)}</span></div>
+              <div class="monthly-security-history-month"><strong>${historyEsc(month||'Unknown month')}</strong><span>${historyEsc(date)}</span></div>
               <div class="monthly-security-history-amount">₹${amount.toLocaleString('en-IN')}</div>
               <span class="monthly-security-history-status">${status}</span>
             </div>`;
         }).join('')}</div>`;
     }catch(e){
         console.error('Monthly Security history error:',e);
-        modal.querySelector('#monthlySecurityHistoryBody').innerHTML=`<div class="monthly-security-history-error">Unable to load payment history: ${monthlySecurityEsc(e?.message||e)}</div>`;
+        modal.querySelector('#monthlySecurityHistoryBody').innerHTML=`<div class="monthly-security-history-error">Unable to load payment history: ${historyEsc(e?.message||e)}</div>`;
     }
 }
 
