@@ -1067,3 +1067,41 @@ label{color:var(--md-on-surface-variant)}
   .monthly-security-history-item{grid-template-columns:1fr auto;gap:8px 12px}
   .monthly-security-history-status{grid-column:1/-1;justify-self:start}
 }
+
+/* Permanent Monthly Security History overlay fix. Keep this block at the end so it wins over legacy rules. */
+#monthlySecurityHistoryModal.monthly-security-history-modal {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2147483000 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 18px !important;
+  box-sizing: border-box !important;
+  width: auto !important;
+  height: auto !important;
+  overflow: auto !important;
+}
+#monthlySecurityHistoryModal .monthly-security-history-backdrop {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 0 !important;
+  background: rgba(15, 28, 32, .55) !important;
+}
+#monthlySecurityHistoryModal .monthly-security-history-dialog {
+  position: relative !important;
+  z-index: 1 !important;
+  width: min(620px, 100%) !important;
+  max-height: 82vh !important;
+  overflow: auto !important;
+  margin: auto !important;
+  background: #fff !important;
+  border-radius: 18px !important;
+  box-shadow: 0 18px 55px rgba(0, 0, 0, .25) !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+@media (max-width: 640px) {
+  #monthlySecurityHistoryModal.monthly-security-history-modal { padding: 10px !important; }
+  #monthlySecurityHistoryModal .monthly-security-history-dialog { max-height: 88vh !important; }
+}
