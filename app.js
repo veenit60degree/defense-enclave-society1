@@ -4206,11 +4206,9 @@ async function adminMonthlySecurityPage(user){
 
         
 async function showMonthlySecurityHistory(userId,userName){
-    // Keep history rendering self-contained so it works whether this function
-    // is loaded from the external script or the legacy inline HTML script.
     const historyMoney = value => { const n = Number(value ?? 0); return Number.isFinite(n) ? n : 0; };
-    const historyEsc = value => String(value ?? '').replace(/[&<>\"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[ch]));
-    const historyMonthFromRow = row => {
+    const historyEsc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+    const historyMonthKey = row => {
         const raw = row?.payment_month ?? row?.month ?? row?.created_at;
         if (!raw) return '';
         const match = String(raw).match(/^(\d{4})-(\d{1,2})(?:-|T|\s|$)/);
@@ -4218,15 +4216,18 @@ async function showMonthlySecurityHistory(userId,userName){
         const d = new Date(raw);
         return Number.isNaN(d.getTime()) ? '' : `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
     };
-    const historyMonthLabel = value => {
-        const [y,m] = String(value || '').split('-').map(Number);
-        return y && m ? new Date(y,m-1,1).toLocaleDateString('en-IN',{month:'long',year:'numeric'}) : String(value || '');
+    const historyMonthLabel = key => {
+        const [y,m] = String(key || '').split('-').map(Number);
+        return y && m ? new Date(y,m-1,1).toLocaleDateString('en-IN',{month:'long',year:'numeric'}) : String(key || '');
     };
-    const historyStatus = row => ['paid','completed','complete','done','success','successful','received'].includes(String(row?.payment_status ?? row?.status ?? 'pending').trim().toLowerCase()) ? 'Completed' : 'Pending';
-    if(!sb)return toast('Supabase is not configured.');
-    const existing=document.getElementById('monthlySecurityHistoryModal');
-    if(existing) existing.remove();
-
+    const historyStatus = row => {
+        const raw = String(row?.payment_status ?? row?.status ?? '').trim();
+        if (['paid','completed','complete','done','success','successful','received'].includes(raw.toLowerCase())) return 'Completed';
+        if (!raw) return 'Pending';
+        return raw.replace(/[_-]+/g,' ').replace(/\b\w/g, c => c.toUpperCase());
+    };
+    if(!sb) return toast('Supabase is not configured.');
+    document.getElementById('monthlySecurityHistoryModal')?.remove();
     const modal=document.createElement('div');
     modal.id='monthlySecurityHistoryModal';
     modal.className='monthly-security-history-modal';
@@ -4237,15 +4238,19 @@ async function showMonthlySecurityHistory(userId,userName){
           <div><div class="eyebrow">PAYMENT HISTORY</div><h3 id="monthlySecurityHistoryTitle">${historyEsc(userName)}</h3></div>
           <button type="button" class="monthly-security-history-close" aria-label="Close">×</button>
         </div>
-        <div class="monthly-security-history-subtitle">Monthly Security payment history</div>
+        <div class="monthly-security-history-toolbar">
+          <div class="monthly-security-history-subtitle">Monthly Security payment history</div>
+          <label class="monthly-security-history-year-label" for="monthlySecurityHistoryYear">Year
+            <select id="monthlySecurityHistoryYear" class="monthly-security-history-year"></select>
+          </label>
+        </div>
         <div id="monthlySecurityHistoryBody" class="monthly-security-history-body">Loading history...</div>
       </div>`;
     document.body.appendChild(modal);
-
-    const close=()=>modal.remove();
+    const close=()=>{modal.remove();document.removeEventListener('keydown',onKey);};
     modal.querySelector('.monthly-security-history-close').onclick=close;
     modal.querySelector('[data-close-history="1"]').onclick=close;
-    const onKey=e=>{if(e.key==='Escape'){close();document.removeEventListener('keydown',onKey);}};
+    const onKey=e=>{if(e.key==='Escape'){close();}};
     document.addEventListener('keydown',onKey);
 
     try{
@@ -4253,40 +4258,57 @@ async function showMonthlySecurityHistory(userId,userName){
             .select('id,payment_month,amount,payment_status,created_at,updated_at')
             .eq('user_id',userId)
             .order('payment_month',{ascending:false})
-            .limit(36);
-        if(error)throw error;
+            .limit(1200);
+        if(error) throw error;
         const rows=Array.isArray(data)?data:[];
+        const rowsByMonth=new Map();
+        const yearSet=new Set([new Date().getFullYear()]);
+        rows.forEach(row=>{
+            const key=historyMonthKey(row);
+            if(!key) return;
+            const year=Number(key.slice(0,4));
+            if(Number.isInteger(year)) yearSet.add(year);
+            // If duplicate records exist for a month, prefer the most recently updated row.
+            const previous=rowsByMonth.get(key);
+            if(!previous || new Date(row.updated_at||row.created_at||0) > new Date(previous.updated_at||previous.created_at||0)) rowsByMonth.set(key,row);
+        });
+        const recordedYears=[...yearSet].filter(Number.isInteger);
+        const currentYear=new Date().getFullYear();
+        const firstYear=Math.min(currentYear,...recordedYears);
+        const lastYear=Math.max(currentYear,...recordedYears);
+        const years=[];
+        for(let year=lastYear;year>=firstYear;year--) years.push(year);
+        const yearSelect=modal.querySelector('#monthlySecurityHistoryYear');
+        yearSelect.innerHTML=years.map(year=>`<option value="${year}">${year}</option>`).join('');
+        yearSelect.value=String(currentYear);
         const body=modal.querySelector('#monthlySecurityHistoryBody');
-        if(!rows.length){
-            body.innerHTML='<div class="monthly-security-history-empty">No payment history found for this member.</div>';
-            return;
-        }
-        body.innerHTML=`<div class="monthly-security-history-list">${rows.map(row=>{
-            const status=historyStatus(row);
-            const month=historyMonthLabel(historyMonthFromRow(row));
-            const amount=historyMoney(row.amount);
-            const updated=row.updated_at||row.created_at;
-            const date=updated?new Date(updated).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'—';
-            return `<div class="monthly-security-history-item ${status==='Completed'?'history-paid':'history-pending'}">
-              <div class="monthly-security-history-month"><strong>${historyEsc(month||'Unknown month')}</strong><span>${historyEsc(date)}</span></div>
-              <div class="monthly-security-history-amount">₹${amount.toLocaleString('en-IN')}</div>
-              <span class="monthly-security-history-status">${status}</span>
-            </div>`;
-        }).join('')}</div>`;
+        const renderYear=year=>{
+            const yearNumber=Number(year);
+            const monthRows=[];
+            // Always render all 12 months. A month without a saved payment row is Pending.
+            for(let month=12;month>=1;month--){
+                const key=`${yearNumber}-${String(month).padStart(2,'0')}`;
+                const row=rowsByMonth.get(key)||null;
+                const status=row?historyStatus(row):'Pending';
+                const completed=status==='Completed';
+                const amount=row ? `₹${historyMoney(row.amount).toLocaleString('en-IN')}` : '—';
+                const updated=row?.updated_at||row?.created_at;
+                const date=updated?new Date(updated).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'No payment recorded';
+                monthRows.push(`<div class="monthly-security-history-item ${completed?'history-paid':'history-pending'}">
+                  <div class="monthly-security-history-month"><strong>${historyEsc(historyMonthLabel(key))}</strong><span>${historyEsc(date)}</span></div>
+                  <div class="monthly-security-history-amount">${amount}</div>
+                  <span class="monthly-security-history-status">${historyEsc(status)}</span>
+                </div>`);
+            }
+            body.innerHTML=`<div class="monthly-security-history-list">${monthRows.join('')}</div>`;
+        };
+        yearSelect.addEventListener('change',()=>renderYear(yearSelect.value));
+        renderYear(yearSelect.value);
     }catch(e){
         console.error('Monthly Security history error:',e);
         modal.querySelector('#monthlySecurityHistoryBody').innerHTML=`<div class="monthly-security-history-error">Unable to load payment history: ${historyEsc(e?.message||e)}</div>`;
     }
 }
-
-    }
-
-    sel.onchange=loadAndRender;
-    document.getElementById('monthlySecuritySearch').oninput=render;
-    document.getElementById('monthlySecurityExport').onclick=()=>adminExportMonthlySecurity(state,sel.value);
-    await loadAndRender();
-}
-
 function adminExportMonthlySecurity(state,month){
     if(!state)return toast('Monthly Security data is not loaded.');
     const rows=adminMonthlySecurityRows(state,month);
