@@ -4010,7 +4010,7 @@ async function adminMonthlySecurityPage(user){
     const exportYear=document.getElementById('monthlySecurityExportYear');
     const exportMonth=document.getElementById('monthlySecurityExportMonth');
     const exportNow=new Date();
-    for(let y=exportNow.getFullYear();y>=Math.min(exportNow.getFullYear()-2,2020);y--){
+    for(let y=exportNow.getFullYear();y>=2026;y--){
         exportYear.insertAdjacentHTML('beforeend',`<option value="${y}">${y}</option>`);
     }
     for(let m=1;m<=12;m++){
