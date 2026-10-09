@@ -5186,7 +5186,15 @@ async function adminMonthlySecurityPage(user){
     for(let m=1;m<=12;m++){const mm=String(m).padStart(2,'0');exportMonth.insertAdjacentHTML('beforeend',`<option value="${mm}">${new Date(exportNow.getFullYear(),m-1,1).toLocaleDateString('en-IN',{month:'long'})}</option>`);}
     exportYear.value=String(exportNow.getFullYear());
     exportMonth.value=String(exportNow.getMonth()+1).padStart(2,'0');
-    exportYear.addEventListener('change',()=>{if(exportYear.value===String(new Date().getFullYear()))exportMonth.value=String(new Date().getMonth()+1).padStart(2,'0');});
+    const refreshExportMonths=()=>{
+        const now=new Date(),selectedYear=Number(exportYear.value);
+        [...exportMonth.options].forEach(option=>{option.disabled=selectedYear>now.getFullYear()||(selectedYear===now.getFullYear()&&Number(option.value)>now.getMonth()+1);});
+        if(selectedYear===now.getFullYear()&&Number(exportMonth.value)>now.getMonth()+1)exportMonth.value=String(now.getMonth()+1).padStart(2,'0');
+        document.getElementById('monthlySecurityExport').disabled=selectedYear>now.getFullYear()||(selectedYear===now.getFullYear()&&Number(exportMonth.value)>now.getMonth()+1);
+    };
+    exportYear.addEventListener('change',refreshExportMonths);
+    exportMonth.addEventListener('change',refreshExportMonths);
+    refreshExportMonths();
     let state={profiles:[],paidByUser:new Map(),table:''};
 
     async function updateMonthlySecurityPayment(item,selectedMonth){
@@ -5258,13 +5266,18 @@ async function adminMonthlySecurityPage(user){
     sel.onchange=render;
     document.getElementById('monthlySecuritySearch').oninput=render;
     document.getElementById('monthlySecurityExport').onclick=async()=>{
-        const year=exportYear.value,monthNumber=exportMonth.value;
-        const exportMonthValue=`${year}-${monthNumber}`;
+        const now=new Date();
+        const year=Number(exportYear.value),monthNumber=Number(exportMonth.value);
+        if(year>now.getFullYear()||(year===now.getFullYear()&&monthNumber>now.getMonth()+1)){
+            toast('Future month Excel export is not available. Please select the current or a past month.');
+            return;
+        }
+        const exportMonthValue=`${year}-${String(monthNumber).padStart(2,'0')}`;
         const btn=document.getElementById('monthlySecurityExport');
         btn.disabled=true;const oldText=btn.textContent;btn.textContent='Preparing...';
         try{const exportState=await monthlySecurityLoadRows(exportMonthValue);adminExportMonthlySecurity(exportState,exportMonthValue);}
         catch(e){console.error('Monthly Security export error:',e);toast('Unable to export: '+(e?.message||e));}
-        finally{btn.disabled=false;btn.textContent=oldText||'Export Excel';}
+        finally{btn.textContent=oldText||'Export Excel';refreshExportMonths();}
     };
     await render();
 }
