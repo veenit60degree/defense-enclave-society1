@@ -1251,3 +1251,57 @@ label{color:var(--md-on-surface-variant)}
     justify-self: start !important;
   }
 }
+
+
+/* Monthly Security history: year selector and all-month status rows */
+#monthlySecurityHistoryModal .monthly-security-history-toolbar {
+  display:flex !important;
+  align-items:center !important;
+  justify-content:space-between !important;
+  gap:16px !important;
+  padding:10px 22px !important;
+  border-bottom:1px solid #edf1f0 !important;
+  box-sizing:border-box !important;
+}
+#monthlySecurityHistoryModal .monthly-security-history-toolbar .monthly-security-history-subtitle {
+  padding:0 !important;
+  margin:0 !important;
+}
+#monthlySecurityHistoryModal .monthly-security-history-year-label {
+  display:flex !important;
+  align-items:center !important;
+  gap:8px !important;
+  color:#52636b !important;
+  font-size:12px !important;
+  font-weight:700 !important;
+  white-space:nowrap !important;
+}
+#monthlySecurityHistoryModal .monthly-security-history-year {
+  min-width:100px !important;
+  padding:8px 30px 8px 10px !important;
+  border:1px solid #d8e2e4 !important;
+  border-radius:9px !important;
+  background:#fff !important;
+  color:#203236 !important;
+  font:inherit !important;
+}
+#monthlySecurityHistoryModal .monthly-security-history-item.history-pending .monthly-security-history-status {
+  background:#ffdfe0 !important;
+  color:#b4232b !important;
+}
+#monthlySecurityHistoryModal .monthly-security-history-item.history-paid .monthly-security-history-status {
+  background:#d7f5e5 !important;
+  color:#137a4d !important;
+}
+@media (max-width:600px) {
+  #monthlySecurityHistoryModal .monthly-security-history-toolbar {
+    align-items:flex-start !important;
+    flex-direction:column !important;
+    padding:12px 16px !important;
+    gap:10px !important;
+  }
+  #monthlySecurityHistoryModal .monthly-security-history-year-label {
+    width:100% !important;
+    justify-content:space-between !important;
+  }
+}
