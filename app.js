@@ -4050,6 +4050,14 @@ async function adminMonthlySecurityPage(user){
           </tr>`).join('');
         document.getElementById('monthlySecurityEmpty').style.display=rows.length?'none':'block';
 
+        // Bind History buttons after each table render. The history function is
+        // scoped to render(), so binding outside this scope caused clicks to fail.
+        tbody.querySelectorAll('.monthly-security-history-btn').forEach(btn => {
+            btn.onclick = () => showMonthlySecurityHistory(
+                btn.dataset.userId,
+                btn.dataset.userName || 'Member'
+            );
+        });
 
       tbody.querySelectorAll('.monthly-security-update-btn').forEach(btn => {
     btn.onclick = async () => {
@@ -4256,11 +4264,6 @@ async function showMonthlySecurityHistory(userId,userName){
 
     }
 
-    tbody.querySelectorAll('.monthly-security-history-btn').forEach(btn=>{
-        btn.onclick=()=>showMonthlySecurityHistory(btn.dataset.userId,btn.dataset.userName||'Member');
-    });
-
-    
     sel.onchange=loadAndRender;
     document.getElementById('monthlySecuritySearch').oninput=render;
     document.getElementById('monthlySecurityExport').onclick=()=>adminExportMonthlySecurity(state,sel.value);
