@@ -5271,7 +5271,8 @@ async function showMonthlySecurityHistory(userId,userName){
         const raw = String(row?.payment_status ?? row?.status ?? '').trim();
         if (['paid','completed','complete','done','success','successful','received'].includes(raw.toLowerCase())) return 'Completed';
         if (!raw) return 'Pending';
-        return raw.replace(/[_-]+/g,' ').replace(/\b\w/g, c => c.toUpperCase());
+        const normalized=raw.replace(/[_-]+/g,' ').replace(/\b\w/g, c => c.toUpperCase());
+        return ['Pending','Not Paid','Unpaid','Incomplete','Failed','Rejected','Cancelled','Canceled'].includes(normalized) ? normalized : normalized;
     };
     if(!sb) return toast('Supabase is not configured.');
     document.getElementById('monthlySecurityHistoryModal')?.remove();
@@ -5288,7 +5289,7 @@ async function showMonthlySecurityHistory(userId,userName){
         <div class="monthly-security-history-toolbar">
           <div class="monthly-security-history-subtitle">Monthly Security payment history</div>
           <label class="monthly-security-history-year-label" for="monthlySecurityHistoryYear">Year
-            <select id="monthlySecurityHistoryYear" class="monthly-security-history-year"></select>
+            <select id="monthlySecurityHistoryYear" class="monthly-security-history-year" aria-label="Select history year"></select>
           </label>
         </div>
         <div id="monthlySecurityHistoryBody" class="monthly-security-history-body">Loading history...</div>
@@ -5301,39 +5302,53 @@ async function showMonthlySecurityHistory(userId,userName){
     document.addEventListener('keydown',onKey);
 
     try{
-        const {data,error}=await sb.from('monthly_security_payments')
-            .select('id,payment_month,amount,payment_status,created_at,updated_at')
-            .eq('user_id',userId)
-            .order('payment_month',{ascending:false})
-            .limit(1200);
+        const [{data,error},{data:profile, error:profileError}]=await Promise.all([
+            sb.from('monthly_security_payments')
+                .select('id,payment_month,amount,payment_status,created_at,updated_at')
+                .eq('user_id',userId)
+                .order('payment_month',{ascending:false})
+                .limit(1200),
+            sb.from('profiles').select('created_at').eq('id',userId).maybeSingle()
+        ]);
         if(error) throw error;
+        // Registration date controls the first month shown. If unavailable,
+        // use the earliest saved payment month so history never invents earlier months.
+        let registrationDate = !profileError && profile?.created_at ? new Date(profile.created_at) : null;
+        if(registrationDate && Number.isNaN(registrationDate.getTime())) registrationDate=null;
         const rows=Array.isArray(data)?data:[];
         const rowsByMonth=new Map();
-        const yearSet=new Set([new Date().getFullYear()]);
         rows.forEach(row=>{
             const key=historyMonthKey(row);
             if(!key) return;
-            const year=Number(key.slice(0,4));
-            if(Number.isInteger(year)) yearSet.add(year);
-            // If duplicate records exist for a month, prefer the most recently updated row.
             const previous=rowsByMonth.get(key);
             if(!previous || new Date(row.updated_at||row.created_at||0) > new Date(previous.updated_at||previous.created_at||0)) rowsByMonth.set(key,row);
         });
-        const recordedYears=[...yearSet].filter(Number.isInteger);
-        const currentYear=new Date().getFullYear();
-        const firstYear=Math.min(currentYear,...recordedYears);
-        const lastYear=Math.max(currentYear,...recordedYears);
+        const currentDate=new Date();
+        const currentYear=currentDate.getFullYear();
+        const currentMonth=currentDate.getMonth()+1;
+        if(!registrationDate){
+            const earliestKey=[...rowsByMonth.keys()].sort()[0];
+            if(earliestKey){
+                const [y,m]=earliestKey.split('-').map(Number);
+                registrationDate=new Date(y,m-1,1);
+            }else{
+                // No registration timestamp and no payments: show only the current month.
+                registrationDate=new Date(currentYear,currentMonth-1,1);
+            }
+        }
+        const firstYear=Math.min(registrationDate.getFullYear(),currentYear);
         const years=[];
-        for(let year=lastYear;year>=firstYear;year--) years.push(year);
+        for(let year=currentYear;year>=firstYear;year--) years.push(year);
         const yearSelect=modal.querySelector('#monthlySecurityHistoryYear');
         yearSelect.innerHTML=years.map(year=>`<option value="${year}">${year}</option>`).join('');
         yearSelect.value=String(currentYear);
         const body=modal.querySelector('#monthlySecurityHistoryBody');
         const renderYear=year=>{
             const yearNumber=Number(year);
+            const startMonth=yearNumber===registrationDate.getFullYear()?registrationDate.getMonth()+1:1;
+            const endMonth=yearNumber===currentYear?currentMonth:12;
             const monthRows=[];
-            // Always render all 12 months. A month without a saved payment row is Pending.
-            for(let month=12;month>=1;month--){
+            for(let month=endMonth;month>=startMonth;month--){
                 const key=`${yearNumber}-${String(month).padStart(2,'0')}`;
                 const row=rowsByMonth.get(key)||null;
                 const status=row?historyStatus(row):'Pending';
