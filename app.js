@@ -3963,6 +3963,12 @@ async function adminMonthlySecurityPage(user){
           <div class="muted">Manage monthly security payments for all society members.</div>
         </div>
         <div class="monthly-security-actions">
+          <label class="monthly-security-export-filter">Export year
+            <select id="monthlySecurityExportYear" aria-label="Export year"></select>
+          </label>
+          <label class="monthly-security-export-filter">Export month
+            <select id="monthlySecurityExportMonth" aria-label="Export month"></select>
+          </label>
           <button class="primary-btn" type="button" id="monthlySecurityExport">Export Excel</button>
         </div>
       </div>
@@ -4000,6 +4006,22 @@ async function adminMonthlySecurityPage(user){
         sel.insertAdjacentHTML('beforeend',`<option value="${v}">${monthlySecurityMonthLabel(v)}</option>`);
     }
     sel.value=month;
+
+    const exportYear=document.getElementById('monthlySecurityExportYear');
+    const exportMonth=document.getElementById('monthlySecurityExportMonth');
+    const exportNow=new Date();
+    for(let y=exportNow.getFullYear();y>=Math.min(exportNow.getFullYear()-10,2020);y--){
+        exportYear.insertAdjacentHTML('beforeend',`<option value="${y}">${y}</option>`);
+    }
+    for(let m=1;m<=12;m++){
+        const value=String(m).padStart(2,'0');
+        const monthValue=`${exportNow.getFullYear()}-${value}`;
+        exportMonth.insertAdjacentHTML('beforeend',`<option value="${value}">${new Date(exportNow.getFullYear(),m-1,1).toLocaleDateString('en-IN',{month:'long'})}</option>`);
+    }
+    exportYear.value=String(exportNow.getFullYear());
+    exportMonth.value=String(exportNow.getMonth()+1).padStart(2,'0');
+    const syncExportMonth=()=>{ if(exportYear.value===String(exportNow.getFullYear())) exportMonth.value=String(exportNow.getMonth()+1).padStart(2,'0'); };
+    exportYear.addEventListener('change',()=>{ if(exportYear.value===String(new Date().getFullYear())) exportMonth.value=String(new Date().getMonth()+1).padStart(2,'0'); });
 
     let state=null;
     async function loadAndRender(){
@@ -4224,8 +4246,7 @@ async function showMonthlySecurityHistory(userId,userName){
         const raw = String(row?.payment_status ?? row?.status ?? '').trim();
         if (['paid','completed','complete','done','success','successful','received'].includes(raw.toLowerCase())) return 'Completed';
         if (!raw) return 'Pending';
-        const normalized=raw.replace(/[_-]+/g,' ').replace(/\b\w/g, c => c.toUpperCase());
-        return ['Pending','Not Paid','Unpaid','Incomplete','Failed','Rejected','Cancelled','Canceled'].includes(normalized) ? normalized : normalized;
+        return raw.replace(/[_-]+/g,' ').replace(/\b\w/g, c => c.toUpperCase());
     };
     if(!sb) return toast('Supabase is not configured.');
     document.getElementById('monthlySecurityHistoryModal')?.remove();
@@ -4242,7 +4263,7 @@ async function showMonthlySecurityHistory(userId,userName){
         <div class="monthly-security-history-toolbar">
           <div class="monthly-security-history-subtitle">Monthly Security payment history</div>
           <label class="monthly-security-history-year-label" for="monthlySecurityHistoryYear">Year
-            <select id="monthlySecurityHistoryYear" class="monthly-security-history-year" aria-label="Select history year"></select>
+            <select id="monthlySecurityHistoryYear" class="monthly-security-history-year"></select>
           </label>
         </div>
         <div id="monthlySecurityHistoryBody" class="monthly-security-history-body">Loading history...</div>
@@ -4255,53 +4276,39 @@ async function showMonthlySecurityHistory(userId,userName){
     document.addEventListener('keydown',onKey);
 
     try{
-        const [{data,error},{data:profile, error:profileError}]=await Promise.all([
-            sb.from('monthly_security_payments')
-                .select('id,payment_month,amount,payment_status,created_at,updated_at')
-                .eq('user_id',userId)
-                .order('payment_month',{ascending:false})
-                .limit(1200),
-            sb.from('profiles').select('created_at').eq('id',userId).maybeSingle()
-        ]);
+        const {data,error}=await sb.from('monthly_security_payments')
+            .select('id,payment_month,amount,payment_status,created_at,updated_at')
+            .eq('user_id',userId)
+            .order('payment_month',{ascending:false})
+            .limit(1200);
         if(error) throw error;
-        // Registration date controls the first month shown. If unavailable,
-        // use the earliest saved payment month so history never invents earlier months.
-        let registrationDate = !profileError && profile?.created_at ? new Date(profile.created_at) : null;
-        if(registrationDate && Number.isNaN(registrationDate.getTime())) registrationDate=null;
         const rows=Array.isArray(data)?data:[];
         const rowsByMonth=new Map();
+        const yearSet=new Set([new Date().getFullYear()]);
         rows.forEach(row=>{
             const key=historyMonthKey(row);
             if(!key) return;
+            const year=Number(key.slice(0,4));
+            if(Number.isInteger(year)) yearSet.add(year);
+            // If duplicate records exist for a month, prefer the most recently updated row.
             const previous=rowsByMonth.get(key);
             if(!previous || new Date(row.updated_at||row.created_at||0) > new Date(previous.updated_at||previous.created_at||0)) rowsByMonth.set(key,row);
         });
-        const currentDate=new Date();
-        const currentYear=currentDate.getFullYear();
-        const currentMonth=currentDate.getMonth()+1;
-        if(!registrationDate){
-            const earliestKey=[...rowsByMonth.keys()].sort()[0];
-            if(earliestKey){
-                const [y,m]=earliestKey.split('-').map(Number);
-                registrationDate=new Date(y,m-1,1);
-            }else{
-                // No registration timestamp and no payments: show only the current month.
-                registrationDate=new Date(currentYear,currentMonth-1,1);
-            }
-        }
-        const firstYear=Math.min(registrationDate.getFullYear(),currentYear);
+        const recordedYears=[...yearSet].filter(Number.isInteger);
+        const currentYear=new Date().getFullYear();
+        const firstYear=Math.min(currentYear,...recordedYears);
+        const lastYear=Math.max(currentYear,...recordedYears);
         const years=[];
-        for(let year=currentYear;year>=firstYear;year--) years.push(year);
+        for(let year=lastYear;year>=firstYear;year--) years.push(year);
         const yearSelect=modal.querySelector('#monthlySecurityHistoryYear');
         yearSelect.innerHTML=years.map(year=>`<option value="${year}">${year}</option>`).join('');
         yearSelect.value=String(currentYear);
         const body=modal.querySelector('#monthlySecurityHistoryBody');
         const renderYear=year=>{
             const yearNumber=Number(year);
-            const startMonth=yearNumber===registrationDate.getFullYear()?registrationDate.getMonth()+1:1;
-            const endMonth=yearNumber===currentYear?currentMonth:12;
             const monthRows=[];
-            for(let month=endMonth;month>=startMonth;month--){
+            // Always render all 12 months. A month without a saved payment row is Pending.
+            for(let month=12;month>=1;month--){
                 const key=`${yearNumber}-${String(month).padStart(2,'0')}`;
                 const row=rowsByMonth.get(key)||null;
                 const status=row?historyStatus(row):'Pending';
@@ -4326,12 +4333,12 @@ async function showMonthlySecurityHistory(userId,userName){
 }
 function adminExportMonthlySecurity(state,month){
     if(!state)return toast('Monthly Security data is not loaded.');
-    const rows=adminMonthlySecurityRows(state,month);
-    const total=rows.filter(x=>x.status==='Completed').reduce((sum,x)=>sum+x.amount,0);
+    const rows=adminMonthlySecurityRows(state,month).map(x=>({...x,exportAmount:x.status==='Completed'?monthlySecurityMoney(x.amount):0}));
+    const total=rows.reduce((sum,x)=>sum+x.exportAmount,0);
     const esc=v=>monthlySecurityEsc(v);
-    const body=rows.map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.email)}</td><td>${esc(x.address)}</td><td>${esc(x.phone)}</td><td>${x.amount.toFixed(2)}</td><td>${esc(x.status)}</td></tr>`).join('');
-    const html=`<html><head><meta charset="UTF-8"></head><body><h2>Monthly Security - ${esc(monthlySecurityMonthLabel(month))}</h2><table border="1"><tr><th>Name</th><th>Email</th><th>Address</th><th>Phone</th><th>Amount</th><th>Payment Status</th></tr>${body}<tr><td colspan="4"><strong>Amount Total</strong></td><td><strong>${total.toFixed(2)}</strong></td><td></td></tr></table></body></html>`;
-    const blob=new Blob([html],{type:'application/vnd.ms-excel'});
+    const body=rows.map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.email)}</td><td>${esc(x.address)}</td><td>${esc(x.phone)}</td><td>${x.exportAmount.toFixed(2)}</td><td>${esc(x.status)}</td></tr>`).join('');
+    const html=`<html><head><meta charset="UTF-8"></head><body><h2>Monthly Security - ${esc(monthlySecurityMonthLabel(month))}</h2><table border="1"><tr><th>Name</th><th>Email</th><th>Address</th><th>Phone</th><th>Amount</th><th>Payment Status</th></tr>${body}<tr><td colspan="4"><strong>Completed Amount Total</strong></td><td><strong>${total.toFixed(2)}</strong></td><td></td></tr></table></body></html>`;
+    const blob=new Blob([html],{type:'application/vnd.ms-excel;charset=utf-8'});
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');a.href=url;a.download=`Monthly-Security-${month}.xls`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
