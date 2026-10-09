@@ -1305,3 +1305,11 @@ label{color:var(--md-on-surface-variant)}
     justify-content:space-between !important;
   }
 }
+
+
+/* Monthly Security Excel export year/month filters */
+.monthly-security-actions{display:flex;align-items:flex-end;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+.monthly-security-export-filter{display:flex;flex-direction:column;gap:5px;margin:0;min-width:115px;color:#526366;font-size:11px;font-weight:700}
+.monthly-security-export-filter select{width:100%;min-height:40px;padding:8px 10px;border:1px solid #d8e2e2;border-radius:9px;background:#fff;color:#203236;font:inherit;font-size:13px}
+#monthlySecurityExport{white-space:nowrap;min-height:40px}
+@media(max-width:720px){.monthly-security-actions{display:grid;grid-template-columns:1fr 1fr;width:100%;align-items:end}.monthly-security-export-filter{min-width:0}.monthly-security-actions #monthlySecurityExport{grid-column:1/-1;width:100%}}
