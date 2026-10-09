@@ -1315,3 +1315,7 @@ label{color:var(--md-on-surface-variant)}
 @media(max-width:720px){.monthly-security-actions{display:grid;grid-template-columns:1fr 1fr;width:100%;align-items:end}.monthly-security-export-filter{min-width:0}.monthly-security-actions #monthlySecurityExport{grid-column:1/-1;width:100%}}
 
 /* Monthly Security history: registration-aware month/year display is rendered by app_v66.js. */
+
+/* Prevent exporting future Monthly Security sheets. */
+#monthlySecurityExport:disabled{opacity:.55;cursor:not-allowed}
+.monthly-security-export-filter select option:disabled{color:#9aa5a8}
