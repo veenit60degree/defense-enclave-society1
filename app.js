@@ -4010,7 +4010,7 @@ async function adminMonthlySecurityPage(user){
     const exportYear=document.getElementById('monthlySecurityExportYear');
     const exportMonth=document.getElementById('monthlySecurityExportMonth');
     const exportNow=new Date();
-    for(let y=exportNow.getFullYear();y>=Math.min(exportNow.getFullYear()-2,2020);y--){
+    for(let y=exportNow.getFullYear();y>=Math.min(exportNow.getFullYear()-10,2020);y--){
         exportYear.insertAdjacentHTML('beforeend',`<option value="${y}">${y}</option>`);
     }
     for(let m=1;m<=12;m++){
@@ -4272,55 +4272,54 @@ async function showMonthlySecurityHistory(userId,userName){
     const close=()=>{modal.remove();document.removeEventListener('keydown',onKey);};
     modal.querySelector('.monthly-security-history-close').onclick=close;
     modal.querySelector('[data-close-history="1"]').onclick=close;
-    const onKey=e=>{if(e.key==='Escape'){close();}};
+    const onKey=e=>{if(e.key==='Escape') close();};
     document.addEventListener('keydown',onKey);
-
     try{
-        const {data,error}=await sb.from('monthly_security_payments')
-            .select('id,payment_month,amount,payment_status,created_at,updated_at')
-            .eq('user_id',userId)
-            .order('payment_month',{ascending:false})
-            .limit(1200);
+        const [{data,error}, profileResult] = await Promise.all([
+            sb.from('monthly_security_payments').select('id,payment_month,amount,payment_status,created_at,updated_at').eq('user_id',userId).order('payment_month',{ascending:false}).limit(1200),
+            sb.from('profiles').select('created_at').eq('id',userId).maybeSingle()
+        ]);
         if(error) throw error;
+        // Registration month defines the first month the member can see. If profiles.created_at
+        // is not readable/available, use the earliest payment month as a safe fallback.
         const rows=Array.isArray(data)?data:[];
         const rowsByMonth=new Map();
-        const yearSet=new Set([new Date().getFullYear()]);
         rows.forEach(row=>{
-            const key=historyMonthKey(row);
-            if(!key) return;
-            const year=Number(key.slice(0,4));
-            if(Number.isInteger(year)) yearSet.add(year);
-            // If duplicate records exist for a month, prefer the most recently updated row.
+            const key=historyMonthKey(row); if(!key) return;
             const previous=rowsByMonth.get(key);
-            if(!previous || new Date(row.updated_at||row.created_at||0) > new Date(previous.updated_at||previous.created_at||0)) rowsByMonth.set(key,row);
+            if(!previous || new Date(row.updated_at||row.created_at||0)>new Date(previous.updated_at||previous.created_at||0)) rowsByMonth.set(key,row);
         });
-        const recordedYears=[...yearSet].filter(Number.isInteger);
-        const currentYear=new Date().getFullYear();
-        const firstYear=Math.min(currentYear,...recordedYears);
-        const lastYear=Math.max(currentYear,...recordedYears);
+        const now=new Date(), currentYear=now.getFullYear(), currentMonth=now.getMonth()+1;
+        let registrationKey='';
+        const createdAt=profileResult?.data?.created_at;
+        if(createdAt){
+            const d=new Date(createdAt);
+            if(!Number.isNaN(d.getTime())) registrationKey=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+        }
+        if(!registrationKey && rowsByMonth.size) registrationKey=[...rowsByMonth.keys()].sort()[0];
+        if(!registrationKey) registrationKey=`${currentYear}-${String(currentMonth).padStart(2,'0')}`;
+        const [registrationYear,registrationMonth]=registrationKey.split('-').map(Number);
+        const firstYear=Math.min(registrationYear,currentYear);
         const years=[];
-        for(let year=lastYear;year>=firstYear;year--) years.push(year);
+        for(let year=currentYear;year>=firstYear;year--) years.push(year);
         const yearSelect=modal.querySelector('#monthlySecurityHistoryYear');
         yearSelect.innerHTML=years.map(year=>`<option value="${year}">${year}</option>`).join('');
         yearSelect.value=String(currentYear);
         const body=modal.querySelector('#monthlySecurityHistoryBody');
         const renderYear=year=>{
-            const yearNumber=Number(year);
+            const y=Number(year);
+            const firstMonth=y===registrationYear?registrationMonth:1;
+            const lastMonth=y===currentYear?currentMonth:12;
             const monthRows=[];
-            // Always render all 12 months. A month without a saved payment row is Pending.
-            for(let month=12;month>=1;month--){
-                const key=`${yearNumber}-${String(month).padStart(2,'0')}`;
+            for(let month=lastMonth;month>=firstMonth;month--){
+                const key=`${y}-${String(month).padStart(2,'0')}`;
                 const row=rowsByMonth.get(key)||null;
                 const status=row?historyStatus(row):'Pending';
                 const completed=status==='Completed';
-                const amount=row ? `₹${historyMoney(row.amount).toLocaleString('en-IN')}` : '—';
+                const amount=row?`₹${historyMoney(row.amount).toLocaleString('en-IN')}`:'—';
                 const updated=row?.updated_at||row?.created_at;
                 const date=updated?new Date(updated).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'No payment recorded';
-                monthRows.push(`<div class="monthly-security-history-item ${completed?'history-paid':'history-pending'}">
-                  <div class="monthly-security-history-month"><strong>${historyEsc(historyMonthLabel(key))}</strong><span>${historyEsc(date)}</span></div>
-                  <div class="monthly-security-history-amount">${amount}</div>
-                  <span class="monthly-security-history-status">${historyEsc(status)}</span>
-                </div>`);
+                monthRows.push(`<div class="monthly-security-history-item ${completed?'history-paid':'history-pending'}"><div class="monthly-security-history-month"><strong>${historyEsc(historyMonthLabel(key))}</strong><span>${historyEsc(date)}</span></div><div class="monthly-security-history-amount">${amount}</div><span class="monthly-security-history-status">${historyEsc(status)}</span></div>`);
             }
             body.innerHTML=`<div class="monthly-security-history-list">${monthRows.join('')}</div>`;
         };
