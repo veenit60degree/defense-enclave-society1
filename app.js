@@ -5377,10 +5377,15 @@ async function ensureDynamicAboutFields() {
             console.error('Monthly Security History: button is missing data-user-id.', button);
             return;
         }
-        if (typeof window.showMonthlySecurityHistory !== 'function') {
-            console.error('Monthly Security History: showMonthlySecurityHistory is not available.');
-            return;
+        // Call the function in this script's lexical scope. It may be a global
+        // lexical declaration without being exposed as window.showMonthlySecurityHistory.
+        try {
+            const result = showMonthlySecurityHistory(userId, userName);
+            if (result && typeof result.catch === 'function') {
+                result.catch(error => console.error('Monthly Security History click failed:', error));
+            }
+        } catch (error) {
+            console.error('Monthly Security History click failed:', error);
         }
-        window.showMonthlySecurityHistory(userId, userName);
     }, true);
 })();
