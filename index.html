@@ -1163,6 +1163,14 @@ label{color:var(--md-on-surface-variant)}
 }
 </style>
 
+
+<style id="monthly-security-history-overlay-fix">
+/* Inline fallback: the deployed page may not load styles_v6.css. */
+#monthlySecurityHistoryModal.monthly-security-history-modal { position:fixed !important; inset:0 !important; z-index:2147483000 !important; display:flex !important; align-items:center !important; justify-content:center !important; padding:18px !important; box-sizing:border-box !important; width:auto !important; height:auto !important; overflow:auto !important; }
+#monthlySecurityHistoryModal .monthly-security-history-backdrop { position:absolute !important; inset:0 !important; z-index:0 !important; background:rgba(15,28,32,.55) !important; }
+#monthlySecurityHistoryModal .monthly-security-history-dialog { position:relative !important; z-index:1 !important; width:min(620px,100%) !important; max-height:82vh !important; overflow:auto !important; margin:auto !important; background:#fff !important; border-radius:18px !important; box-shadow:0 18px 55px rgba(0,0,0,.25) !important; display:flex !important; flex-direction:column !important; }
+@media(max-width:640px) { #monthlySecurityHistoryModal.monthly-security-history-modal { padding:10px !important; } #monthlySecurityHistoryModal .monthly-security-history-dialog { max-height:88vh !important; } }
+</style>
 </head><body>
 <div id="toast"></div>
 <header class="public-nav" id="login_btn_panel"><div class="inner"><div class="brand"><div class="brand-mark">DE</div><div><strong>Defense Enclave</strong><span>Society Portal</span></div></div><button class="public-nav-toggle" id="publicNavToggle" aria-label="Open menu" aria-expanded="false"><span></span><span></span><span></span></button><div class="public-nav-links" id="publicNavLinks"><a href="#home">Home</a><a href="#members">Members</a><a href="#work">Work</a><a href="#events">Events</a><a href="#gallery">Gallery</a><a href="#map">Map</a><a href="#about">About</a><button class="login-pill" id="openLogin">Member Login</button></div><div class="public-nav-backdrop" id="publicNavBackdrop"></div></div></header>
