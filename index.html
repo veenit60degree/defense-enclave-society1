@@ -5170,7 +5170,7 @@ async function adminMonthlySecurityPage(user){
     if(!sb)return toast('Supabase is not configured.');
     const month=window.__monthlySecurityMonth||monthlySecurityMonthValue();
     window.__monthlySecurityMonth=month;
-    c.innerHTML=`<div class="hero monthly-security-hero"><div><div class="eyebrow">ADMINISTRATION</div><h2>Monthly Security</h2><div class="muted">Check monthly security collection and payment status for every member.</div></div><div class="monthly-security-actions"><label class="monthly-security-export-filter">Export year<select id="monthlySecurityExportYear" aria-label="Export year"></select></label><label class="monthly-security-export-filter">Export month<select id="monthlySecurityExportMonth" aria-label="Export month"></select></label><button class="primary-btn" id="monthlySecurityExport">Export Excel</button></div></div>
+    c.innerHTML=`<div class="hero monthly-security-hero"><div><div class="eyebrow">ADMINISTRATION</div><h2>Monthly Security</h2><div class="muted">Check monthly security collection and payment status for every member.</div></div><div class="monthly-security-actions"><label class="monthly-security-export-filter">Export year<select id="" aria-label="Export year"></select></label><label class="monthly-security-export-filter">Export month<select id="monthlySecurityExportMonth" aria-label="Export month"></select></label><button class="primary-btn" id="monthlySecurityExport">Export Excel</button></div></div>
     <div class="panel monthly-security-toolbar"><div class="monthly-security-toolbar-grid"><label>Month<select id="monthlySecurityMonth"><option value="${month}">${monthlySecurityMonthLabel(month)}</option></select></label><label class="monthly-security-search-label">Search members<input id="monthlySecuritySearch" type="search" placeholder="Search name, email, phone or address"></label></div></div>
     <div id="monthlySecurityMessage" class="muted" style="padding:12px 0"></div>
     <div class="stats monthly-security-stats"><div class="stat"><div class="stat-head">Total Collection<span>₹</span></div><div class="value" id="monthlySecurityTotal">₹0</div><div class="trend" id="monthlySecurityMonthLabel">${monthlySecurityMonthLabel(month)}</div></div><div class="stat"><div class="stat-head">Paid Members<span>✓</span></div><div class="value" id="monthlySecurityPaid">0</div><div class="trend">Payment completed</div></div><div class="stat"><div class="stat-head">Pending Members<span>!</span></div><div class="value" id="monthlySecurityPending">0</div><div class="trend">Payment pending</div></div></div>
@@ -5182,7 +5182,7 @@ async function adminMonthlySecurityPage(user){
     const exportYear=document.getElementById('monthlySecurityExportYear');
     const exportMonth=document.getElementById('monthlySecurityExportMonth');
     const exportNow=new Date();
-    for(let y=exportNow.getFullYear();y>=Math.min(exportNow.getFullYear()-10,2020);y--){exportYear.insertAdjacentHTML('beforeend',`<option value="${y}">${y}</option>`);}
+    for(let y=exportNow.getFullYear();y>=Math.min(exportNow.getFullYear()-2,2020);y--){exportYear.insertAdjacentHTML('beforeend',`<option value="${y}">${y}</option>`);}
     for(let m=1;m<=12;m++){const mm=String(m).padStart(2,'0');exportMonth.insertAdjacentHTML('beforeend',`<option value="${mm}">${new Date(exportNow.getFullYear(),m-1,1).toLocaleDateString('en-IN',{month:'long'})}</option>`);}
     exportYear.value=String(exportNow.getFullYear());
     exportMonth.value=String(exportNow.getMonth()+1).padStart(2,'0');
