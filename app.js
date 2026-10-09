@@ -5464,3 +5464,53 @@ async function ensureDynamicAboutFields() {
         }
     }, true);
 })();
+
+
+/* Responsive keyboard support: keep focused fields visible when the mobile
+   software keyboard changes the visual viewport, especially in landscape. */
+(function setupResponsiveKeyboardHandling(){
+  if(window.__responsiveKeyboardHandlingReady)return;
+  window.__responsiveKeyboardHandlingReady=true;
+  const root=document.documentElement;
+  const updateViewportHeight=()=>{
+    const height=window.visualViewport?.height || window.innerHeight;
+    if(height>0)root.style.setProperty('--app-visual-height',`${Math.round(height)}px`);
+  };
+  updateViewportHeight();
+  window.addEventListener('resize',updateViewportHeight,{passive:true});
+  window.addEventListener('orientationchange',()=>setTimeout(updateViewportHeight,120),{passive:true});
+  window.visualViewport?.addEventListener('resize',updateViewportHeight,{passive:true});
+  document.addEventListener('focusin',event=>{
+    const field=event.target;
+    if(!(field instanceof HTMLElement) || !field.matches('input,textarea,select,[contenteditable="true"]'))return;
+    const smallScreen=window.matchMedia('(max-width: 900px)').matches;
+    if(!smallScreen)return;
+    window.setTimeout(()=>{
+      updateViewportHeight();
+      const modal=field.closest('.auth-card,.modal-card,.tour-card');
+      if(modal){
+        const fieldRect=field.getBoundingClientRect();
+        const viewHeight=window.visualViewport?.height || window.innerHeight;
+        if(fieldRect.bottom>viewHeight-12 || fieldRect.top<8){
+          field.scrollIntoView({block:'nearest',inline:'nearest',behavior:'auto'});
+        }
+        modal.scrollTop += Math.max(0,field.offsetTop+field.offsetHeight-modal.clientHeight+24);
+      }else if(window.matchMedia('(orientation: landscape)').matches){
+        field.scrollIntoView({block:'nearest',inline:'nearest',behavior:'auto'});
+      }
+    },180);
+  },true);
+  document.addEventListener('keydown',event=>{
+    if(event.key!=='Escape')return;
+    const nav=document.getElementById('publicNavLinks');
+    const toggle=document.getElementById('publicNavToggle');
+    if(nav?.classList.contains('open')){
+      nav.classList.remove('open');
+      document.getElementById('publicNavBackdrop')?.classList.remove('open');
+      toggle?.classList.remove('open');
+      toggle?.setAttribute('aria-expanded','false');
+      toggle?.setAttribute('aria-label','Open menu');
+      toggle?.focus();
+    }
+  });
+})();
